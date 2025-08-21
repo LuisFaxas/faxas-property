@@ -29,6 +29,8 @@ import {
   Menu
 } from 'lucide-react'
 import { useState } from 'react'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
 
 interface PageShellProps {
   children: React.ReactNode
@@ -58,13 +60,28 @@ const contractorNavItems = [
   { href: '/contractor/plans', label: 'Plans', icon: FileText },
 ]
 
-export function PageShell({ children, userRole = 'VIEWER', userName = 'User', userEmail = 'user@example.com' }: PageShellProps) {
+export function PageShell({ children, userRole: propUserRole, userName: propUserName, userEmail: propUserEmail }: PageShellProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, logout, userRole: authUserRole } = useAuth()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  // Use auth context values if available, otherwise use props
+  const userRole = authUserRole as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER' || propUserRole || 'VIEWER'
+  const userName = user?.displayName || propUserName || 'User'
+  const userEmail = user?.email || propUserEmail || 'user@example.com'
+
   const navItems = userRole === 'ADMIN' || userRole === 'STAFF' ? adminNavItems : contractorNavItems
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
 
   return (
     <div className="flex h-screen bg-graphite-900">
@@ -134,7 +151,7 @@ export function PageShell({ children, userRole = 'VIEWER', userName = 'User', us
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
               </DropdownMenuItem>

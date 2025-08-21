@@ -1,0 +1,63 @@
+import { headers } from 'next/headers';
+import { auth } from '@/lib/firebaseAdmin';
+import { prisma } from '@/lib/prisma';
+import { ApiError } from './response';
+import type { User, Role } from '@prisma/client';
+
+export type AuthenticatedUser = {
+  uid: string;
+  email: string;
+  role: Role;
+  user: User;
+};
+
+export async function requireAuth(): Promise<AuthenticatedUser> {
+  const headersList = await headers();
+  const authorization = headersList.get('authorization');
+  
+  if (!authorization?.startsWith('Bearer ')) {
+    throw new ApiError(401, 'Missing or invalid authorization header');
+  }
+  
+  const token = authorization.split('Bearer ')[1];
+  
+  try {
+    const decodedToken = await auth.verifyIdToken(token);
+    
+    const user = await prisma.user.findUnique({
+      where: { id: decodedToken.uid }
+    });
+    
+    if (!user) {
+      throw new ApiError(404, 'User not found');
+    }
+    
+    return {
+      uid: decodedToken.uid,
+      email: decodedToken.email || '',
+      role: user.role,
+      user
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(401, 'Invalid or expired token');
+  }
+}
+
+export async function requireRole(allowedRoles: Role[]): Promise<AuthenticatedUser> {
+  const authUser = await requireAuth();
+  
+  if (!allowedRoles.includes(authUser.role)) {
+    throw new ApiError(403, 'Insufficient permissions');
+  }
+  
+  return authUser;
+}
+
+export async function optionalAuth(): Promise<AuthenticatedUser | null> {
+  try {
+    return await requireAuth();
+  } catch {
+    return null;
+  }
+}
