@@ -1,0 +1,278 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  CONTRACTOR
+  VIEWER
+}
+
+enum ScheduleType {
+  CALL
+  MEETING
+  SITE_VISIT
+  WORK
+  EMAIL_FOLLOWUP
+}
+
+enum ScheduleStatus {
+  REQUESTED
+  PLANNED
+  DONE
+  CANCELED
+  RESCHEDULE_NEEDED
+}
+
+enum BudgetStatus {
+  BUDGETED
+  COMMITTED
+  PAID
+}
+
+enum ProcurementStatus {
+  QUOTED
+  ORDERED
+  DELIVERED
+  INSTALLED
+}
+
+enum InvoiceStatus {
+  RECEIVED
+  UNDER_REVIEW
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum Module {
+  TASKS
+  SCHEDULE
+  PLANS
+  UPLOADS
+  INVOICES
+  PROCUREMENT_READ
+  DOCS_READ
+}
+
+model User {
+  id        String   @id
+  email     String   @unique
+  role      Role
+  createdAt DateTime @default(now())
+  tasks     Task[]   @relation("AssignedTasks")
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  status    String
+  createdAt DateTime @default(now())
+
+  contacts    Contact[]
+  tasks       Task[]
+  schedule    ScheduleEvent[]
+  budgets     BudgetItem[]
+  procurement Procurement[]
+  plans       PlanFile[]
+  decisions   Decision[]
+  risks       Risk[]
+  meetings    Meeting[]
+  invoices    Invoice[]
+  access      UserModuleAccess[]
+}
+
+model Contact {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id])
+  name         String
+  company      String?
+  specialty    String?
+  category     String
+  referredById String?
+  status       String
+  emails       String[]
+  phones       String[]
+  notes        String?
+  userId       String?
+}
+
+model Task {
+  id                String    @id @default(cuid())
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id])
+  title             String
+  description       String?
+  status            String
+  dueDate           DateTime?
+  assignedToId      String?
+  assignedTo        User?     @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  relatedContactIds String[]
+  createdAt         DateTime  @default(now())
+
+  @@index([projectId, status, dueDate])
+}
+
+model ScheduleEvent {
+  id                String         @id @default(cuid())
+  projectId         String
+  project           Project        @relation(fields: [projectId], references: [id])
+  title             String
+  type              ScheduleType
+  start             DateTime
+  end               DateTime?
+  status            ScheduleStatus
+  googleEventId     String?
+  replied           Boolean        @default(false)
+  notes             String?
+  requesterUserId   String?
+  relatedContactIds String[]
+  createdAt         DateTime       @default(now())
+
+  @@index([projectId, start(sort: Desc)])
+}
+
+model BudgetItem {
+  id              String       @id @default(cuid())
+  projectId       String
+  project         Project      @relation(fields: [projectId], references: [id])
+  discipline      String
+  category        String
+  item            String
+  unit            String?
+  qty             Decimal      @default(0) @db.Decimal(12, 2)
+  estUnitCost     Decimal      @default(0) @db.Decimal(12, 2)
+  estTotal        Decimal      @default(0) @db.Decimal(12, 2)
+  committedTotal  Decimal      @default(0) @db.Decimal(12, 2)
+  paidToDate      Decimal      @default(0) @db.Decimal(12, 2)
+  vendorContactId String?
+  status          BudgetStatus
+  variance        Decimal      @default(0) @db.Decimal(6, 4)
+
+  @@index([projectId, discipline, status])
+}
+
+model Procurement {
+  id           String            @id @default(cuid())
+  projectId    String
+  project      Project           @relation(fields: [projectId], references: [id])
+  materialItem String
+  quantity     Decimal           @db.Decimal(12, 2)
+  discipline   String
+  phase        String
+  requiredBy   DateTime
+  leadTimeDays Int
+  supplierId   String?
+  orderStatus  ProcurementStatus
+  eta          DateTime?
+  notes        String?
+  budgetItemId String?
+
+  @@index([projectId, requiredBy, orderStatus])
+}
+
+model PlanFile {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id])
+  category      String
+  storagePath   String
+  version       String
+  dateIssued    DateTime
+  notes         String?
+  sharedWithIds String[]
+  createdAt     DateTime @default(now())
+}
+
+model Decision {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id])
+  topic          String
+  options        String[]
+  decision       String
+  date           DateTime
+  ownerUserId    String
+  rationale      String?
+  followUpNeeded Boolean  @default(false)
+}
+
+model Risk {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id])
+  description   String
+  category      String
+  probability   Decimal  @db.Decimal(6, 4)
+  impactCost    Decimal? @db.Decimal(12, 2)
+  impactDays    Int?
+  impactQuality Int?
+  score         Decimal  @db.Decimal(12, 4)
+  mitigation    String?
+  trigger       String?
+  status        String
+
+  @@index([projectId, status, score(sort: Desc)])
+}
+
+model Meeting {
+  id                    String    @id @default(cuid())
+  projectId             String
+  project               Project   @relation(fields: [projectId], references: [id])
+  date                  DateTime
+  participantContactIds String[]
+  type                  String
+  agenda                String?
+  notes                 String?
+  decisionIds           String[]
+  actionTaskIds         String[]
+  nextMeetingDate       DateTime?
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  projectId        String
+  project          Project       @relation(fields: [projectId], references: [id])
+  contractorUserId String
+  contactId        String
+  budgetItemId     String?
+  amount           Decimal       @db.Decimal(12, 2)
+  tax              Decimal?      @db.Decimal(12, 2)
+  status           InvoiceStatus
+  filePath         String
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  paidAt           DateTime?
+}
+
+model UserModuleAccess {
+  userId     String
+  projectId  String
+  module     Module
+  canView    Boolean @default(false)
+  canEdit    Boolean @default(false)
+  canUpload  Boolean @default(false)
+  canRequest Boolean @default(false)
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@id([userId, projectId, module])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  meta      Json
+  createdAt DateTime @default(now())
+}

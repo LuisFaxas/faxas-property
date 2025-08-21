@@ -1,26 +1,81 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 220 14% 96%;
+    --foreground: 220 9% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 9% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 9% 10%;
+    --primary: 220 9% 20%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 220 14% 90%;
+    --secondary-foreground: 220 9% 10%;
+    --muted: 220 14% 90%;
+    --muted-foreground: 220 9% 40%;
+    --accent: 165 70% 75%;
+    --accent-foreground: 220 9% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 13% 85%;
+    --input: 220 13% 85%;
+    --ring: 220 9% 20%;
+    --radius: 0.875rem;
+  }
+
+  .dark {
+    --background: 220 15% 7%;
+    --foreground: 210 40% 98%;
+    --card: 220 15% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 15% 9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 165 70% 75%;
+    --primary-foreground: 220 15% 7%;
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 220 15% 15%;
+    --muted-foreground: 220 10% 54%;
+    --accent: 165 70% 75%;
+    --accent-foreground: 220 15% 7%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 15% 15%;
+    --input: 220 15% 15%;
+    --ring: 165 70% 75%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply dark;
+  }
+}
+
+@layer components {
+  .glass {
+    background: rgba(20, 22, 27, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 14px;
+  }
+  
+  .glass-card {
+    @apply glass p-6;
+  }
+  
+  .glass-hover {
+    @apply transition-all duration-200 hover:shadow-xl hover:backdrop-blur-lg;
+  }
 }
