@@ -15,19 +15,16 @@ export async function GET(request: NextRequest) {
     tomorrow.setDate(tomorrow.getDate() + 1);
     
     const where: any = {
-      startTime: {
+      start: {
         gte: today,
         lt: tomorrow
       },
       ...(projectId && { projectId })
     };
     
-    // Contractors can only see their own requested events or approved events
+    // Contractors can only see events for their projects with proper status
     if (authUser.role === 'CONTRACTOR') {
-      where.OR = [
-        { requestedById: authUser.uid },
-        { status: 'APPROVED' }
-      ];
+      where.status = { in: ['PLANNED', 'DONE'] };
     }
     
     const events = await prisma.scheduleEvent.findMany({
@@ -39,16 +36,10 @@ export async function GET(request: NextRequest) {
             name: true
           }
         },
-        requestedBy: {
-          select: {
-            id: true,
-            email: true,
-            name: true
-          }
-        }
+        // Remove requestedBy as it doesn't exist in schema
       },
       orderBy: {
-        startTime: 'asc'
+        start: 'asc'
       }
     });
     
@@ -56,7 +47,7 @@ export async function GET(request: NextRequest) {
     const formattedEvents = events.map(event => ({
       id: event.id,
       title: event.title,
-      time: new Date(event.startTime).toLocaleTimeString('en-US', {
+      time: new Date(event.start).toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
@@ -64,8 +55,7 @@ export async function GET(request: NextRequest) {
       type: event.type,
       status: event.status,
       location: event.location,
-      attendees: event.attendees,
-      requestedBy: event.requestedBy
+      relatedContactIds: event.relatedContactIds
     }));
     
     return successResponse(formattedEvents);

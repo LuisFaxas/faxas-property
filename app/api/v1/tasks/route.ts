@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
     const where: Prisma.TaskWhereInput = {
       projectId: query.projectId,
       ...(query.status && { status: query.status }),
-      ...(query.priority && { priority: query.priority }),
       ...(query.assignedToId && { assignedToId: query.assignedToId }),
       ...(query.search && {
         OR: [
@@ -37,8 +36,7 @@ export async function GET(request: NextRequest) {
           assignedTo: {
             select: {
               id: true,
-              email: true,
-              name: true
+              email: true
             }
           },
           project: {
@@ -47,19 +45,11 @@ export async function GET(request: NextRequest) {
               name: true
             }
           },
-          relatedContacts: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
         },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
         orderBy: [
           { dueDate: 'asc' },
-          { priority: 'desc' },
           { createdAt: 'desc' }
         ]
       }),
@@ -88,33 +78,22 @@ export async function POST(request: NextRequest) {
         title: data.title,
         description: data.description,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-        priority: data.priority,
-        status: data.status,
+        status: data.status || 'TODO',
         assignedToId: data.assignedToId,
         projectId: data.projectId,
-        relatedContacts: data.relatedContactIds ? {
-          connect: data.relatedContactIds.map(id => ({ id }))
-        } : undefined
+        relatedContactIds: data.relatedContactIds || []
       },
       include: {
         assignedTo: {
           select: {
             id: true,
-            email: true,
-            name: true
+            email: true
           }
         },
         project: {
           select: {
             id: true,
             name: true
-          }
-        },
-        relatedContacts: {
-          select: {
-            id: true,
-            name: true,
-            email: true
           }
         }
       }
@@ -125,9 +104,9 @@ export async function POST(request: NextRequest) {
       data: {
         userId: authUser.uid,
         action: 'CREATE',
-        entityType: 'TASK',
+        entity: 'TASK',
         entityId: task.id,
-        metadata: {
+        meta: {
           title: task.title,
           assignedTo: task.assignedToId
         }

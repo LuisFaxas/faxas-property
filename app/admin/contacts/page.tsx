@@ -1,0 +1,762 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { PageShell } from '@/components/blocks/page-shell';
+import { DataTable } from '@/components/ui/data-table';
+import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useAuth } from '@/app/contexts/AuthContext';
+import { useContacts, useCreateContact } from '@/hooks/use-api';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { ColumnDef } from '@tanstack/react-table';
+import { 
+  Plus, 
+  MoreHorizontal, 
+  Edit, 
+  Trash, 
+  Phone,
+  Mail,
+  Building,
+  User,
+  UserPlus,
+  Download
+} from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import apiClient from '@/lib/api-client';
+
+// Form schema
+const contactFormSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  company: z.string().optional(),
+  category: z.enum(['SUBCONTRACTOR', 'SUPPLIER', 'CONSULTANT', 'INSPECTOR', 'CLIENT', 'OTHER']),
+  type: z.enum(['INDIVIDUAL', 'COMPANY']),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'POTENTIAL', 'BLACKLISTED', 'FOLLOW_UP']),
+  notes: z.string().optional(),
+  projectId: z.string(),
+});
+
+type ContactFormValues = z.infer<typeof contactFormSchema>;
+
+// Category badge component
+function CategoryBadge({ category }: { category: string }) {
+  const colors: Record<string, string> = {
+    SUBCONTRACTOR: 'bg-blue-500/20 text-blue-500',
+    SUPPLIER: 'bg-green-500/20 text-green-500',
+    CONSULTANT: 'bg-purple-500/20 text-purple-500',
+    INSPECTOR: 'bg-orange-500/20 text-orange-500',
+    CLIENT: 'bg-yellow-500/20 text-yellow-500',
+    OTHER: 'bg-gray-500/20 text-gray-500',
+  };
+
+  return (
+    <Badge className={colors[category] || colors.OTHER}>
+      {category}
+    </Badge>
+  );
+}
+
+// Status badge component
+function StatusBadge({ status }: { status: string }) {
+  const variants: Record<string, any> = {
+    ACTIVE: 'default',
+    INACTIVE: 'secondary',
+    POTENTIAL: 'outline',
+    BLACKLISTED: 'destructive',
+    FOLLOW_UP: 'default',
+  };
+
+  return (
+    <Badge variant={variants[status] || 'secondary'}>
+      {status.replace('_', ' ')}
+    </Badge>
+  );
+}
+
+export default function AdminContactsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [isReady, setIsReady] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<any>(null);
+  
+  // Get default project ID
+  const [projectId, setProjectId] = useState<string>('');
+
+  // Wait for auth
+  useEffect(() => {
+    if (!authLoading && user) {
+      setTimeout(() => setIsReady(true), 500);
+    }
+  }, [authLoading, user]);
+
+  // Fetch data
+  const { data: contactsData, isLoading: contactsLoading, refetch } = useContacts(
+    { projectId, limit: 100 },
+    isReady
+  );
+  
+  // Mutations
+  const createMutation = useCreateContact();
+
+  // Form
+  const form = useForm<ContactFormValues>({
+    resolver: zodResolver(contactFormSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      category: 'SUBCONTRACTOR',
+      type: 'INDIVIDUAL',
+      status: 'ACTIVE',
+      notes: '',
+      projectId: projectId || 'default',
+    },
+  });
+
+  // Columns definition
+  const columns: ColumnDef<any>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'name',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Name" />
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          {row.original.type === 'COMPANY' ? (
+            <Building className="h-4 w-4 text-white/40" />
+          ) : (
+            <User className="h-4 w-4 text-white/40" />
+          )}
+          <div>
+            <p className="font-medium">{row.getValue('name')}</p>
+            {row.original.company && (
+              <p className="text-sm text-white/60">{row.original.company}</p>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'email',
+      header: 'Contact Info',
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          {row.original.email && (
+            <div className="flex items-center gap-1 text-sm">
+              <Mail className="h-3 w-3 text-white/40" />
+              <span className="text-white/80">{row.original.email}</span>
+            </div>
+          )}
+          {row.original.phone && (
+            <div className="flex items-center gap-1 text-sm">
+              <Phone className="h-3 w-3 text-white/40" />
+              <span className="text-white/80">{row.original.phone}</span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'category',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Category" />
+      ),
+      cell: ({ row }) => <CategoryBadge category={row.getValue('category')} />,
+      filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id));
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Status" />
+      ),
+      cell: ({ row }) => <StatusBadge status={row.getValue('status')} />,
+    },
+    {
+      accessorKey: 'tasks',
+      header: 'Related Tasks',
+      cell: ({ row }) => {
+        const tasks = row.original.tasks || [];
+        return (
+          <span className="text-sm">
+            {tasks.length > 0 ? `${tasks.length} tasks` : 'No tasks'}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'lastContactDate',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Last Contact" />
+      ),
+      cell: ({ row }) => {
+        const date = row.getValue('lastContactDate');
+        if (!date) return <span className="text-white/40">Never</span>;
+        
+        const lastContact = new Date(date as string);
+        const daysAgo = Math.floor((Date.now() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysAgo === 0) return 'Today';
+        if (daysAgo === 1) return 'Yesterday';
+        if (daysAgo < 7) return `${daysAgo} days ago`;
+        if (daysAgo < 30) return `${Math.floor(daysAgo / 7)} weeks ago`;
+        return `${Math.floor(daysAgo / 30)} months ago`;
+      },
+    },
+    {
+      id: 'actions',
+      enableHiding: false,
+      cell: ({ row }) => {
+        const contact = row.original;
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleEdit(contact)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleInvite(contact)}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Invite as Contractor
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => handleDelete(contact)}
+                className="text-red-500"
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
+  // Handlers
+  const handleCreate = async (values: ContactFormValues) => {
+    try {
+      await createMutation.mutateAsync({
+        ...values,
+        projectId: projectId || 'default',
+      });
+      setIsCreateOpen(false);
+      form.reset();
+      refetch();
+    } catch (error) {
+      console.error('Error creating contact:', error);
+    }
+  };
+
+  const handleEdit = (contact: any) => {
+    setSelectedContact(contact);
+    form.reset({
+      name: contact.name,
+      email: contact.email || '',
+      phone: contact.phone || '',
+      company: contact.company || '',
+      category: contact.category,
+      type: contact.type,
+      status: contact.status,
+      notes: contact.notes || '',
+      projectId: contact.projectId,
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleUpdate = async (values: ContactFormValues) => {
+    if (!selectedContact) return;
+    
+    try {
+      await apiClient.put(`/contacts/${selectedContact.id}`, values);
+      toast({
+        title: 'Success',
+        description: 'Contact updated successfully',
+      });
+      setIsEditOpen(false);
+      setSelectedContact(null);
+      form.reset();
+      refetch();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update contact',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDelete = (contact: any) => {
+    setSelectedContact(contact);
+    setIsDeleteOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedContact) return;
+    
+    try {
+      await apiClient.delete(`/contacts/${selectedContact.id}`);
+      toast({
+        title: 'Success',
+        description: 'Contact deleted successfully',
+      });
+      setIsDeleteOpen(false);
+      setSelectedContact(null);
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to delete contact',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleInvite = (contact: any) => {
+    toast({
+      title: 'Invite Contractor',
+      description: `Invitation feature coming soon for ${contact.name}`,
+    });
+  };
+
+  const handleExport = () => {
+    // Implement CSV export
+    const contacts = contactsData?.data || [];
+    const csv = [
+      ['Name', 'Email', 'Phone', 'Company', 'Category', 'Status'],
+      ...contacts.map((c: any) => [
+        c.name,
+        c.email || '',
+        c.phone || '',
+        c.company || '',
+        c.category,
+        c.status,
+      ]),
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'contacts.csv';
+    a.click();
+    
+    toast({
+      title: 'Success',
+      description: 'Contacts exported successfully',
+    });
+  };
+
+  // Loading state
+  if (contactsLoading || !isReady) {
+    return (
+      <PageShell 
+        userRole={user?.role || 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+      >
+        <div className="p-6 space-y-6">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </PageShell>
+    );
+  }
+
+  const contacts = contactsData?.data || [];
+
+  return (
+    <PageShell 
+      userRole={user?.role || 'VIEWER'} 
+      userName={user?.displayName || 'User'} 
+      userEmail={user?.email || ''}
+    >
+      <div className="p-6 space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Contacts Management</h1>
+            <p className="text-white/60 mt-1">Manage project contacts and contractors</p>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={handleExport}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+            <Button 
+              className="bg-accent-500 hover:bg-accent-600"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Contact
+            </Button>
+          </div>
+        </div>
+
+        {/* Data Table */}
+        <div className="glass-card p-6">
+          <DataTable
+            columns={columns}
+            data={contacts}
+            searchKey="name"
+            searchPlaceholder="Search contacts..."
+          />
+        </div>
+
+        {/* Create Dialog */}
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogContent className="sm:max-w-[525px] bg-graphite-800 border-white/10">
+            <DialogHeader>
+              <DialogTitle className="text-white">Create New Contact</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Add a new contact to the project. Click save when you're done.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Name *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Contact name" 
+                            className="bg-white/5 border-white/10 text-white"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="company"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Company</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Company name"
+                            className="bg-white/5 border-white/10 text-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Email</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="email"
+                            placeholder="email@example.com"
+                            className="bg-white/5 border-white/10 text-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Phone</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="(555) 123-4567"
+                            className="bg-white/5 border-white/10 text-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="INDIVIDUAL">Individual</SelectItem>
+                            <SelectItem value="COMPANY">Company</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="SUBCONTRACTOR">Subcontractor</SelectItem>
+                            <SelectItem value="SUPPLIER">Supplier</SelectItem>
+                            <SelectItem value="CONSULTANT">Consultant</SelectItem>
+                            <SelectItem value="INSPECTOR">Inspector</SelectItem>
+                            <SelectItem value="CLIENT">Client</SelectItem>
+                            <SelectItem value="OTHER">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="ACTIVE">Active</SelectItem>
+                            <SelectItem value="INACTIVE">Inactive</SelectItem>
+                            <SelectItem value="POTENTIAL">Potential</SelectItem>
+                            <SelectItem value="BLACKLISTED">Blacklisted</SelectItem>
+                            <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Notes</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Additional notes..."
+                          className="bg-white/5 border-white/10 text-white resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="bg-accent-500 hover:bg-accent-600">
+                    Create Contact
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Dialog - Similar to Create */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="sm:max-w-[525px] bg-graphite-800 border-white/10">
+            <DialogHeader>
+              <DialogTitle className="text-white">Edit Contact</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Make changes to the contact. Click save when you're done.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+                {/* Same form fields as Create */}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Name *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Contact name" 
+                            className="bg-white/5 border-white/10 text-white"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="company"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Company</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Company name"
+                            className="bg-white/5 border-white/10 text-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="bg-accent-500 hover:bg-accent-600">
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation */}
+        <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+          <AlertDialogContent className="bg-graphite-800 border-white/10">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription className="text-white/60">
+                This action cannot be undone. This will permanently delete the contact
+                "{selectedContact?.name}".
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-white/10">Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmDelete}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </PageShell>
+  );
+}

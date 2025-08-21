@@ -88,6 +88,14 @@ export function useUpdateTaskStatus() {
 }
 
 // Budget API hooks
+export function useBudget(query?: any, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['budget', query],
+    queryFn: () => apiClient.get('/budget', { params: query }),
+    enabled
+  });
+}
+
 export function useBudgetSummary(projectId?: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ['budget', 'summary', projectId],
@@ -105,6 +113,23 @@ export function useBudgetExceptions(projectId?: string, enabled: boolean = true)
 }
 
 // Schedule API hooks
+export function useSchedule(query?: any, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['schedule', query],
+    queryFn: () => apiClient.get('/schedule', { params: query }),
+    enabled
+  });
+}
+
+export function useTodaysSchedule(projectId?: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['schedule', 'today', projectId],
+    queryFn: () => apiClient.get('/schedule/today', { params: { projectId } }),
+    refetchInterval: 60000, // Refresh every minute
+    enabled
+  });
+}
+
 export function useTodaySchedule(projectId?: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ['schedule', 'today', projectId],

@@ -26,13 +26,13 @@ export async function PATCH(
       throw new ApiError(400, 'Only requested events can be approved or rejected');
     }
     
-    const newStatus = data.approved ? 'APPROVED' : 'CANCELLED';
+    const newStatus = data.approved ? 'PLANNED' : 'CANCELED';
     
     const event = await prisma.scheduleEvent.update({
       where: { id: params.id },
       data: {
         status: newStatus,
-        approvalNotes: data.notes
+        notes: data.notes
       },
       include: {
         project: {
@@ -41,13 +41,7 @@ export async function PATCH(
             name: true
           }
         },
-        requestedBy: {
-          select: {
-            id: true,
-            email: true,
-            name: true
-          }
-        }
+        // Remove requestedBy as it doesn't exist in schema
       }
     });
     
@@ -56,9 +50,9 @@ export async function PATCH(
       data: {
         userId: authUser.uid,
         action: data.approved ? 'APPROVE' : 'REJECT',
-        entityType: 'SCHEDULE_EVENT',
+        entity: 'SCHEDULE_EVENT',
         entityId: event.id,
-        metadata: {
+        meta: {
           from: existingEvent.status,
           to: newStatus,
           notes: data.notes

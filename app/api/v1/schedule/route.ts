@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       projectId: query.projectId,
       ...(query.type && { type: query.type }),
       ...(query.status && { status: query.status }),
-      ...(query.requestedById && { requestedById: query.requestedById })
+      // Remove requestedById filter as field doesn't exist
     };
     
     // Date filtering
@@ -24,26 +24,23 @@ export async function GET(request: NextRequest) {
       const date = new Date(query.date);
       const nextDay = new Date(date);
       nextDay.setDate(nextDay.getDate() + 1);
-      where.startTime = {
+      where.start = {
         gte: date,
         lt: nextDay
       };
     } else if (query.startDate || query.endDate) {
-      where.startTime = {};
+      where.start = {};
       if (query.startDate) {
-        where.startTime.gte = new Date(query.startDate);
+        where.start.gte = new Date(query.startDate);
       }
       if (query.endDate) {
-        where.startTime.lte = new Date(query.endDate);
+        where.start.lte = new Date(query.endDate);
       }
     }
     
-    // Contractors can only see their own requested events or approved events
+    // Contractors can only see events for their projects with proper status
     if (authUser.role === 'CONTRACTOR') {
-      where.OR = [
-        { requestedById: authUser.uid },
-        { status: 'APPROVED' }
-      ];
+      where.status = { in: ['PLANNED', 'DONE'] };
     }
     
     const [events, total] = await Promise.all([
@@ -56,18 +53,12 @@ export async function GET(request: NextRequest) {
               name: true
             }
           },
-          requestedBy: {
-            select: {
-              id: true,
-              email: true,
-              name: true
-            }
-          }
+          // Remove requestedBy as it doesn't exist in schema
         },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
         orderBy: {
-          startTime: 'asc'
+          start: 'asc'
         }
       }),
       prisma.scheduleEvent.count({ where })
@@ -93,21 +84,19 @@ export async function POST(request: NextRequest) {
     // Contractors can only create REQUESTED events
     if (authUser.role === 'CONTRACTOR') {
       data.status = 'REQUESTED';
-      data.requestedById = authUser.uid;
     }
     
     const event = await prisma.scheduleEvent.create({
       data: {
         title: data.title,
-        description: data.description,
-        startTime: new Date(data.startTime),
-        endTime: new Date(data.endTime),
+        start: new Date(data.startTime),
+        end: data.endTime ? new Date(data.endTime) : undefined,
         type: data.type,
-        status: data.status,
-        location: data.location,
-        attendees: data.attendees || [],
+        status: data.status || 'REQUESTED',
+        notes: data.description,
+        relatedContactIds: data.attendees || [],
         projectId: data.projectId,
-        requestedById: data.requestedById || authUser.uid
+        requesterUserId: authUser.uid
       },
       include: {
         project: {
@@ -116,13 +105,7 @@ export async function POST(request: NextRequest) {
             name: true
           }
         },
-        requestedBy: {
-          select: {
-            id: true,
-            email: true,
-            name: true
-          }
-        }
+        // Remove requestedBy as it doesn't exist in schema
       }
     });
     
@@ -131,9 +114,9 @@ export async function POST(request: NextRequest) {
       data: {
         userId: authUser.uid,
         action: 'CREATE',
-        entityType: 'SCHEDULE_EVENT',
+        entity: 'SCHEDULE_EVENT',
         entityId: event.id,
-        metadata: {
+        meta: {
           title: event.title,
           type: event.type,
           status: event.status

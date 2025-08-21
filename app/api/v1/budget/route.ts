@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
       ...(query.category && { category: query.category }),
       ...(query.status && { status: query.status }),
       ...(query.overBudgetOnly && {
-        actualAmount: {
-          gt: prisma.budgetItem.fields.budgetAmount
+        paidToDate: {
+          gt: prisma.budgetItem.fields.estTotal
         }
       })
     };
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         take: query.limit,
         orderBy: [
           { category: 'asc' },
-          { name: 'asc' }
+          { item: 'asc' }
         ]
       }),
       prisma.budgetItem.count({ where })
@@ -47,9 +47,11 @@ export async function GET(request: NextRequest) {
     // Calculate variance for each item
     const itemsWithVariance = items.map(item => ({
       ...item,
-      variance: item.actualAmount - item.budgetAmount,
-      variancePercent: item.budgetAmount > 0 
-        ? ((item.actualAmount - item.budgetAmount) / item.budgetAmount) * 100
+      budgetAmount: Number(item.estTotal),
+      actualSpent: Number(item.paidToDate),
+      variance: Number(item.paidToDate) - Number(item.estTotal),
+      variancePercent: Number(item.estTotal) > 0 
+        ? ((Number(item.paidToDate) - Number(item.estTotal)) / Number(item.estTotal)) * 100
         : 0
     }));
     
@@ -72,13 +74,13 @@ export async function POST(request: NextRequest) {
     
     const budgetItem = await prisma.budgetItem.create({
       data: {
-        name: data.name,
-        category: data.category,
-        budgetAmount: data.budgetAmount,
-        committedAmount: data.committedAmount,
-        actualAmount: data.actualAmount,
-        status: data.status,
-        notes: data.notes,
+        item: data.item || 'New Item',
+        discipline: data.category || 'GENERAL',
+        category: data.category || 'GENERAL',
+        estTotal: data.budgetAmount || 0,
+        committedTotal: data.committedAmount || 0,
+        paidToDate: data.actualSpent || 0,
+        status: data.status || 'NEW',
         projectId: data.projectId
       },
       include: {
@@ -96,12 +98,12 @@ export async function POST(request: NextRequest) {
       data: {
         userId: authUser.uid,
         action: 'CREATE',
-        entityType: 'BUDGET_ITEM',
+        entity: 'BUDGET_ITEM',
         entityId: budgetItem.id,
-        metadata: {
-          name: budgetItem.name,
+        meta: {
+          item: budgetItem.item,
           category: budgetItem.category,
-          amount: budgetItem.budgetAmount
+          amount: budgetItem.estTotal
         }
       }
     });
