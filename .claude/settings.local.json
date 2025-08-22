@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(cat:*)",
+      "Bash(npx create-next-app:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(ls:*)",
+      "Bash(npm run:*)",
+      "Bash(timeout:*)",
+      "Bash(npx ts-node:*)",
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__list_directory",
+      "mcp__filesystem__read_text_file",
+      "mcp__filesystem__search_files",
+      "mcp__filesystem__list_allowed_directories",
+      "Bash(find:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c:*)",
+      "Bash(powershell:*)",
+      "Bash(git commit:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(tail:*)",
+      "Bash(npx tsc:*)",
+      "WebSearch",
+      "Bash(curl:*)",
+      "Bash(curl:*)",
+      "Bash(PORT=3001 npm run dev)",
+      "Bash(set PORT=3001)",
+      "mcp__brave-search__brave_web_search",
+      "Bash(git rm:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\"
+    ]
+  }
+}
