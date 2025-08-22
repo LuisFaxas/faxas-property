@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Define enums locally since Prisma enums might not be available at build time
 export const ScheduleType = z.enum(['MEETING', 'SITE_VISIT', 'INSPECTION', 'DELIVERY', 'WORK', 'OTHER']);
-export const ScheduleStatus = z.enum(['PLANNED', 'APPROVED', 'REQUESTED', 'COMPLETED', 'CANCELLED']);
+export const ScheduleStatus = z.enum(['REQUESTED', 'PLANNED', 'DONE', 'CANCELED', 'RESCHEDULE_NEEDED']);
 
 export const createScheduleEventSchema = z.object({
   title: z.string().min(1).max(200),

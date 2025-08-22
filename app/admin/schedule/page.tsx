@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import apiClient from '@/lib/api-client';
 import { Plus, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +42,8 @@ import { PageShell } from '@/components/blocks/page-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { useSchedule, useTodaysSchedule } from '@/hooks/use-api';
+import { useSchedule, useTodaysSchedule, useProjects } from '@/hooks/use-api';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -61,7 +63,8 @@ const getDefaultTime = (hoursOffset = 1) => {
 
 const combineDateAndTime = (date: string, time: string) => {
   if (!date || !time) return '';
-  return `${date}T${time}`;
+  // Add Z for UTC timezone to match API datetime format
+  return `${date}T${time}:00.000Z`;
 };
 
 const splitDateTime = (datetime: string) => {
@@ -73,6 +76,8 @@ const splitDateTime = (datetime: string) => {
 
 export default function AdminSchedulePage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isReady = !!user;
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -85,17 +90,18 @@ export default function AdminSchedulePage() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    eventType: 'WORK',
+    type: 'WORK',
     startDate: getDefaultDate(),
     startTime: getDefaultTime(1),
     endDate: getDefaultDate(),
     endTime: getDefaultTime(2),
     location: '',
     attendees: '',
-    status: 'SCHEDULED',
+    status: 'PLANNED',
     requestedBy: '',
     approvedBy: '',
-    notes: ''
+    notes: '',
+    projectId: ''
   });
 
   // Computed values for API calls
@@ -105,6 +111,15 @@ export default function AdminSchedulePage() {
   // Fetch schedule data
   const { data: scheduleEvents, isLoading, refetch } = useSchedule();
   const { data: todaysEvents } = useTodaysSchedule();
+  const { data: projectsData } = useProjects(isReady);
+  
+  // Set default projectId when projects are loaded
+  useEffect(() => {
+    if (projectsData && Array.isArray(projectsData) && projectsData.length > 0 && !formData.projectId) {
+      const defaultProjectId = projectsData[0].id;
+      setFormData(prev => ({ ...prev, projectId: defaultProjectId }));
+    }
+  }, [projectsData, formData.projectId]);
 
   // Filter events based on active tab
   const filteredEvents = useMemo(() => {
@@ -151,27 +166,17 @@ export default function AdminSchedulePage() {
 
   const handleCreate = async () => {
     try {
-      const response = await fetch('/api/v1/schedule', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          eventType: formData.eventType,
-          startTime: startDateTime,
-          endTime: endDateTime,
-          location: formData.location,
-          attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
-          status: formData.status,
-          requestedBy: formData.requestedBy,
-          approvedBy: formData.approvedBy,
-          notes: formData.notes
-        }),
+      await apiClient.post('/schedule', {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        location: formData.location,
+        attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
+        status: formData.status,
+        projectId: formData.projectId
       });
-
-      if (!response.ok) throw new Error('Failed to create event');
 
       toast({
         title: 'Success',
@@ -194,27 +199,17 @@ export default function AdminSchedulePage() {
     if (!selectedEvent) return;
 
     try {
-      const response = await fetch(`/api/v1/schedule/${selectedEvent.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          eventType: formData.eventType,
-          startTime: startDateTime,
-          endTime: endDateTime,
-          location: formData.location,
-          attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
-          status: formData.status,
-          requestedBy: formData.requestedBy,
-          approvedBy: formData.approvedBy,
-          notes: formData.notes
-        }),
+      await apiClient.put(`/schedule/${selectedEvent.id}`, {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        location: formData.location,
+        attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
+        status: formData.status,
+        projectId: formData.projectId
       });
-
-      if (!response.ok) throw new Error('Failed to update event');
 
       toast({
         title: 'Success',
@@ -238,11 +233,7 @@ export default function AdminSchedulePage() {
     if (!selectedEvent) return;
 
     try {
-      const response = await fetch(`/api/v1/schedule/${selectedEvent.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete event');
+      await apiClient.delete(`/schedule/${selectedEvent.id}`);
 
       toast({
         title: 'Success',
@@ -311,32 +302,41 @@ export default function AdminSchedulePage() {
     setFormData({
       title: '',
       description: '',
-      eventType: 'WORK',
-      startTime: getDefaultDateTime(1),
-      endTime: getDefaultDateTime(2),
+      type: 'WORK',
+      startDate: getDefaultDate(),
+      startTime: getDefaultTime(1),
+      endDate: getDefaultDate(),
+      endTime: getDefaultTime(2),
       location: '',
       attendees: '',
-      status: 'SCHEDULED',
+      status: 'PLANNED',
       requestedBy: '',
       approvedBy: '',
-      notes: ''
+      notes: '',
+      projectId: projectsData && Array.isArray(projectsData) && projectsData.length > 0 ? projectsData[0].id : ''
     });
   };
 
   const openEditDialog = (event: any) => {
     setSelectedEvent(event);
+    const startDateTime = event.start || event.startTime ? splitDateTime((event.start || event.startTime)) : { date: getDefaultDate(), time: getDefaultTime(1) };
+    const endDateTime = event.end || event.endTime ? splitDateTime((event.end || event.endTime)) : { date: getDefaultDate(), time: getDefaultTime(2) };
+    
     setFormData({
       title: event.title,
-      description: event.description || '',
-      eventType: event.eventType,
-      startTime: event.startTime ? new Date(event.startTime).toISOString().slice(0, 16) : getDefaultDateTime(1),
-      endTime: event.endTime ? new Date(event.endTime).toISOString().slice(0, 16) : getDefaultDateTime(2),
+      description: event.description || event.notes || '',
+      type: event.type || event.eventType || 'WORK',
+      startDate: startDateTime.date,
+      startTime: startDateTime.time,
+      endDate: endDateTime.date,
+      endTime: endDateTime.time,
       location: event.location || '',
-      attendees: event.attendees?.join(', ') || '',
-      status: event.status,
+      attendees: event.attendees?.join ? event.attendees.join(', ') : (event.relatedContactIds?.join ? event.relatedContactIds.join(', ') : ''),
+      status: event.status || 'PLANNED',
       requestedBy: event.requestedBy || '',
       approvedBy: event.approvedBy || '',
-      notes: event.notes || ''
+      notes: event.notes || '',
+      projectId: event.projectId || (projectsData && Array.isArray(projectsData) && projectsData.length > 0 ? projectsData[0].id : '')
     });
     setIsEditOpen(true);
   };
@@ -376,12 +376,12 @@ export default function AdminSchedulePage() {
       ),
     },
     {
-      accessorKey: 'eventType',
+      accessorKey: 'type',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Type" />
       ),
       cell: ({ row }) => {
-        const type = row.getValue<string>('eventType');
+        const type = row.getValue<string>('type');
         return (
           <Badge
             variant={
@@ -397,21 +397,39 @@ export default function AdminSchedulePage() {
       },
     },
     {
-      accessorKey: 'startTime',
+      accessorKey: 'start',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Date & Time" />
       ),
       cell: ({ row }) => {
-        const start = new Date(row.getValue('startTime'));
-        const end = new Date(row.original.endTime);
-        return (
-          <div>
-            <div className="font-medium">{format(start, 'MMM dd, yyyy')}</div>
-            <div className="text-sm text-white/60">
-              {format(start, 'h:mm a')} - {format(end, 'h:mm a')}
+        const startValue = row.getValue('start') || row.original.startTime;
+        const endValue = row.original.end || row.original.endTime;
+        
+        if (!startValue) {
+          return <div className="text-white/40">No date set</div>;
+        }
+        
+        try {
+          const start = new Date(startValue);
+          const end = endValue ? new Date(endValue) : null;
+          
+          // Check if dates are valid
+          if (isNaN(start.getTime())) {
+            return <div className="text-white/40">Invalid date</div>;
+          }
+          
+          return (
+            <div>
+              <div className="font-medium">{format(start, 'MMM dd, yyyy')}</div>
+              <div className="text-sm text-white/60">
+                {format(start, 'h:mm a')}
+                {end && !isNaN(end.getTime()) && ` - ${format(end, 'h:mm a')}`}
+              </div>
             </div>
-          </div>
-        );
+          );
+        } catch (error) {
+          return <div className="text-white/40">Invalid date</div>;
+        }
       },
     },
     {
@@ -447,10 +465,11 @@ export default function AdminSchedulePage() {
         return (
           <Badge
             variant={
-              status === 'APPROVED' ? 'default' :
-              status === 'SCHEDULED' ? 'secondary' :
-              status === 'COMPLETED' ? 'outline' :
-              status === 'CANCELLED' ? 'destructive' :
+              status === 'PLANNED' ? 'default' :
+              status === 'REQUESTED' ? 'secondary' :
+              status === 'DONE' ? 'outline' :
+              status === 'CANCELED' ? 'destructive' :
+              status === 'RESCHEDULE_NEEDED' ? 'destructive' :
               'destructive'
             }
           >
@@ -558,8 +577,8 @@ export default function AdminSchedulePage() {
                   <div className="space-y-2">
                     <Label>Event Type</Label>
                     <Select
-                      value={formData.eventType}
-                      onValueChange={(value) => setFormData({ ...formData, eventType: value })}
+                      value={formData.type}
+                      onValueChange={(value) => setFormData({ ...formData, type: value })}
                     >
                       <SelectTrigger className="bg-white/5 border-white/10">
                         <SelectValue />
@@ -650,10 +669,11 @@ export default function AdminSchedulePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="PENDING">Pending Approval</SelectItem>
-                        <SelectItem value="APPROVED">Approved</SelectItem>
-                        <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-                        <SelectItem value="COMPLETED">Completed</SelectItem>
-                        <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                        <SelectItem value="REQUESTED">Requested</SelectItem>
+                        <SelectItem value="PLANNED">Planned</SelectItem>
+                        <SelectItem value="DONE">Done</SelectItem>
+                        <SelectItem value="CANCELED">Canceled</SelectItem>
+                        <SelectItem value="RESCHEDULE_NEEDED">Reschedule Needed</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -816,8 +836,8 @@ export default function AdminSchedulePage() {
                 <div className="space-y-2">
                   <Label>Event Type</Label>
                   <Select
-                    value={formData.eventType}
-                    onValueChange={(value) => setFormData({ ...formData, eventType: value })}
+                    value={formData.type}
+                    onValueChange={(value) => setFormData({ ...formData, type: value })}
                   >
                     <SelectTrigger className="bg-white/5 border-white/10">
                       <SelectValue />
@@ -906,10 +926,11 @@ export default function AdminSchedulePage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="PENDING">Pending Approval</SelectItem>
-                      <SelectItem value="APPROVED">Approved</SelectItem>
-                      <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-                      <SelectItem value="COMPLETED">Completed</SelectItem>
-                      <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                      <SelectItem value="REQUESTED">Requested</SelectItem>
+                      <SelectItem value="PLANNED">Planned</SelectItem>
+                      <SelectItem value="DONE">Done</SelectItem>
+                      <SelectItem value="CANCELED">Canceled</SelectItem>
+                      <SelectItem value="RESCHEDULE_NEEDED">Reschedule Needed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

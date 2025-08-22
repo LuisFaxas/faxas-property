@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
   try {
     const authUser = await requireAuth();
     const body = await request.json();
+    console.log('Schedule POST body:', body);
     const data = createScheduleEventSchema.parse(body);
     
     // Contractors can only create REQUESTED events
