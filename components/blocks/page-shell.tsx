@@ -31,6 +31,7 @@ import {
 import { useState } from 'react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import { ProjectSwitcher } from '@/components/blocks/project-switcher'
 
 interface PageShellProps {
   children: React.ReactNode
@@ -48,7 +49,7 @@ const adminNavItems = [
   { href: '/admin/procurement', label: 'Procurement', icon: Package },
   { href: '/admin/plans', label: 'Plans', icon: FileText },
   { href: '/admin/risks', label: 'Risks', icon: AlertTriangle },
-  { href: '/admin/access', label: 'Access Control', icon: Settings },
+  { href: '/admin/users', label: 'User Management', icon: Users },
 ]
 
 const contractorNavItems = [
@@ -149,7 +150,7 @@ export function PageShell({ children, userRole: propUserRole, userName: propUser
             <DropdownMenuContent align="end" className="w-56 glass-card">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
@@ -214,6 +215,21 @@ export function PageShell({ children, userRole: propUserRole, userName: propUser
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
+        {/* Desktop Header with Project Switcher */}
+        <div className="hidden md:flex items-center justify-between p-4 border-b border-white/10 glass">
+          <ProjectSwitcher />
+          <div className="flex items-center gap-4">
+            <span className="text-white/50 text-sm">
+              {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </span>
+          </div>
+        </div>
+        
         <div className="md:pt-0 pt-16">
           {children}
         </div>

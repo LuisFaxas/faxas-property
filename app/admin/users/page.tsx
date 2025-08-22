@@ -171,7 +171,7 @@ const moduleDescriptions = {
   reports: 'Generate and view reports'
 };
 
-export default function AdminAccessPage() {
+export default function UserManagementPage() {
   const { toast } = useToast();
   const [users, setUsers] = useState(mockUsers);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -583,12 +583,12 @@ export default function AdminAccessPage() {
 
   return (
     <PageShell>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">Access Control</h1>
-            <p className="text-white/60">Manage user roles and module permissions</p>
+            <h1 className="text-3xl font-bold text-white">User Management</h1>
+            <p className="text-white/60">Manage user accounts, roles, and permissions</p>
           </div>
           <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
             <DialogTrigger asChild>
