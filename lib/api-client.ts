@@ -49,7 +49,13 @@ apiClient.interceptors.request.use(async (config) => {
 
 // Handle responses
 apiClient.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    // If the response has a standard API structure with data property, extract it
+    if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+      return response.data.data || response.data;
+    }
+    return response.data;
+  },
   async (error) => {
     if (error.response?.status === 401) {
       // Try to refresh the token once before redirecting

@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         description: data.description,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
         status: data.status || 'TODO',
-        assignedToId: data.assignedToId,
+        assignedToId: data.assignedToId && data.assignedToId !== '' ? data.assignedToId : undefined,
         projectId: data.projectId,
         relatedContactIds: data.relatedContactIds || []
       },

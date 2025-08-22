@@ -18,23 +18,13 @@ export async function GET(
         assignedTo: {
           select: {
             id: true,
-            email: true,
-            name: true
+            email: true
           }
         },
         project: {
           select: {
             id: true,
             name: true
-          }
-        },
-        relatedContacts: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            company: true
           }
         }
       }
@@ -79,34 +69,22 @@ export async function PUT(
         title: data.title,
         description: data.description,
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-        priority: data.priority,
         status: data.status,
-        assignedToId: data.assignedToId,
+        assignedToId: data.assignedToId && data.assignedToId !== '' ? data.assignedToId : undefined,
         projectId: data.projectId,
-        relatedContacts: data.relatedContactIds ? {
-          set: [],
-          connect: data.relatedContactIds.map(id => ({ id }))
-        } : undefined
+        relatedContactIds: data.relatedContactIds || undefined
       },
       include: {
         assignedTo: {
           select: {
             id: true,
-            email: true,
-            name: true
+            email: true
           }
         },
         project: {
           select: {
             id: true,
             name: true
-          }
-        },
-        relatedContacts: {
-          select: {
-            id: true,
-            name: true,
-            email: true
           }
         }
       }
@@ -117,9 +95,9 @@ export async function PUT(
       data: {
         userId: authUser.uid,
         action: 'UPDATE',
-        entityType: 'TASK',
+        entity: 'TASK',
         entityId: task.id,
-        metadata: {
+        meta: {
           changes: {
             from: existingTask,
             to: task
@@ -159,9 +137,9 @@ export async function DELETE(
       data: {
         userId: authUser.uid,
         action: 'DELETE',
-        entityType: 'TASK',
+        entity: 'TASK',
         entityId: params.id,
-        metadata: {
+        meta: {
           deletedTask: task
         }
       }

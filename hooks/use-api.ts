@@ -2,6 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api-client';
 import { toast } from '@/hooks/use-toast';
 
+// Projects API hooks
+export function useProjects(enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['projects'],
+    queryFn: () => apiClient.get('/projects'),
+    enabled
+  });
+}
+
 // Tasks API hooks
 export function useTasks(query?: any, enabled: boolean = true) {
   return useQuery({

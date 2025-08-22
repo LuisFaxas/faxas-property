@@ -58,7 +58,8 @@ import {
   useCreateTask, 
   useUpdateTask, 
   useUpdateTaskStatus,
-  useContacts 
+  useContacts,
+  useProjects 
 } from '@/hooks/use-api';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -145,44 +146,52 @@ export default function AdminTasksPage() {
     }
   }, [authLoading, user]);
 
-  // Fetch data
-  const { data: tasksData, isLoading: tasksLoading, refetch } = useTasks(
-    { projectId, limit: 100 },
-    isReady
-  );
-  const { data: contactsData } = useContacts({ projectId }, isReady);
-  
-  // Mutations
-  const createMutation = useCreateTask();
-  const updateMutation = useUpdateTask();
-  const updateStatusMutation = useUpdateTaskStatus();
-
-  // Get default project on mount
-  useEffect(() => {
-    async function getDefaultProject() {
-      try {
-        const response = await apiClient.get('/budget/summary');
-        // This will trigger the query to get the default project
-      } catch (error) {
-        console.error('Error fetching default project:', error);
-      }
-    }
-    if (isReady) {
-      getDefaultProject();
-    }
-  }, [isReady]);
-
-  // Form
+  // Form - define before using in useEffect
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
       title: '',
       description: '',
+      dueDate: '',
       priority: 'MEDIUM',
       status: 'TODO',
-      projectId: projectId || 'default',
+      assignedToId: '',
+      projectId: projectId || '',
     },
   });
+
+  // Fetch projects first
+  const { data: projectsData } = useProjects(isReady);
+  
+  // Set default project when projects are loaded
+  useEffect(() => {
+    if (projectsData && Array.isArray(projectsData) && projectsData.length > 0 && !projectId) {
+      const defaultProjectId = projectsData[0].id;
+      setProjectId(defaultProjectId);
+      // Update form default value for projectId
+      form.setValue('projectId', defaultProjectId);
+    }
+  }, [projectsData, projectId, form]);
+
+  // Fetch data
+  const { data: tasksData, isLoading: tasksLoading, refetch } = useTasks(
+    { projectId, limit: 100 },
+    isReady && !!projectId
+  );
+  
+  // Log for debugging
+  useEffect(() => {
+    if (tasksData) {
+      console.log('Tasks fetched:', tasksData);
+      console.log('Current projectId:', projectId);
+    }
+  }, [tasksData, projectId]);
+  const { data: contactsData } = useContacts({ projectId }, isReady && !!projectId);
+  
+  // Mutations
+  const createMutation = useCreateTask();
+  const updateMutation = useUpdateTask();
+  const updateStatusMutation = useUpdateTaskStatus();
 
   // Columns definition
   const columns: ColumnDef<any>[] = [
@@ -320,13 +329,32 @@ export default function AdminTasksPage() {
   // Handlers
   const handleCreate = async (values: TaskFormValues) => {
     try {
-      await createMutation.mutateAsync({
+      // Ensure we have a valid projectId
+      const finalProjectId = projectId || values.projectId;
+      
+      if (!finalProjectId) {
+        toast({
+          title: 'Error',
+          description: 'No project selected. Please refresh the page.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Convert date to datetime format if present
+      const dataToSend = {
         ...values,
-        projectId: projectId || 'default',
-      });
+        dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : undefined,
+        projectId: finalProjectId,
+      };
+      const result = await createMutation.mutateAsync(dataToSend);
+      console.log('Task created:', result);
       setIsCreateOpen(false);
       form.reset();
-      refetch();
+      // Force refetch of tasks
+      setTimeout(() => {
+        refetch();
+      }, 500);
     } catch (error) {
       console.error('Error creating task:', error);
     }
@@ -337,7 +365,7 @@ export default function AdminTasksPage() {
     form.reset({
       title: task.title,
       description: task.description || '',
-      dueDate: task.dueDate ? format(new Date(task.dueDate), "yyyy-MM-dd'T'HH:mm") : '',
+      dueDate: task.dueDate ? format(new Date(task.dueDate), "yyyy-MM-dd") : '',
       priority: task.priority,
       status: task.status,
       assignedToId: task.assignedToId || '',
@@ -350,10 +378,13 @@ export default function AdminTasksPage() {
     if (!selectedTask) return;
     
     try {
-      await updateMutation.mutateAsync({
+      // Convert date to datetime format if present
+      const dataToSend = {
         id: selectedTask.id,
         ...values,
-      });
+        dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : undefined,
+      };
+      await updateMutation.mutateAsync(dataToSend);
       setIsEditOpen(false);
       setSelectedTask(null);
       form.reset();
@@ -422,7 +453,7 @@ export default function AdminTasksPage() {
     );
   }
 
-  const tasks = tasksData?.data || [];
+  const tasks = Array.isArray(tasksData) ? tasksData : [];
 
   return (
     <PageShell 
@@ -567,7 +598,7 @@ export default function AdminTasksPage() {
                       <FormLabel className="text-white">Due Date</FormLabel>
                       <FormControl>
                         <Input 
-                          type="datetime-local"
+                          type="date"
                           className="bg-white/5 border-white/10 text-white"
                           {...field}
                         />
@@ -690,7 +721,7 @@ export default function AdminTasksPage() {
                       <FormLabel className="text-white">Due Date</FormLabel>
                       <FormControl>
                         <Input 
-                          type="datetime-local"
+                          type="date"
                           className="bg-white/5 border-white/10 text-white"
                           {...field}
                         />

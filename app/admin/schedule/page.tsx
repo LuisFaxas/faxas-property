@@ -33,6 +33,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -44,6 +45,32 @@ import { useSchedule, useTodaysSchedule } from '@/hooks/use-api';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 
+// Helper functions for date and time handling
+const getDefaultDate = () => {
+  const now = new Date();
+  return now.toISOString().split('T')[0]; // YYYY-MM-DD
+};
+
+const getDefaultTime = (hoursOffset = 1) => {
+  const now = new Date();
+  now.setHours(now.getHours() + hoursOffset);
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`; // HH:mm
+};
+
+const combineDateAndTime = (date: string, time: string) => {
+  if (!date || !time) return '';
+  return `${date}T${time}`;
+};
+
+const splitDateTime = (datetime: string) => {
+  if (!datetime) return { date: getDefaultDate(), time: getDefaultTime() };
+  const [date, timeWithZ] = datetime.split('T');
+  const time = timeWithZ ? timeWithZ.substring(0, 5) : getDefaultTime();
+  return { date, time };
+};
+
 export default function AdminSchedulePage() {
   const { toast } = useToast();
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
@@ -54,13 +81,15 @@ export default function AdminSchedulePage() {
   const [activeTab, setActiveTab] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
 
-  // Form state
+  // Form state with separate date and time fields
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     eventType: 'WORK',
-    startTime: '',
-    endTime: '',
+    startDate: getDefaultDate(),
+    startTime: getDefaultTime(1),
+    endDate: getDefaultDate(),
+    endTime: getDefaultTime(2),
     location: '',
     attendees: '',
     status: 'SCHEDULED',
@@ -68,6 +97,10 @@ export default function AdminSchedulePage() {
     approvedBy: '',
     notes: ''
   });
+
+  // Computed values for API calls
+  const startDateTime = combineDateAndTime(formData.startDate, formData.startTime);
+  const endDateTime = combineDateAndTime(formData.endDate, formData.endTime);
 
   // Fetch schedule data
   const { data: scheduleEvents, isLoading, refetch } = useSchedule();
@@ -124,8 +157,17 @@ export default function AdminSchedulePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
+          title: formData.title,
+          description: formData.description,
+          eventType: formData.eventType,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          location: formData.location,
           attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
+          status: formData.status,
+          requestedBy: formData.requestedBy,
+          approvedBy: formData.approvedBy,
+          notes: formData.notes
         }),
       });
 
@@ -158,8 +200,17 @@ export default function AdminSchedulePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
+          title: formData.title,
+          description: formData.description,
+          eventType: formData.eventType,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          location: formData.location,
           attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
+          status: formData.status,
+          requestedBy: formData.requestedBy,
+          approvedBy: formData.approvedBy,
+          notes: formData.notes
         }),
       });
 
@@ -261,8 +312,8 @@ export default function AdminSchedulePage() {
       title: '',
       description: '',
       eventType: 'WORK',
-      startTime: '',
-      endTime: '',
+      startTime: getDefaultDateTime(1),
+      endTime: getDefaultDateTime(2),
       location: '',
       attendees: '',
       status: 'SCHEDULED',
@@ -278,8 +329,8 @@ export default function AdminSchedulePage() {
       title: event.title,
       description: event.description || '',
       eventType: event.eventType,
-      startTime: new Date(event.startTime).toISOString().slice(0, 16),
-      endTime: new Date(event.endTime).toISOString().slice(0, 16),
+      startTime: event.startTime ? new Date(event.startTime).toISOString().slice(0, 16) : getDefaultDateTime(1),
+      endTime: event.endTime ? new Date(event.endTime).toISOString().slice(0, 16) : getDefaultDateTime(2),
       location: event.location || '',
       attendees: event.attendees?.join(', ') || '',
       status: event.status,
@@ -457,9 +508,21 @@ export default function AdminSchedulePage() {
     },
   ];
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <PageShell>
+        <div className="p-6 space-y-6">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -487,8 +550,9 @@ export default function AdminSchedulePage() {
                     <Input
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="bg-white/5 border-white/10"
+                      className="bg-white/5 border-white/10 text-white"
                       placeholder="e.g., Site Inspection"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -519,24 +583,50 @@ export default function AdminSchedulePage() {
                     placeholder="Event details..."
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Start Time</Label>
-                    <Input
-                      type="datetime-local"
-                      value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                    />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <Input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="bg-white/5 border-white/10 text-white"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Start Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.startTime}
+                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                        className="bg-white/5 border-white/10 text-white"
+                        required
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>End Time</Label>
-                    <Input
-                      type="datetime-local"
-                      value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>End Date</Label>
+                      <Input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        className="bg-white/5 border-white/10 text-white"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.endTime}
+                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                        className="bg-white/5 border-white/10 text-white"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -573,7 +663,7 @@ export default function AdminSchedulePage() {
                   <Input
                     value={formData.attendees}
                     onChange={(e) => setFormData({ ...formData, attendees: e.target.value })}
-                    className="bg-white/5 border-white/10"
+                    className="bg-white/5 border-white/10 text-white"
                     placeholder="John Doe, Jane Smith"
                   />
                 </div>
@@ -719,7 +809,8 @@ export default function AdminSchedulePage() {
                   <Input
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="bg-white/5 border-white/10"
+                    className="bg-white/5 border-white/10 text-white"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -746,27 +837,53 @@ export default function AdminSchedulePage() {
                 <Textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="bg-white/5 border-white/10"
+                  className="bg-white/5 border-white/10 text-white"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Start Time</Label>
-                  <Input
-                    type="datetime-local"
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                  />
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <Input
+                      type="time"
+                      value={formData.startTime}
+                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      required
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>End Time</Label>
-                  <Input
-                    type="datetime-local"
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <Input
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <Input
+                      type="time"
+                      value={formData.endTime}
+                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -775,7 +892,7 @@ export default function AdminSchedulePage() {
                   <Input
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    className="bg-white/5 border-white/10"
+                    className="bg-white/5 border-white/10 text-white"
                   />
                 </div>
                 <div className="space-y-2">
@@ -802,7 +919,7 @@ export default function AdminSchedulePage() {
                 <Input
                   value={formData.attendees}
                   onChange={(e) => setFormData({ ...formData, attendees: e.target.value })}
-                  className="bg-white/5 border-white/10"
+                  className="bg-white/5 border-white/10 text-white"
                 />
               </div>
             </div>

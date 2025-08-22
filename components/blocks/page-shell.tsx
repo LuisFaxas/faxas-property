@@ -107,7 +107,9 @@ export function PageShell({ children, userRole: propUserRole, userName: propUser
         <nav className="flex-1 p-2 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            // Check exact match or if it's a sub-route (but not for dashboard which is a parent route)
+            const isActive = pathname === item.href || 
+              (item.href !== '/admin' && item.href !== '/contractor' && pathname.startsWith(item.href + '/'))
             
             return (
               <Link

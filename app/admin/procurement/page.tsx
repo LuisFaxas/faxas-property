@@ -33,6 +33,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -119,6 +120,7 @@ const mockProcurements = [
 
 export default function AdminProcurementPage() {
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
   const [procurements, setProcurements] = useState(mockProcurements);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -492,9 +494,21 @@ export default function AdminProcurementPage() {
     },
   ];
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <PageShell>
+        <div className="p-6 space-y-6">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
