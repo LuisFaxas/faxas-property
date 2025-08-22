@@ -387,11 +387,13 @@ export default function AdminSchedulePage() {
             variant={
               type === 'WORK' ? 'default' :
               type === 'MEETING' ? 'secondary' :
-              type === 'INSPECTION' ? 'outline' :
+              type === 'SITE_VISIT' ? 'outline' :
+              type === 'CALL' ? 'secondary' :
+              type === 'EMAIL_FOLLOWUP' ? 'outline' :
               'destructive'
             }
           >
-            {type}
+            {type.replace('_', ' ')}
           </Badge>
         );
       },
@@ -584,11 +586,11 @@ export default function AdminSchedulePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="WORK">Work</SelectItem>
+                        <SelectItem value="CALL">Call</SelectItem>
                         <SelectItem value="MEETING">Meeting</SelectItem>
-                        <SelectItem value="INSPECTION">Inspection</SelectItem>
-                        <SelectItem value="DELIVERY">Delivery</SelectItem>
-                        <SelectItem value="OTHER">Other</SelectItem>
+                        <SelectItem value="SITE_VISIT">Site Visit</SelectItem>
+                        <SelectItem value="WORK">Work</SelectItem>
+                        <SelectItem value="EMAIL_FOLLOWUP">Email Followup</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -843,11 +845,11 @@ export default function AdminSchedulePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="WORK">Work</SelectItem>
+                      <SelectItem value="CALL">Call</SelectItem>
                       <SelectItem value="MEETING">Meeting</SelectItem>
-                      <SelectItem value="INSPECTION">Inspection</SelectItem>
-                      <SelectItem value="DELIVERY">Delivery</SelectItem>
-                      <SelectItem value="OTHER">Other</SelectItem>
+                      <SelectItem value="SITE_VISIT">Site Visit</SelectItem>
+                      <SelectItem value="WORK">Work</SelectItem>
+                      <SelectItem value="EMAIL_FOLLOWUP">Email Followup</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

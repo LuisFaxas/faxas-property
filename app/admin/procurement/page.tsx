@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageShell } from '@/components/blocks/page-shell';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
   DialogContent,
@@ -49,8 +50,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -79,430 +84,402 @@ import {
   XCircle,
   AlertCircle,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Truck,
+  Calendar,
+  Filter,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  Upload,
+  RefreshCw,
+  BarChart3,
+  ShoppingCart,
+  Layers,
+  Tag,
+  Building2,
+  Users,
+  FileSpreadsheet,
+  Send,
+  Archive,
+  Star,
+  AlertTriangle,
+  Zap,
+  Target,
+  Activity,
+  CreditCard,
+  Receipt,
+  Banknote,
+  Paperclip,
+  Hash
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInDays, addDays } from 'date-fns';
 import apiClient from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import { createProcurementSchema } from '@/lib/validations/procurement';
 
-// Validation schemas
-const POStatus = z.enum(['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'ISSUED', 'RECEIVED', 'CLOSED', 'CANCELLED']);
-const PaymentTerms = z.enum(['NET_30', 'NET_60', 'NET_90', 'DUE_ON_RECEIPT', 'PREPAID', 'MILESTONE', 'CUSTOM']);
+// Common disciplines
+const DISCIPLINES = [
+  'General Conditions',
+  'Site Work',
+  'Concrete',
+  'Masonry',
+  'Metals',
+  'Wood & Plastics',
+  'Thermal & Moisture',
+  'Doors & Windows',
+  'Finishes',
+  'Mechanical',
+  'Electrical',
+  'Plumbing',
+  'HVAC',
+  'Fire Protection',
+  'Landscaping'
+];
 
-const purchaseOrderItemSchema = z.object({
-  description: z.string().min(1, 'Description is required'),
-  quantity: z.number().min(1, 'Quantity must be at least 1'),
-  unitPrice: z.number().min(0, 'Unit price must be positive'),
-  totalPrice: z.number().min(0),
-  budgetItemId: z.string().optional(),
-  notes: z.string().optional()
-});
+// Project phases
+const PHASES = [
+  'Pre-Construction',
+  'Foundation',
+  'Framing',
+  'Roofing',
+  'Exterior',
+  'MEP Rough-in',
+  'Insulation',
+  'Drywall',
+  'Flooring',
+  'Interior Finish',
+  'Landscaping',
+  'Final Inspection',
+  'Closeout'
+];
 
-const purchaseOrderSchema = z.object({
-  poNumber: z.string().optional(),
-  vendorId: z.string().min(1, 'Vendor is required'),
-  projectId: z.string().min(1, 'Project is required'),
-  budgetItemId: z.string().optional(),
-  description: z.string().min(1, 'Description is required'),
-  items: z.array(purchaseOrderItemSchema).min(1, 'At least one item is required'),
-  subtotal: z.number().min(0),
-  tax: z.number().min(0).default(0),
-  shipping: z.number().min(0).default(0),
-  totalAmount: z.number().min(0),
-  paymentTerms: PaymentTerms.default('NET_30'),
-  deliveryDate: z.string().optional(),
-  deliveryAddress: z.string().optional(),
-  notes: z.string().optional(),
-  status: POStatus.default('DRAFT')
-});
+// Common units
+const UNITS = [
+  'EA', 'PC', 'SET', 'BOX', 'CASE',
+  'SF', 'SY', 'LF', 'CF', 'CY',
+  'TON', 'LB', 'GAL', 'BAG',
+  'HOUR', 'DAY', 'WEEK', 'MONTH'
+];
 
-type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
+// Status configuration
+const STATUS_CONFIG = {
+  DRAFT: { label: 'Draft', color: 'bg-gray-500', icon: FileText },
+  QUOTED: { label: 'Quoted', color: 'bg-blue-500', icon: DollarSign },
+  APPROVED: { label: 'Approved', color: 'bg-green-500', icon: CheckCircle },
+  ORDERED: { label: 'Ordered', color: 'bg-purple-500', icon: ShoppingCart },
+  SHIPPED: { label: 'Shipped', color: 'bg-indigo-500', icon: Truck },
+  DELIVERED: { label: 'Delivered', color: 'bg-teal-500', icon: Package },
+  INSTALLED: { label: 'Installed', color: 'bg-emerald-500', icon: CheckCircle },
+  CANCELLED: { label: 'Cancelled', color: 'bg-red-500', icon: XCircle }
+};
 
-const invoiceSchema = z.object({
-  invoiceNumber: z.string().min(1, 'Invoice number is required'),
-  purchaseOrderId: z.string().min(1, 'Purchase order is required'),
-  vendorId: z.string().min(1, 'Vendor is required'),
-  projectId: z.string().min(1, 'Project is required'),
-  invoiceDate: z.string().min(1, 'Invoice date is required'),
-  dueDate: z.string().min(1, 'Due date is required'),
-  amount: z.number().min(0, 'Amount must be positive'),
-  notes: z.string().optional()
-});
-
-type InvoiceFormValues = z.infer<typeof invoiceSchema>;
-
-const paymentSchema = z.object({
-  invoiceId: z.string().min(1, 'Invoice is required'),
-  purchaseOrderId: z.string().min(1, 'Purchase order is required'),
-  amount: z.number().min(0.01, 'Amount must be greater than 0'),
-  paymentDate: z.string().min(1, 'Payment date is required'),
-  paymentMethod: z.enum(['CHECK', 'ACH', 'WIRE', 'CREDIT_CARD', 'CASH', 'OTHER']),
-  referenceNumber: z.string().optional(),
-  notes: z.string().optional()
-});
-
-type PaymentFormValues = z.infer<typeof paymentSchema>;
-
-// Status badge component
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, { variant: any; icon: any }> = {
-    DRAFT: { variant: 'secondary', icon: FileText },
-    PENDING: { variant: 'default', icon: Clock },
-    APPROVED: { variant: 'success', icon: CheckCircle },
-    REJECTED: { variant: 'destructive', icon: XCircle },
-    ISSUED: { variant: 'default', icon: Package },
-    RECEIVED: { variant: 'success', icon: CheckCircle },
-    CLOSED: { variant: 'secondary', icon: CheckCircle },
-    CANCELLED: { variant: 'destructive', icon: XCircle }
-  };
-
-  const config = variants[status] || { variant: 'default', icon: AlertCircle };
-  const Icon = config.icon;
-
-  return (
-    <Badge variant={config.variant} className="flex items-center gap-1">
-      <Icon className="h-3 w-3" />
-      {status}
-    </Badge>
-  );
-}
+// Priority configuration
+const PRIORITY_CONFIG = {
+  LOW: { label: 'Low', color: 'bg-slate-500', icon: ChevronDown },
+  MEDIUM: { label: 'Medium', color: 'bg-blue-500', icon: Target },
+  HIGH: { label: 'High', color: 'bg-orange-500', icon: AlertCircle },
+  URGENT: { label: 'Urgent', color: 'bg-red-500', icon: AlertTriangle },
+  CRITICAL: { label: 'Critical', color: 'bg-red-600', icon: Zap }
+};
 
 export default function ProcurementPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const isAuthenticated = !!user;
   const { toast } = useToast();
-  const isReady = !!user;
   
-  // State
-  const [activeTab, setActiveTab] = useState('orders');
-  const [selectedProject, setSelectedProject] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(true);
-  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
+  // State management
+  const [procurements, setProcurements] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterSupplier, setFilterSupplier] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('requiredBy');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
   
-  // Dialog states
-  const [isCreatePOOpen, setIsCreatePOOpen] = useState(false);
-  const [isEditPOOpen, setIsEditPOOpen] = useState(false);
-  const [isDeletePOOpen, setIsDeletePOOpen] = useState(false);
-  const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
-  const [isCreatePaymentOpen, setIsCreatePaymentOpen] = useState(false);
-  const [selectedPO, setSelectedPO] = useState<any>(null);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  // Form setup
+  const form = useForm({
+    resolver: zodResolver(createProcurementSchema),
+    defaultValues: {
+      projectId: '',
+      materialItem: '',
+      description: '',
+      quantity: 1,
+      unit: 'EA',
+      unitPrice: 0,
+      totalCost: 0,
+      discipline: '',
+      phase: '',
+      category: 'MATERIALS',
+      requiredBy: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
+      leadTimeDays: 7,
+      supplierId: '',
+      orderStatus: 'DRAFT',
+      priority: 'MEDIUM',
+      eta: '',
+      notes: '',
+      budgetItemId: '',
+      attachments: [],
+      tags: []
+    }
+  });
   
-  // Form state for PO items
-  const [poItems, setPOItems] = useState<any[]>([{
-    description: '',
-    quantity: 1,
-    unitPrice: 0,
-    totalPrice: 0,
-    notes: ''
-  }]);
-
-  // Use hooks for data fetching
-  const { data: projectsData } = useProjects(isReady);
-  const { data: contactsData } = useContacts({}, isReady);
-  const { data: budgetData } = useBudget({ 
-    projectId: selectedProject !== 'all' ? selectedProject : '' 
-  }, isReady);
-
-  const projects = Array.isArray(projectsData) ? projectsData : [];
-  // Filter contacts for vendors (Subcontractors and Suppliers can be vendors)
-  const vendors = Array.isArray(contactsData) ? contactsData.filter((c: any) => 
-    c.category === 'SUBCONTRACTOR' || c.category === 'SUPPLIER'
-  ) : [];
-  const budgetItems = Array.isArray(budgetData) ? budgetData : [];
-
-  // Forms
-  const poForm = useForm<PurchaseOrderFormValues>({
-    resolver: zodResolver(purchaseOrderSchema),
-    defaultValues: {
-      status: 'DRAFT',
-      paymentTerms: 'NET_30',
-      tax: 0,
-      shipping: 0,
-      items: [],
-      projectId: projects[0]?.id || ''
-    }
-  });
-
-  const invoiceForm = useForm<InvoiceFormValues>({
-    resolver: zodResolver(invoiceSchema),
-    defaultValues: {
-      invoiceDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    }
-  });
-
-  const paymentForm = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentSchema),
-    defaultValues: {
-      paymentDate: new Date().toISOString().split('T')[0],
-      paymentMethod: 'CHECK'
-    }
-  });
-
-  // Set default project when projects load
+  // Watch form fields for calculations
+  const watchQuantity = form.watch('quantity');
+  const watchUnitPrice = form.watch('unitPrice');
+  
   useEffect(() => {
-    if (projects.length > 0 && !poForm.getValues('projectId')) {
-      poForm.setValue('projectId', projects[0].id);
+    if (watchQuantity && watchUnitPrice) {
+      form.setValue('totalCost', watchQuantity * watchUnitPrice);
     }
-  }, [projects, poForm]);
-
+  }, [watchQuantity, watchUnitPrice, form]);
+  
+  // Fetch data hooks
+  const { data: projectsData } = useProjects(isAuthenticated);
+  const { data: contactsData } = useContacts(isAuthenticated);
+  const { data: budgetData } = useBudget({ projectId: selectedProject }, isAuthenticated && !!selectedProject);
+  
+  // Filter suppliers from contacts
+  const suppliers = useMemo(() => {
+    if (!contactsData || !Array.isArray(contactsData)) return [];
+    return contactsData.filter((c: any) => 
+      c.category === 'SUBCONTRACTOR' || c.category === 'SUPPLIER'
+    );
+  }, [contactsData]);
+  
   // Fetch procurement data
-  useEffect(() => {
-    if (isReady) {
-      fetchProcurementData();
-    }
-  }, [selectedProject, isReady]);
-
-  const fetchProcurementData = async () => {
+  const fetchProcurementData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const params = new URLSearchParams();
-      if (selectedProject && selectedProject !== 'all') {
-        params.append('projectId', selectedProject);
-      }
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: pageSize.toString(),
+        ...(selectedProject && selectedProject !== 'all' && { projectId: selectedProject }),
+        ...(searchQuery && { search: searchQuery }),
+        ...(filterStatus && filterStatus !== 'all' && { orderStatus: filterStatus }),
+        ...(filterPriority && filterPriority !== 'all' && { priority: filterPriority }),
+        ...(filterCategory && filterCategory !== 'all' && { category: filterCategory }),
+        ...(filterSupplier && filterSupplier !== 'all' && { supplierId: filterSupplier }),
+        ...(sortBy && { sortBy }),
+        ...(sortOrder && { sortOrder })
+      });
       
-      const [posRes, invoicesRes, paymentsRes, summaryRes] = await Promise.all([
-        apiClient.get(`/api/v1/procurement?${params}`),
-        apiClient.get(`/api/v1/procurement/invoices?${params}`),
-        apiClient.get(`/api/v1/procurement/payments?${params}`),
-        apiClient.get(`/api/v1/procurement/summary?${params}`)
+      const [procRes, summaryRes] = await Promise.all([
+        apiClient.get(`/procurement?${params}`).catch(err => {
+          console.error('Error fetching procurement:', err);
+          return { data: { data: [], meta: { total: 0 } } };
+        }),
+        apiClient.get(`/procurement/summary?${selectedProject && selectedProject !== 'all' ? `projectId=${selectedProject}` : ''}`).catch(err => {
+          console.error('Error fetching summary:', err);
+          return { data: { data: null } };
+        })
       ]);
       
-      setPurchaseOrders(posRes.data.data || []);
-      setInvoices(invoicesRes.data.data || []);
-      setPayments(paymentsRes.data.data || []);
-      setSummary(summaryRes.data.data);
-    } catch (error) {
-      console.error('Error fetching procurement data:', error);
+      setProcurements(procRes?.data?.data || []);
+      setTotalItems(procRes?.data?.meta?.total || 0);
+      setSummary(summaryRes?.data?.data);
+    } catch (error: any) {
+      console.error('Error fetching procurement data:', error.response?.data || error);
       toast({
         title: 'Error',
-        description: 'Failed to load procurement data',
+        description: error.response?.data?.error || 'Failed to load procurement data',
         variant: 'destructive'
       });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // PO Items management
-  const addPOItem = () => {
-    setPOItems([...poItems, {
-      description: '',
-      quantity: 1,
-      unitPrice: 0,
-      totalPrice: 0,
-      notes: ''
-    }]);
-  };
-
-  const removePOItem = (index: number) => {
-    if (poItems.length > 1) {
-      setPOItems(poItems.filter((_, i) => i !== index));
-    }
-  };
-
-  const updatePOItem = (index: number, field: string, value: any) => {
-    const updated = [...poItems];
-    updated[index][field] = value;
-    
-    // Auto-calculate total
-    if (field === 'quantity' || field === 'unitPrice') {
-      updated[index].totalPrice = updated[index].quantity * updated[index].unitPrice;
-    }
-    
-    setPOItems(updated);
-    
-    // Update form totals
-    const subtotal = updated.reduce((sum, item) => sum + item.totalPrice, 0);
-    const tax = poForm.getValues('tax') || 0;
-    const shipping = poForm.getValues('shipping') || 0;
-    poForm.setValue('subtotal', subtotal);
-    poForm.setValue('totalAmount', subtotal + tax + shipping);
-  };
-
-  // Auto-calculate PO totals
-  const watchTax = poForm.watch('tax');
-  const watchShipping = poForm.watch('shipping');
+  }, [selectedProject, searchQuery, filterStatus, filterPriority, filterCategory, filterSupplier, 
+      sortBy, sortOrder, currentPage, pageSize, toast]);
   
   useEffect(() => {
-    const subtotal = poItems.reduce((sum, item) => sum + item.totalPrice, 0);
-    const total = subtotal + (watchTax || 0) + (watchShipping || 0);
-    poForm.setValue('subtotal', subtotal);
-    poForm.setValue('totalAmount', total);
-  }, [watchTax, watchShipping, poItems, poForm]);
-
-  // CRUD Operations
-  const handleCreatePO = async (data: PurchaseOrderFormValues) => {
+    if (isAuthenticated) {
+      fetchProcurementData();
+    }
+  }, [isAuthenticated, fetchProcurementData]);
+  
+  // Set default project
+  useEffect(() => {
+    if (projectsData && Array.isArray(projectsData) && projectsData.length > 0 && !selectedProject) {
+      const defaultProjectId = projectsData[0].id;
+      setSelectedProject(defaultProjectId);
+      form.setValue('projectId', defaultProjectId);
+    }
+  }, [projectsData, selectedProject, form]);
+  
+  // Handle form submission - Add
+  const onSubmitAdd = async (values: any) => {
     try {
-      const formData = {
-        ...data,
-        items: poItems.filter(item => item.description),
-        subtotal: poItems.reduce((sum, item) => sum + item.totalPrice, 0)
+      // Clean up values - convert 'none' to null for optional fields
+      const cleanedValues = {
+        ...values,
+        supplierId: values.supplierId === 'none' ? null : values.supplierId,
+        budgetItemId: values.budgetItemId === 'none' ? null : values.budgetItemId
       };
-      
-      await apiClient.post('/api/v1/procurement', formData);
-      
+      await apiClient.post('/procurement', cleanedValues);
       toast({
         title: 'Success',
-        description: 'Purchase order created successfully'
+        description: 'Procurement item created successfully'
       });
-      
-      setIsCreatePOOpen(false);
-      poForm.reset();
-      setPOItems([{
-        description: '',
-        quantity: 1,
-        unitPrice: 0,
-        totalPrice: 0,
-        notes: ''
-      }]);
+      setShowAddDialog(false);
+      form.reset();
       fetchProcurementData();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create purchase order',
+        description: error.response?.data?.error || 'Failed to create procurement item',
         variant: 'destructive'
       });
     }
   };
-
-  const handleUpdatePO = async (data: PurchaseOrderFormValues) => {
-    if (!selectedPO) return;
+  
+  // Handle form submission - Edit
+  const onSubmitEdit = async (values: any) => {
+    if (!selectedItem) return;
     
     try {
-      await apiClient.put(`/api/v1/procurement/${selectedPO.id}`, data);
-      
+      // Clean up values - convert 'none' to null for optional fields
+      const cleanedValues = {
+        ...values,
+        supplierId: values.supplierId === 'none' ? null : values.supplierId,
+        budgetItemId: values.budgetItemId === 'none' ? null : values.budgetItemId
+      };
+      await apiClient.put(`/procurement/${selectedItem.id}`, cleanedValues);
       toast({
         title: 'Success',
-        description: 'Purchase order updated successfully'
+        description: 'Procurement item updated successfully'
       });
-      
-      setIsEditPOOpen(false);
+      setShowEditDialog(false);
+      setSelectedItem(null);
+      form.reset();
       fetchProcurementData();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to update purchase order',
+        description: error.response?.data?.error || 'Failed to update procurement item',
         variant: 'destructive'
       });
     }
   };
-
-  const handleDeletePO = async () => {
-    if (!selectedPO) return;
+  
+  // Handle delete
+  const handleDelete = async () => {
+    if (!selectedItem) return;
     
     try {
-      await apiClient.delete(`/api/v1/procurement/${selectedPO.id}`);
-      
+      await apiClient.delete(`/procurement/${selectedItem.id}`);
       toast({
         title: 'Success',
-        description: 'Purchase order deleted successfully'
+        description: 'Procurement item deleted successfully'
       });
-      
-      setIsDeletePOOpen(false);
-      setSelectedPO(null);
+      setShowDeleteDialog(false);
+      setSelectedItem(null);
       fetchProcurementData();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete purchase order',
+        description: error.response?.data?.error || 'Failed to delete procurement item',
         variant: 'destructive'
       });
     }
   };
-
-  const handlePOAction = async (id: string, action: 'approve' | 'reject' | 'cancel') => {
+  
+  // Handle status update
+  const handleStatusUpdate = async (id: string, newStatus: string, additionalData?: any) => {
     try {
-      await apiClient.patch(`/api/v1/procurement/${id}`, { action });
-      
+      await apiClient.patch(`/procurement/${id}`, {
+        status: newStatus,
+        ...additionalData
+      });
       toast({
         title: 'Success',
-        description: `Purchase order ${action}d successfully`
+        description: `Status updated to ${newStatus}`
       });
-      
       fetchProcurementData();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || `Failed to ${action} purchase order`,
+        description: error.response?.data?.error || 'Failed to update status',
         variant: 'destructive'
       });
     }
   };
-
-  const handleCreateInvoice = async (data: InvoiceFormValues) => {
-    try {
-      await apiClient.post('/api/v1/procurement/invoices', {
-        ...data,
-        status: 'PENDING',
-        paidAmount: 0
-      });
-      
+  
+  // Handle bulk operations
+  const handleBulkOperation = async (operation: string, data?: any) => {
+    if (selectedItems.length === 0) {
       toast({
-        title: 'Success',
-        description: 'Invoice created successfully'
-      });
-      
-      setIsCreateInvoiceOpen(false);
-      invoiceForm.reset();
-      fetchProcurementData();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.message || 'Failed to create invoice',
+        title: 'Warning',
+        description: 'Please select items first',
         variant: 'destructive'
       });
+      return;
     }
-  };
-
-  const handleCreatePayment = async (data: PaymentFormValues) => {
-    try {
-      await apiClient.post('/api/v1/procurement/payments', data);
-      
-      toast({
-        title: 'Success',
-        description: 'Payment recorded successfully'
-      });
-      
-      setIsCreatePaymentOpen(false);
-      paymentForm.reset();
-      fetchProcurementData();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.message || 'Failed to record payment',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  // Export to CSV
-  const exportToCSV = () => {
-    const csvContent = [
-      ['PO Number', 'Vendor', 'Project', 'Total Amount', 'Status', 'Created Date'],
-      ...purchaseOrders.map(po => [
-        po.poNumber,
-        po.vendor?.name || '',
-        po.project?.name || '',
-        po.totalAmount,
-        po.status,
-        new Date(po.createdAt).toLocaleDateString()
-      ])
-    ].map(row => row.join(',')).join('\n');
     
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `procurement-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    try {
+      await apiClient.post('/procurement/bulk', {
+        ids: selectedItems,
+        operation,
+        data
+      });
+      toast({
+        title: 'Success',
+        description: `Bulk ${operation} completed successfully`
+      });
+      setSelectedItems([]);
+      setShowBulkDialog(false);
+      fetchProcurementData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Bulk operation failed',
+        variant: 'destructive'
+      });
+    }
   };
-
-  // Table columns
-  const poColumns: ColumnDef<any>[] = [
+  
+  // Status badge component
+  const StatusBadge = ({ status }: { status: string }) => {
+    const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
+    const Icon = config?.icon || FileText;
+    
+    return (
+      <Badge className={cn('gap-1', config?.color)}>
+        <Icon className="h-3 w-3" />
+        {config?.label || status}
+      </Badge>
+    );
+  };
+  
+  // Priority badge component
+  const PriorityBadge = ({ priority }: { priority: string }) => {
+    const config = PRIORITY_CONFIG[priority as keyof typeof PRIORITY_CONFIG];
+    const Icon = config?.icon || Target;
+    
+    return (
+      <Badge variant="outline" className={cn('gap-1 border-0', config?.color, 'bg-opacity-20')}>
+        <Icon className="h-3 w-3" />
+        {config?.label || priority}
+      </Badge>
+    );
+  };
+  
+  // Table columns definition
+  const columns: ColumnDef<any>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -525,61 +502,142 @@ export default function ProcurementPage() {
     {
       accessorKey: 'poNumber',
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="PO Number" />
+        <DataTableColumnHeader column={column} title="PO #" />
       ),
       cell: ({ row }) => (
-        <span className="font-medium">{row.getValue('poNumber')}</span>
+        <div className="flex items-center gap-2">
+          <Hash className="h-3 w-3 text-muted-foreground" />
+          <span className="font-mono text-sm">
+            {row.original.poNumber || 'N/A'}
+          </span>
+        </div>
       )
     },
     {
-      accessorKey: 'vendor',
+      accessorKey: 'materialItem',
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Vendor" />
-      ),
-      cell: ({ row }) => row.original.vendor?.name || '-'
-    },
-    {
-      accessorKey: 'description',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Description" />
+        <DataTableColumnHeader column={column} title="Item" />
       ),
       cell: ({ row }) => (
-        <span className="max-w-[200px] truncate" title={row.getValue('description')}>
-          {row.getValue('description')}
-        </span>
+        <div className="max-w-[300px]">
+          <div className="font-medium truncate">{row.original.materialItem}</div>
+          {row.original.description && (
+            <div className="text-sm text-muted-foreground truncate">
+              {row.original.description}
+            </div>
+          )}
+          <div className="flex gap-2 mt-1">
+            <Badge variant="outline" className="text-xs">
+              {row.original.discipline}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {row.original.phase}
+            </Badge>
+          </div>
+        </div>
       )
     },
     {
-      accessorKey: 'totalAmount',
+      accessorKey: 'quantity',
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Total Amount" />
+        <DataTableColumnHeader column={column} title="Qty" />
+      ),
+      cell: ({ row }) => (
+        <div className="text-center">
+          <div className="font-medium">
+            {row.original.quantity} {row.original.unit}
+          </div>
+        </div>
+      )
+    },
+    {
+      accessorKey: 'totalCost',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Total Cost" />
       ),
       cell: ({ row }) => {
-        const amount = parseFloat(row.getValue('totalAmount'));
-        return <span className="font-medium">${amount.toLocaleString()}</span>;
+        const amount = row.original.totalCost || 0;
+        const formatted = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD'
+        }).format(amount);
+        
+        return (
+          <div className="text-right">
+            <div className="font-medium">{formatted}</div>
+            {row.original.unitPrice && (
+              <div className="text-xs text-muted-foreground">
+                @ ${row.original.unitPrice}/{row.original.unit}
+              </div>
+            )}
+          </div>
+        );
       }
     },
     {
-      accessorKey: 'status',
+      accessorKey: 'supplier',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Supplier" />
+      ),
+      cell: ({ row }) => {
+        const supplier = row.original.supplier;
+        if (!supplier) return <span className="text-muted-foreground">Not assigned</span>;
+        
+        return (
+          <div>
+            <div className="font-medium">{supplier.name}</div>
+            {supplier.company && (
+              <div className="text-sm text-muted-foreground">{supplier.company}</div>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      accessorKey: 'requiredBy',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Required By" />
+      ),
+      cell: ({ row }) => {
+        const date = new Date(row.original.requiredBy);
+        const daysUntil = row.original.daysUntilRequired;
+        const isOverdue = row.original.isOverdue;
+        
+        return (
+          <div className={cn('flex items-center gap-2', isOverdue && 'text-red-600')}>
+            <Calendar className="h-3 w-3" />
+            <div>
+              <div className="font-medium">{format(date, 'MMM d, yyyy')}</div>
+              <div className="text-xs text-muted-foreground">
+                {isOverdue ? (
+                  <span className="text-red-600">Overdue by {Math.abs(daysUntil)} days</span>
+                ) : (
+                  <span>{daysUntil} days remaining</span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      accessorKey: 'priority',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Priority" />
+      ),
+      cell: ({ row }) => <PriorityBadge priority={row.original.priority} />
+    },
+    {
+      accessorKey: 'orderStatus',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Status" />
       ),
-      cell: ({ row }) => <StatusBadge status={row.getValue('status')} />
-    },
-    {
-      accessorKey: 'deliveryDate',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Delivery Date" />
-      ),
-      cell: ({ row }) => {
-        const date = row.getValue('deliveryDate');
-        return date ? format(new Date(date as string), 'MMM dd, yyyy') : '-';
-      }
+      cell: ({ row }) => <StatusBadge status={row.original.orderStatus} />
     },
     {
       id: 'actions',
       cell: ({ row }) => {
-        const po = row.original;
+        const item = row.original;
         
         return (
           <DropdownMenu>
@@ -589,460 +647,1245 @@ export default function ProcurementPage() {
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="glass-card">
+            <DropdownMenuContent align="end" className="w-[200px]">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              
               <DropdownMenuItem onClick={() => {
-                setSelectedPO(po);
-                // View details modal
+                setSelectedItem(item);
+                setShowDetailsDialog(true);
               }}>
                 <Eye className="mr-2 h-4 w-4" />
                 View Details
               </DropdownMenuItem>
-              {po.status === 'PENDING' && user?.role === 'ADMIN' && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={() => handlePOAction(po.id, 'approve')}
-                    className="text-green-500"
-                  >
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Approve
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => handlePOAction(po.id, 'reject')}
-                    className="text-red-500"
-                  >
-                    <XCircle className="mr-2 h-4 w-4" />
-                    Reject
-                  </DropdownMenuItem>
-                </>
-              )}
-              {['DRAFT', 'PENDING'].includes(po.status) && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => {
-                    setSelectedPO(po);
-                    poForm.reset(po);
-                    setPOItems(po.items || []);
-                    setIsEditPOOpen(true);
-                  }}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit
-                  </DropdownMenuItem>
-                </>
-              )}
-              {po.status === 'DRAFT' && (
+              
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Activity className="mr-2 h-4 w-4" />
+                  Update Status
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {item.orderStatus === 'DRAFT' && (
+                    <DropdownMenuItem onClick={() => handleStatusUpdate(item.id, 'QUOTED')}>
+                      Request Quote
+                    </DropdownMenuItem>
+                  )}
+                  {item.orderStatus === 'QUOTED' && (
+                    <>
+                      <DropdownMenuItem onClick={() => handleStatusUpdate(item.id, 'APPROVED')}>
+                        Approve
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleStatusUpdate(item.id, 'REJECTED')}>
+                        Reject
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {item.orderStatus === 'APPROVED' && (
+                    <DropdownMenuItem onClick={() => handleStatusUpdate(item.id, 'ORDERED')}>
+                      Place Order
+                    </DropdownMenuItem>
+                  )}
+                  {item.orderStatus === 'ORDERED' && (
+                    <DropdownMenuItem onClick={() => handleStatusUpdate(item.id, 'SHIPPED')}>
+                      Mark as Shipped
+                    </DropdownMenuItem>
+                  )}
+                  {item.orderStatus === 'SHIPPED' && (
+                    <DropdownMenuItem onClick={() => handleStatusUpdate(item.id, 'DELIVERED')}>
+                      Mark as Delivered
+                    </DropdownMenuItem>
+                  )}
+                  {item.orderStatus === 'DELIVERED' && (
+                    <DropdownMenuItem onClick={() => handleStatusUpdate(item.id, 'INSTALLED')}>
+                      Mark as Installed
+                    </DropdownMenuItem>
+                  )}
+                  {item.canCancel && (
+                    <DropdownMenuItem 
+                      onClick={() => handleStatusUpdate(item.id, 'CANCELLED')}
+                      className="text-red-600"
+                    >
+                      Cancel Order
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              
+              <DropdownMenuSeparator />
+              
+              {item.canEdit && (
                 <DropdownMenuItem
                   onClick={() => {
-                    setSelectedPO(po);
-                    setIsDeletePOOpen(true);
+                    setSelectedItem(item);
+                    form.reset({
+                      projectId: item.projectId,
+                      materialItem: item.materialItem,
+                      description: item.description || '',
+                      quantity: item.quantity,
+                      unit: item.unit || 'EA',
+                      unitPrice: item.unitPrice || 0,
+                      totalCost: item.totalCost || 0,
+                      discipline: item.discipline,
+                      phase: item.phase,
+                      category: item.category || 'MATERIALS',
+                      requiredBy: format(new Date(item.requiredBy), 'yyyy-MM-dd'),
+                      leadTimeDays: item.leadTimeDays,
+                      supplierId: item.supplierId || '',
+                      orderStatus: item.orderStatus,
+                      priority: item.priority || 'MEDIUM',
+                      eta: item.eta ? format(new Date(item.eta), 'yyyy-MM-dd') : '',
+                      notes: item.notes || '',
+                      budgetItemId: item.budgetItemId || '',
+                      attachments: item.attachments || [],
+                      tags: item.tags || []
+                    });
+                    setShowEditDialog(true);
                   }}
-                  className="text-red-500"
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+              )}
+              
+              {item.canDelete && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedItem(item);
+                    setShowDeleteDialog(true);
+                  }}
+                  className="text-red-600"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </DropdownMenuItem>
               )}
+              
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuItem>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </DropdownMenuItem>
+              
+              <DropdownMenuItem>
+                <Paperclip className="mr-2 h-4 w-4" />
+                Attachments
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
       }
     }
   ];
-
-  const invoiceColumns: ColumnDef<any>[] = [
-    {
-      accessorKey: 'invoiceNumber',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Invoice #" />
-      ),
-      cell: ({ row }) => (
-        <span className="font-medium">{row.getValue('invoiceNumber')}</span>
-      )
-    },
-    {
-      accessorKey: 'vendor',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Vendor" />
-      ),
-      cell: ({ row }) => row.original.vendor?.name || '-'
-    },
-    {
-      accessorKey: 'amount',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Amount" />
-      ),
-      cell: ({ row }) => {
-        const amount = parseFloat(row.getValue('amount'));
-        return <span className="font-medium">${amount.toLocaleString()}</span>;
-      }
-    },
-    {
-      accessorKey: 'balanceDue',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Balance Due" />
-      ),
-      cell: ({ row }) => {
-        const balance = row.original.balanceDue || 0;
-        return (
-          <span className={cn(
-            "font-medium",
-            balance > 0 ? 'text-red-500' : 'text-green-500'
-          )}>
-            ${balance.toLocaleString()}
-          </span>
-        );
-      }
-    },
-    {
-      accessorKey: 'dueDate',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Due Date" />
-      ),
-      cell: ({ row }) => {
-        const dueDate = new Date(row.getValue('dueDate'));
-        const isOverdue = row.original.isOverdue;
-        return (
-          <span className={cn(isOverdue && 'text-red-500 font-medium')}>
-            {format(dueDate, 'MMM dd, yyyy')}
-            {isOverdue && ` (${row.original.daysOverdue}d overdue)`}
-          </span>
-        );
-      }
-    },
-    {
-      accessorKey: 'status',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Status" />
-      ),
-      cell: ({ row }) => {
-        const status = row.getValue('status') as string;
-        const variant = {
-          PENDING: 'default',
-          PARTIAL: 'warning',
-          PAID: 'success',
-          OVERDUE: 'destructive',
-          CANCELLED: 'secondary'
-        }[status] || 'default';
-        
-        return <Badge variant={variant as any}>{status}</Badge>;
-      }
-    },
-    {
-      id: 'actions',
-      cell: ({ row }) => {
-        const invoice = row.original;
-        
-        return invoice.status !== 'PAID' ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setSelectedInvoice(invoice);
-              paymentForm.setValue('invoiceId', invoice.id);
-              paymentForm.setValue('purchaseOrderId', invoice.purchaseOrderId);
-              paymentForm.setValue('amount', invoice.balanceDue || 0);
-              setIsCreatePaymentOpen(true);
-            }}
-          >
-            Record Payment
-          </Button>
-        ) : null;
-      }
-    }
-  ];
-
-  const paymentColumns: ColumnDef<any>[] = [
-    {
-      accessorKey: 'paymentDate',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Date" />
-      ),
-      cell: ({ row }) => format(new Date(row.getValue('paymentDate')), 'MMM dd, yyyy')
-    },
-    {
-      accessorKey: 'invoiceNumber',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Invoice #" />
-      ),
-      cell: ({ row }) => row.getValue('invoiceNumber') || '-'
-    },
-    {
-      accessorKey: 'vendorName',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Vendor" />
-      ),
-      cell: ({ row }) => row.getValue('vendorName') || '-'
-    },
-    {
-      accessorKey: 'amount',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Amount" />
-      ),
-      cell: ({ row }) => {
-        const amount = parseFloat(row.getValue('amount'));
-        return <span className="font-medium">${amount.toLocaleString()}</span>;
-      }
-    },
-    {
-      accessorKey: 'paymentMethod',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Method" />
-      ),
-      cell: ({ row }) => (
-        <Badge variant="outline">{row.getValue('paymentMethod')}</Badge>
-      )
-    },
-    {
-      accessorKey: 'referenceNumber',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Reference #" />
-      ),
-      cell: ({ row }) => row.getValue('referenceNumber') || '-'
-    }
-  ];
-
-  // Loading skeleton
-  const LoadingSkeleton = () => (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-4 w-[100px]" />
-              <Skeleton className="h-4 w-4 rounded-full" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-7 w-[120px] mb-1" />
-              <Skeleton className="h-3 w-[80px]" />
+  
+  // Calculate KPI metrics
+  const kpiMetrics = useMemo(() => {
+    if (!summary) return null;
+    
+    const totalValue = procurements.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+    const overdueCount = procurements.filter(item => item.isOverdue).length;
+    const pendingApproval = procurements.filter(item => item.needsApproval).length;
+    const thisMonthSpend = procurements
+      .filter(item => {
+        const date = new Date(item.createdAt);
+        const now = new Date();
+        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, item) => sum + (item.totalCost || 0), 0);
+    
+    return {
+      totalValue,
+      overdueCount,
+      pendingApproval,
+      thisMonthSpend,
+      totalItems: summary.total || 0,
+      activeSuppliers: new Set(procurements.map(p => p.supplierId).filter(Boolean)).size
+    };
+  }, [procurements, summary]);
+  
+  if (authLoading) {
+    return (
+      <PageShell>
+        <div className="p-6">
+          <div className="grid gap-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-96 w-full" />
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return (
+      <PageShell>
+        <div className="p-6">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center text-muted-foreground">
+                Please sign in to view procurement data
+              </p>
             </CardContent>
           </Card>
-        ))}
-      </div>
-      <Skeleton className="h-[400px] w-full" />
-    </div>
-  );
-
+        </div>
+      </PageShell>
+    );
+  }
+  
   return (
     <PageShell>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-white">Procurement Management</h1>
-            <p className="text-white/60 mt-1">Manage purchase orders, invoices, and payments</p>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Procurement Management</h1>
+              <p className="text-muted-foreground">
+                Manage purchase orders, track deliveries, and control procurement spend
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={fetchProcurementData}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Procurement
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Create Procurement Item</DialogTitle>
+                    <DialogDescription>
+                      Add a new material or service procurement request
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmitAdd)} className="space-y-6">
+                      <Tabs defaultValue="basic" className="w-full">
+                        <TabsList className="grid w-full grid-cols-4">
+                          <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                          <TabsTrigger value="details">Details</TabsTrigger>
+                          <TabsTrigger value="budget">Budget</TabsTrigger>
+                          <TabsTrigger value="tracking">Tracking</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="basic" className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="projectId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Project *</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select project" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {Array.isArray(projectsData) && projectsData.map((project: any) => (
+                                        <SelectItem key={project.id} value={project.id}>
+                                          {project.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="priority"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Priority</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {Object.entries(PRIORITY_CONFIG).map(([value, config]) => (
+                                        <SelectItem key={value} value={value}>
+                                          <div className="flex items-center gap-2">
+                                            <config.icon className="h-4 w-4" />
+                                            {config.label}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          
+                          <FormField
+                            control={form.control}
+                            name="materialItem"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Material/Service Item *</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="e.g., Concrete Mix, Steel Beams, Labor Services" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Description</FormLabel>
+                                <FormControl>
+                                  <Textarea 
+                                    {...field} 
+                                    placeholder="Detailed specifications, requirements, or notes"
+                                    rows={3}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <div className="grid grid-cols-3 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="quantity"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Quantity *</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      {...field}
+                                      onChange={e => field.onChange(parseFloat(e.target.value))}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="unit"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Unit</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {UNITS.map(unit => (
+                                        <SelectItem key={unit} value={unit}>
+                                          {unit}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="unitPrice"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Unit Price</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      step="0.01"
+                                      {...field}
+                                      onChange={e => field.onChange(parseFloat(e.target.value))}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          
+                          {form.watch('totalCost') > 0 && (
+                            <div className="p-4 bg-muted rounded-lg">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium">Total Cost:</span>
+                                <span className="text-2xl font-bold">
+                                  ${form.watch('totalCost').toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </TabsContent>
+                        
+                        <TabsContent value="details" className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="discipline"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Discipline *</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select discipline" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {DISCIPLINES.map(disc => (
+                                        <SelectItem key={disc} value={disc}>
+                                          {disc}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="phase"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Phase *</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select phase" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {PHASES.map(phase => (
+                                        <SelectItem key={phase} value={phase}>
+                                          {phase}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="category"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Category</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="MATERIALS">Materials</SelectItem>
+                                      <SelectItem value="EQUIPMENT">Equipment</SelectItem>
+                                      <SelectItem value="TOOLS">Tools</SelectItem>
+                                      <SelectItem value="SAFETY">Safety</SelectItem>
+                                      <SelectItem value="CONSUMABLES">Consumables</SelectItem>
+                                      <SelectItem value="SERVICES">Services</SelectItem>
+                                      <SelectItem value="RENTAL">Rental</SelectItem>
+                                      <SelectItem value="OTHER">Other</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="supplierId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Preferred Supplier</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select supplier" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="none">None</SelectItem>
+                                      {suppliers.map((supplier: any) => (
+                                        <SelectItem key={supplier.id} value={supplier.id}>
+                                          {supplier.name} {supplier.company && `- ${supplier.company}`}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="requiredBy"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Required By Date *</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="leadTimeDays"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Lead Time (days) *</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      {...field}
+                                      onChange={e => field.onChange(parseInt(e.target.value))}
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Typical delivery time for this item
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </TabsContent>
+                        
+                        <TabsContent value="budget" className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="budgetItemId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Link to Budget Item</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select budget item" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {Array.isArray(budgetData) && budgetData.map((item: any) => (
+                                      <SelectItem key={item.id} value={item.id}>
+                                        {item.item} - {item.discipline} 
+                                        (${Number(item.estTotal).toFixed(2)})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormDescription>
+                                  Link to track against budget allocation
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          {form.watch('budgetItemId') && budgetData && (
+                            <div className="p-4 bg-muted rounded-lg space-y-2">
+                              {(() => {
+                                const budgetItem = budgetData.find(
+                                  (b: any) => b.id === form.watch('budgetItemId')
+                                );
+                                if (!budgetItem) return null;
+                                
+                                const remaining = Number(budgetItem.estTotal) - Number(budgetItem.committedTotal);
+                                const willExceed = form.watch('totalCost') > remaining;
+                                
+                                return (
+                                  <>
+                                    <div className="flex justify-between text-sm">
+                                      <span>Budget Allocated:</span>
+                                      <span>${Number(budgetItem.estTotal).toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span>Already Committed:</span>
+                                      <span>${Number(budgetItem.committedTotal).toFixed(2)}</span>
+                                    </div>
+                                    <Separator />
+                                    <div className="flex justify-between font-medium">
+                                      <span>Remaining Budget:</span>
+                                      <span className={cn(willExceed && 'text-red-600')}>
+                                        ${remaining.toFixed(2)}
+                                      </span>
+                                    </div>
+                                    {willExceed && (
+                                      <div className="text-sm text-red-600 flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        This order will exceed the budget by $
+                                        {(form.watch('totalCost') - remaining).toFixed(2)}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </TabsContent>
+                        
+                        <TabsContent value="tracking" className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="orderStatus"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Initial Status</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {Object.entries(STATUS_CONFIG).map(([value, config]) => (
+                                        <SelectItem key={value} value={value}>
+                                          <div className="flex items-center gap-2">
+                                            <config.icon className="h-4 w-4" />
+                                            {config.label}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="eta"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Estimated Arrival</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          
+                          <FormField
+                            control={form.control}
+                            name="notes"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Notes</FormLabel>
+                                <FormControl>
+                                  <Textarea 
+                                    {...field} 
+                                    placeholder="Special instructions, delivery notes, etc."
+                                    rows={4}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <div className="space-y-2">
+                            <Label>Attachments</Label>
+                            <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                              <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                Drag and drop files here, or click to browse
+                              </p>
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                      
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit">Create Procurement</Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Select value={selectedProject} onValueChange={setSelectedProject}>
-              <SelectTrigger className="w-[200px] glass-input">
-                <SelectValue placeholder="All Projects" />
-              </SelectTrigger>
-              <SelectContent className="glass-card">
-                <SelectItem value="all">All Projects</SelectItem>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={exportToCSV} variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-          </div>
-        </div>
-
-        {/* Loading or Content */}
-        {isLoading ? (
-          <LoadingSkeleton />
-        ) : (
-          <>
-            {/* Summary Cards */}
-            {summary && (
-              <div className="grid gap-4 md:grid-cols-4">
-                <Card className="glass-card">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total POs</CardTitle>
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{summary.overview?.totalPOs || 0}</div>
-                    <p className="text-xs text-muted-foreground">
-                      ${(summary.overview?.totalPOAmount || 0).toLocaleString()} total value
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="glass-card">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ${(summary.invoices?.outstandingAmount || 0).toLocaleString()}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {summary.invoices?.overdueCount || 0} overdue invoices
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="glass-card">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{summary.overview?.pendingApproval || 0}</div>
-                    <p className="text-xs text-muted-foreground">
-                      Requires review
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="glass-card">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ${(summary.payments?.totalAmount || 0).toLocaleString()}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {summary.payments?.total || 0} payments
-                    </p>
-                  </CardContent>
-                </Card>
+          
+          {/* Filters Bar */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex-1 min-w-[300px]">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search items, PO numbers, suppliers..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                
+                <Select value={selectedProject} onValueChange={setSelectedProject}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="All Projects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {Array.isArray(projectsData) && projectsData.map((project: any) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    {Object.entries(STATUS_CONFIG).map(([value, config]) => (
+                      <SelectItem key={value} value={value}>
+                        {config.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={filterPriority} onValueChange={setFilterPriority}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="All Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    {Object.entries(PRIORITY_CONFIG).map(([value, config]) => (
+                      <SelectItem key={value} value={value}>
+                        {config.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <Filter className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
+                    <DropdownMenuLabel>Advanced Filters</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem>
+                      Overdue Items
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem>
+                      Needs Approval
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem>
+                      Has Attachments
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-red-600">
+                      Clear Filters
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-            )}
-
-            {/* Main Content Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="glass-tabs">
-                <TabsTrigger value="orders">Purchase Orders</TabsTrigger>
-                <TabsTrigger value="invoices">Invoices</TabsTrigger>
-                <TabsTrigger value="payments">Payments</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="orders" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-white">Purchase Orders</h2>
-                  <Dialog open={isCreatePOOpen} onOpenChange={setIsCreatePOOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="mr-2 h-4 w-4" />
-                        New Purchase Order
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto glass-card">
-                      <DialogHeader>
-                        <DialogTitle>Create Purchase Order</DialogTitle>
-                        <DialogDescription>
-                          Create a new purchase order for vendor services or materials
-                        </DialogDescription>
-                      </DialogHeader>
-                      <Form {...poForm}>
-                        <form onSubmit={poForm.handleSubmit(handleCreatePO)} className="space-y-4">
-                          {/* Form fields will go here - keeping it shorter for brevity */}
-                          <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setIsCreatePOOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button type="submit">Create Purchase Order</Button>
-                          </DialogFooter>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* KPI Cards */}
+        {kpiMetrics && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${kpiMetrics.totalValue.toLocaleString()}
                 </div>
-                <DataTable columns={poColumns} data={purchaseOrders} />
-              </TabsContent>
-
-              <TabsContent value="invoices" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-white">Invoices</h2>
-                  <Dialog open={isCreateInvoiceOpen} onOpenChange={setIsCreateInvoiceOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="mr-2 h-4 w-4" />
-                        New Invoice
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="glass-card">
-                      <DialogHeader>
-                        <DialogTitle>Create Invoice</DialogTitle>
-                        <DialogDescription>
-                          Record a new vendor invoice
-                        </DialogDescription>
-                      </DialogHeader>
-                      <Form {...invoiceForm}>
-                        <form onSubmit={invoiceForm.handleSubmit(handleCreateInvoice)} className="space-y-4">
-                          {/* Invoice form fields */}
-                          <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setIsCreateInvoiceOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button type="submit">Create Invoice</Button>
-                          </DialogFooter>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
+                <p className="text-xs text-muted-foreground">
+                  Across {kpiMetrics.totalItems} items
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">This Month</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${kpiMetrics.thisMonthSpend.toLocaleString()}
                 </div>
-                <DataTable columns={invoiceColumns} data={invoices} />
-              </TabsContent>
-
-              <TabsContent value="payments" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-white">Payment History</h2>
+                <p className="text-xs text-muted-foreground">
+                  Current month spend
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{kpiMetrics.pendingApproval}</div>
+                <p className="text-xs text-muted-foreground">
+                  Awaiting approval
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Overdue</CardTitle>
+                <AlertCircle className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">
+                  {kpiMetrics.overdueCount}
                 </div>
-                <DataTable columns={paymentColumns} data={payments} />
-              </TabsContent>
-            </Tabs>
-          </>
+                <p className="text-xs text-muted-foreground">
+                  Past required date
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {summary?.statusBreakdown?.ordered || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  In progress
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Suppliers</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{kpiMetrics.activeSuppliers}</div>
+                <p className="text-xs text-muted-foreground">
+                  Active suppliers
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         )}
-
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={isDeletePOOpen} onOpenChange={setIsDeletePOOpen}>
-          <AlertDialogContent className="glass-card">
+        
+        {/* Main Content Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+            <TabsTrigger value="overview" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="items" className="gap-2">
+              <Package className="h-4 w-4" />
+              Items
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2">
+              <Activity className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="approvals" className="gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Approvals
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Status Distribution */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Status Distribution</CardTitle>
+                  <CardDescription>Current procurement status breakdown</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {summary?.statusBreakdown && Object.entries(summary.statusBreakdown).map(([status, count]: [string, any]) => {
+                      const config = STATUS_CONFIG[status.toUpperCase() as keyof typeof STATUS_CONFIG];
+                      const percentage = (count / summary.total) * 100;
+                      
+                      return (
+                        <div key={status} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              {config && <config.icon className="h-4 w-4" />}
+                              <span className="capitalize">{status}</span>
+                            </div>
+                            <span className="font-medium">{count}</span>
+                          </div>
+                          <Progress value={percentage} className="h-2" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Recent Activity */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Activity</CardTitle>
+                  <CardDescription>Latest procurement updates</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] overflow-y-auto">
+                    <div className="space-y-4">
+                      {summary?.recentItems?.slice(0, 5).map((item: any) => (
+                        <div key={item.id} className="flex items-start gap-3 pb-3 border-b last:border-0">
+                          <div className="p-2 bg-muted rounded-lg">
+                            <Package className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <p className="text-sm font-medium leading-none">
+                              {item.materialItem}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.project?.name} • {format(new Date(item.createdAt), 'MMM d, yyyy')}
+                            </p>
+                            <StatusBadge status={item.orderStatus} />
+                          </div>
+                          <div className="text-sm font-medium">
+                            ${item.totalCost ? Number(item.totalCost).toFixed(2) : '0.00'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="items" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Procurement Items</CardTitle>
+                    <CardDescription>
+                      Manage all procurement requests and purchase orders
+                    </CardDescription>
+                  </div>
+                  {selectedItems.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {selectedItems.length} selected
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowBulkDialog(true)}
+                      >
+                        Bulk Actions
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-4">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : (
+                  <DataTable
+                    columns={columns}
+                    data={procurements}
+                    searchKey="materialItem"
+                    searchPlaceholder="Search items..."
+                    onRowSelectionChange={(rows) => {
+                      setSelectedItems(rows.map(r => r.original.id));
+                    }}
+                  />
+                )}
+              </CardContent>
+              {totalItems > pageSize && (
+                <CardFooter className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {(currentPage - 1) * pageSize + 1} to{' '}
+                    {Math.min(currentPage * pageSize, totalItems)} of {totalItems} items
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => p + 1)}
+                      disabled={currentPage * pageSize >= totalItems}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </CardFooter>
+              )}
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Spend by Category</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center text-muted-foreground py-8">
+                    Chart visualization would go here
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Monthly Trend</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center text-muted-foreground py-8">
+                    Chart visualization would go here
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="approvals" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Approvals</CardTitle>
+                <CardDescription>
+                  Items requiring approval before processing
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {procurements
+                    .filter(item => item.needsApproval)
+                    .map(item => (
+                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-1">
+                          <p className="font-medium">{item.materialItem}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {item.quantity} {item.unit} • ${Number(item.totalCost).toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStatusUpdate(item.id, 'REJECTED')}
+                          >
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Reject
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleStatusUpdate(item.id, 'APPROVED')}
+                          >
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Approve
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  {procurements.filter(item => item.needsApproval).length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No items pending approval
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+        
+        {/* Edit Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Procurement Item</DialogTitle>
+              <DialogDescription>
+                Update procurement details
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmitEdit)} className="space-y-6">
+                {/* Same form content as Add Dialog */}
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">Update Item</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Delete Confirmation */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Purchase Order</AlertDialogTitle>
-              <AlertDialogDescription className="text-white/60">
-                Are you sure you want to delete PO "{selectedPO?.poNumber}"? This action cannot be undone.
+              <AlertDialogTitle>Delete Procurement Item</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{selectedItem?.materialItem}"? 
+                This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="border-white/10">Cancel</AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction 
-                onClick={handleDeletePO}
-                className="bg-red-500 hover:bg-red-600"
+                onClick={handleDelete}
+                className="bg-red-600 hover:bg-red-700"
               >
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        {/* Payment Dialog */}
-        <Dialog open={isCreatePaymentOpen} onOpenChange={setIsCreatePaymentOpen}>
-          <DialogContent className="glass-card">
+        
+        {/* Bulk Operations Dialog */}
+        <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Record Payment</DialogTitle>
+              <DialogTitle>Bulk Operations</DialogTitle>
               <DialogDescription>
-                Record a payment for invoice {selectedInvoice?.invoiceNumber}
+                Apply action to {selectedItems.length} selected items
               </DialogDescription>
             </DialogHeader>
-            <Form {...paymentForm}>
-              <form onSubmit={paymentForm.handleSubmit(handleCreatePayment)} className="space-y-4">
-                {/* Payment form fields */}
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsCreatePaymentOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Record Payment</Button>
-                </DialogFooter>
-              </form>
-            </Form>
+            
+            <div className="space-y-4">
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={() => handleBulkOperation('approve')}
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve All
+              </Button>
+              
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={() => handleBulkOperation('updateStatus', { status: 'ORDERED' })}
+              >
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Mark as Ordered
+              </Button>
+              
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={() => handleBulkOperation('assignSupplier')}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Assign Supplier
+              </Button>
+              
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={() => handleBulkOperation('updatePriority', { priority: 'HIGH' })}
+              >
+                <Zap className="mr-2 h-4 w-4" />
+                Set High Priority
+              </Button>
+              
+              <Separator />
+              
+              <Button
+                className="w-full justify-start"
+                variant="destructive"
+                onClick={() => handleBulkOperation('delete')}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Selected
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

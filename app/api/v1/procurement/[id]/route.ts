@@ -1,233 +1,239 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, requireRole } from '@/lib/api/auth-check';
-import { successResponse, errorResponse, ApiError } from '@/lib/api/response';
-import { updatePurchaseOrderSchema } from '@/lib/validations/procurement';
+import { successResponse, errorResponse } from '@/lib/api/response';
+import { 
+  updateProcurementSchema, 
+  statusUpdateSchema,
+  approvalActionSchema 
+} from '@/lib/validations/procurement';
 
-// GET /api/v1/procurement/[id] - Get single purchase order
+// Helper to generate PO number
+async function generatePONumber(): Promise<string> {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  
+  const lastPO = await prisma.procurement.findFirst({
+    where: {
+      poNumber: {
+        startsWith: `PO-${year}${month}`
+      }
+    },
+    orderBy: {
+      poNumber: 'desc'
+    }
+  });
+  
+  let sequence = 1;
+  if (lastPO?.poNumber) {
+    const lastSequence = parseInt(lastPO.poNumber.split('-')[2] || '0');
+    sequence = lastSequence + 1;
+  }
+  
+  return `PO-${year}${month}-${String(sequence).padStart(4, '0')}`;
+}
+
+// GET /api/v1/procurement/[id] - Get single procurement item with full details
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAuth();
-    const { id } = await params;
+    const { id } = await context.params;
     
-    const purchaseOrder = await prisma.purchaseOrder.findUnique({
+    const procurement = await prisma.procurement.findUnique({
       where: { id },
       include: {
-        vendor: true,
         project: true,
-        budgetItem: true,
-        items: true,
-        invoices: {
-          include: {
-            payments: true
-          }
-        },
-        payments: true,
-        createdBy: {
+        supplier: {
           select: {
             id: true,
             name: true,
-            email: true
+            company: true,
+            emails: true,
+            phones: true,
+            specialty: true,
+            status: true
+          }
+        },
+        budgetItem: {
+          select: {
+            id: true,
+            item: true,
+            discipline: true,
+            category: true,
+            estTotal: true,
+            committedTotal: true,
+            paidToDate: true,
+            variance: true
           }
         }
       }
     });
     
-    if (!purchaseOrder) {
-      throw new ApiError(404, 'Purchase order not found');
+    if (!procurement) {
+      return errorResponse('Procurement item not found', 404);
     }
     
-    // Calculate payment status
-    const totalPaid = purchaseOrder.payments.reduce(
-      (sum, payment) => sum + Number(payment.amount), 
-      0
-    );
-    
-    const orderWithDetails = {
-      ...purchaseOrder,
-      totalPaid,
-      balanceDue: Number(purchaseOrder.totalAmount) - totalPaid,
-      paymentStatus: totalPaid === 0 
-        ? 'UNPAID' 
-        : totalPaid >= Number(purchaseOrder.totalAmount) 
-          ? 'PAID' 
-          : 'PARTIAL'
+    // Add calculated fields
+    const procurementWithDetails = {
+      ...procurement,
+      quantity: procurement.quantity ? Number(procurement.quantity) : 0,
+      unitPrice: procurement.unitPrice ? Number(procurement.unitPrice) : 0,
+      totalCost: procurement.totalCost ? Number(procurement.totalCost) : 0,
+      isOverdue: ['QUOTED', 'ORDERED', 'SHIPPED'].includes(procurement.orderStatus) && 
+                 new Date(procurement.requiredBy) < new Date(),
+      daysUntilRequired: Math.ceil((new Date(procurement.requiredBy).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
+      needsApproval: procurement.orderStatus === 'QUOTED' && !procurement.approvedAt,
+      canEdit: ['DRAFT', 'QUOTED'].includes(procurement.orderStatus),
+      canDelete: procurement.orderStatus === 'DRAFT',
+      canApprove: procurement.orderStatus === 'QUOTED' && !procurement.approvedAt,
+      canOrder: procurement.orderStatus === 'APPROVED',
+      canCancel: ['DRAFT', 'QUOTED', 'APPROVED', 'ORDERED'].includes(procurement.orderStatus)
     };
     
-    return successResponse(orderWithDetails);
+    return successResponse(procurementWithDetails);
   } catch (error) {
     return errorResponse(error);
   }
 }
 
-// PUT /api/v1/procurement/[id] - Update purchase order
+// PUT /api/v1/procurement/[id] - Update procurement item
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
-    const { id } = await params;
+    const { id } = await context.params;
     const body = await request.json();
-    const data = updatePurchaseOrderSchema.parse({ ...body, id });
+    const data = updateProcurementSchema.parse(body);
     
-    const existingPO = await prisma.purchaseOrder.findUnique({
-      where: { id },
-      include: { items: true }
+    // Check if procurement exists and can be edited
+    const existing = await prisma.procurement.findUnique({
+      where: { id }
     });
     
-    if (!existingPO) {
-      throw new ApiError(404, 'Purchase order not found');
+    if (!existing) {
+      return errorResponse('Procurement item not found', 404);
     }
     
-    // Check if status is changing to APPROVED
-    const isApproving = existingPO.status !== 'APPROVED' && data.status === 'APPROVED';
+    if (!['DRAFT', 'QUOTED'].includes(existing.orderStatus)) {
+      return errorResponse('Cannot edit procurement item in current status', 400);
+    }
     
-    // Start transaction for complex update
-    const purchaseOrder = await prisma.$transaction(async (tx) => {
-      // Delete existing items if new items provided
-      if (data.items) {
-        await tx.purchaseOrderItem.deleteMany({
-          where: { purchaseOrderId: id }
-        });
+    // Calculate total cost if quantity or unit price changed
+    let totalCost = existing.totalCost ? Number(existing.totalCost) : 0;
+    if (data.quantity !== undefined || data.unitPrice !== undefined) {
+      const quantity = data.quantity ?? Number(existing.quantity);
+      const unitPrice = data.unitPrice ?? (existing.unitPrice ? Number(existing.unitPrice) : 0);
+      totalCost = quantity * unitPrice;
+    }
+    
+    // Generate PO number if status is changing to APPROVED or beyond
+    let poNumber = existing.poNumber;
+    if (data.orderStatus && !existing.poNumber && 
+        !['DRAFT', 'QUOTED'].includes(data.orderStatus)) {
+      poNumber = await generatePONumber();
+    }
+    
+    // Update procurement
+    const procurement = await prisma.procurement.update({
+      where: { id },
+      data: {
+        ...(data.materialItem && { materialItem: data.materialItem }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.quantity !== undefined && { quantity: data.quantity }),
+        ...(data.unit !== undefined && { unit: data.unit }),
+        ...(data.unitPrice !== undefined && { unitPrice: data.unitPrice }),
+        ...(totalCost && { totalCost }),
+        ...(data.discipline && { discipline: data.discipline }),
+        ...(data.phase && { phase: data.phase }),
+        ...(data.category && { category: data.category }),
+        ...(data.requiredBy && { requiredBy: new Date(data.requiredBy) }),
+        ...(data.leadTimeDays !== undefined && { leadTimeDays: data.leadTimeDays }),
+        ...(data.supplierId !== undefined && { supplierId: data.supplierId }),
+        ...(data.orderStatus && { orderStatus: data.orderStatus }),
+        ...(data.priority && { priority: data.priority }),
+        ...(data.eta !== undefined && { eta: data.eta ? new Date(data.eta) : null }),
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.budgetItemId !== undefined && { budgetItemId: data.budgetItemId }),
+        ...(data.attachments && { attachments: data.attachments }),
+        ...(data.tags && { tags: data.tags }),
+        ...(poNumber && { poNumber }),
+        updatedBy: authUser.uid,
+        updatedAt: new Date()
+      },
+      include: {
+        project: true,
+        supplier: true,
+        budgetItem: true
       }
-      
-      // Update purchase order
-      const updated = await tx.purchaseOrder.update({
-        where: { id },
+    });
+    
+    // Update budget commitment if status changed to ORDERED/APPROVED
+    if (data.orderStatus && data.budgetItemId && 
+        ['ORDERED', 'APPROVED'].includes(data.orderStatus) &&
+        !['ORDERED', 'APPROVED'].includes(existing.orderStatus)) {
+      await prisma.budgetItem.update({
+        where: { id: data.budgetItemId },
         data: {
-          ...(data.poNumber && { poNumber: data.poNumber }),
-          ...(data.vendorId && { vendorId: data.vendorId }),
-          ...(data.projectId && { projectId: data.projectId }),
-          ...(data.budgetItemId !== undefined && { budgetItemId: data.budgetItemId }),
-          ...(data.description && { description: data.description }),
-          ...(data.subtotal !== undefined && { subtotal: data.subtotal }),
-          ...(data.tax !== undefined && { tax: data.tax }),
-          ...(data.shipping !== undefined && { shipping: data.shipping }),
-          ...(data.totalAmount !== undefined && { totalAmount: data.totalAmount }),
-          ...(data.paymentTerms && { paymentTerms: data.paymentTerms }),
-          ...(data.deliveryDate !== undefined && { 
-            deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : null 
-          }),
-          ...(data.deliveryAddress !== undefined && { deliveryAddress: data.deliveryAddress }),
-          ...(data.notes !== undefined && { notes: data.notes }),
-          ...(data.status && { status: data.status }),
-          ...(isApproving && {
-            approvedBy: authUser.uid,
-            approvedAt: new Date()
-          }),
-          ...(data.items && {
-            items: {
-              create: data.items.map(item => ({
-                description: item.description,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice,
-                budgetItemId: item.budgetItemId,
-                notes: item.notes
-              }))
-            }
-          })
-        },
-        include: {
-          vendor: true,
-          project: true,
-          items: true
+          committedTotal: {
+            increment: totalCost
+          },
+          status: 'COMMITTED'
         }
       });
-      
-      // Update budget commitment if amount changed
-      if (data.budgetItemId && data.totalAmount !== undefined) {
-        const difference = data.totalAmount - Number(existingPO.totalAmount);
-        if (difference !== 0) {
-          await tx.budgetItem.update({
-            where: { id: data.budgetItemId },
-            data: {
-              committedTotal: {
-                increment: difference
-              }
-            }
-          });
-        }
-      }
-      
-      return updated;
-    });
+    }
     
     // Log activity
     await prisma.auditLog.create({
       data: {
         userId: authUser.uid,
         action: 'UPDATE',
-        entity: 'PURCHASE_ORDER',
-        entityId: purchaseOrder.id,
+        entity: 'PROCUREMENT',
+        entityId: id,
         meta: {
-          changes: {
-            from: existingPO,
-            to: purchaseOrder
-          }
+          changes: data,
+          previousStatus: existing.orderStatus,
+          newStatus: data.orderStatus
         }
       }
     });
     
-    return successResponse(purchaseOrder, 'Purchase order updated successfully');
+    return successResponse(procurement, 'Procurement item updated successfully');
   } catch (error) {
     return errorResponse(error);
   }
 }
 
-// DELETE /api/v1/procurement/[id] - Delete purchase order
+// DELETE /api/v1/procurement/[id] - Delete procurement item
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireRole(['ADMIN']);
-    const { id } = await params;
+    const { id } = await context.params;
     
-    const purchaseOrder = await prisma.purchaseOrder.findUnique({
-      where: { id },
-      include: {
-        invoices: true,
-        payments: true
-      }
+    // Check if procurement exists and can be deleted
+    const existing = await prisma.procurement.findUnique({
+      where: { id }
     });
     
-    if (!purchaseOrder) {
-      throw new ApiError(404, 'Purchase order not found');
+    if (!existing) {
+      return errorResponse('Procurement item not found', 404);
     }
     
-    // Check if PO has invoices or payments
-    if (purchaseOrder.invoices.length > 0 || purchaseOrder.payments.length > 0) {
-      throw new ApiError(400, 'Cannot delete purchase order with invoices or payments');
+    if (existing.orderStatus !== 'DRAFT') {
+      return errorResponse('Can only delete draft procurement items', 400);
     }
     
-    // Transaction to delete PO and update budget
-    await prisma.$transaction(async (tx) => {
-      // Update budget commitment if linked
-      if (purchaseOrder.budgetItemId) {
-        await tx.budgetItem.update({
-          where: { id: purchaseOrder.budgetItemId },
-          data: {
-            committedTotal: {
-              decrement: Number(purchaseOrder.totalAmount)
-            }
-          }
-        });
-      }
-      
-      // Delete PO items first
-      await tx.purchaseOrderItem.deleteMany({
-        where: { purchaseOrderId: id }
-      });
-      
-      // Delete the PO
-      await tx.purchaseOrder.delete({
-        where: { id }
-      });
+    // Delete procurement
+    await prisma.procurement.delete({
+      where: { id }
     });
     
     // Log activity
@@ -235,104 +241,166 @@ export async function DELETE(
       data: {
         userId: authUser.uid,
         action: 'DELETE',
-        entity: 'PURCHASE_ORDER',
+        entity: 'PROCUREMENT',
         entityId: id,
         meta: {
-          deletedPO: purchaseOrder
+          materialItem: existing.materialItem,
+          orderStatus: existing.orderStatus
         }
       }
     });
     
-    return successResponse(null, 'Purchase order deleted successfully');
+    return successResponse(null, 'Procurement item deleted successfully');
   } catch (error) {
     return errorResponse(error);
   }
 }
 
-// PATCH /api/v1/procurement/[id]/approve - Approve purchase order
+// PATCH /api/v1/procurement/[id] - Update procurement status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authUser = await requireRole(['ADMIN']);
-    const { id } = await params;
+    const authUser = await requireRole(['ADMIN', 'STAFF']);
+    const { id } = await context.params;
     const body = await request.json();
-    const action = body.action; // 'approve', 'reject', 'cancel'
+    const data = statusUpdateSchema.parse(body);
     
-    const purchaseOrder = await prisma.purchaseOrder.findUnique({
-      where: { id }
+    const existing = await prisma.procurement.findUnique({
+      where: { id },
+      include: { budgetItem: true }
     });
     
-    if (!purchaseOrder) {
-      throw new ApiError(404, 'Purchase order not found');
+    if (!existing) {
+      return errorResponse('Procurement item not found', 404);
     }
     
-    let newStatus: string;
-    let updateData: any = {};
+    // Validate status transition
+    const validTransitions: Record<string, string[]> = {
+      'DRAFT': ['QUOTED', 'CANCELLED'],
+      'QUOTED': ['APPROVED', 'REJECTED', 'CANCELLED'],
+      'APPROVED': ['ORDERED', 'CANCELLED'],
+      'ORDERED': ['SHIPPED', 'CANCELLED'],
+      'SHIPPED': ['DELIVERED', 'CANCELLED'],
+      'DELIVERED': ['INSTALLED'],
+      'INSTALLED': [],
+      'CANCELLED': ['DRAFT'],
+      'REJECTED': ['QUOTED', 'DRAFT']
+    };
     
-    switch (action) {
-      case 'approve':
-        if (purchaseOrder.status !== 'PENDING') {
-          throw new ApiError(400, 'Only pending orders can be approved');
-        }
-        newStatus = 'APPROVED';
-        updateData = {
-          status: 'APPROVED',
-          approvedBy: authUser.uid,
-          approvedAt: new Date()
-        };
-        break;
-        
-      case 'reject':
-        if (purchaseOrder.status !== 'PENDING') {
-          throw new ApiError(400, 'Only pending orders can be rejected');
-        }
-        newStatus = 'REJECTED';
-        updateData = {
-          status: 'REJECTED',
-          approvedBy: authUser.uid,
-          approvedAt: new Date()
-        };
-        break;
-        
-      case 'cancel':
-        if (['CLOSED', 'CANCELLED'].includes(purchaseOrder.status)) {
-          throw new ApiError(400, 'Order is already closed or cancelled');
-        }
-        newStatus = 'CANCELLED';
-        updateData = { status: 'CANCELLED' };
-        break;
-        
-      default:
-        throw new ApiError(400, 'Invalid action');
+    const currentStatus = existing.orderStatus;
+    const allowedStatuses = validTransitions[currentStatus] || [];
+    
+    if (!allowedStatuses.includes(data.status)) {
+      return errorResponse(
+        `Cannot transition from ${currentStatus} to ${data.status}`,
+        400
+      );
     }
     
-    const updated = await prisma.purchaseOrder.update({
+    // Generate PO number if transitioning to ORDERED
+    let poNumber = existing.poNumber;
+    if (data.status === 'ORDERED' && !poNumber) {
+      poNumber = await generatePONumber();
+    }
+    
+    // Update procurement with new status
+    const updateData: any = {
+      orderStatus: data.status,
+      updatedBy: authUser.uid,
+      updatedAt: new Date()
+    };
+    
+    // Add status-specific fields
+    if (data.status === 'ORDERED') {
+      updateData.poNumber = poNumber;
+      if (!existing.eta) {
+        updateData.eta = new Date(Date.now() + existing.leadTimeDays * 24 * 60 * 60 * 1000);
+      }
+    }
+    
+    if (data.status === 'DELIVERED' && data.actualDelivery) {
+      updateData.actualDelivery = new Date(data.actualDelivery);
+    }
+    
+    if (data.trackingNumber) {
+      updateData.trackingNumber = data.trackingNumber;
+    }
+    
+    if (data.notes) {
+      updateData.notes = existing.notes 
+        ? `${existing.notes}\n\n[${new Date().toISOString()}] ${data.notes}`
+        : data.notes;
+    }
+    
+    const procurement = await prisma.procurement.update({
       where: { id },
       data: updateData,
       include: {
-        vendor: true,
-        project: true
+        project: true,
+        supplier: true,
+        budgetItem: true
       }
     });
+    
+    // Update budget based on status change
+    if (existing.budgetItemId) {
+      const totalCost = existing.totalCost ? Number(existing.totalCost) : 0;
+      
+      // Moving to ORDERED/APPROVED - increase commitment
+      if (['ORDERED', 'APPROVED'].includes(data.status) && 
+          !['ORDERED', 'APPROVED'].includes(currentStatus)) {
+        await prisma.budgetItem.update({
+          where: { id: existing.budgetItemId },
+          data: {
+            committedTotal: { increment: totalCost },
+            status: 'COMMITTED'
+          }
+        });
+      }
+      
+      // Moving to DELIVERED/INSTALLED - increase paid amount
+      if (['DELIVERED', 'INSTALLED'].includes(data.status) && 
+          !['DELIVERED', 'INSTALLED'].includes(currentStatus)) {
+        await prisma.budgetItem.update({
+          where: { id: existing.budgetItemId },
+          data: {
+            paidToDate: { increment: totalCost },
+            status: 'PAID'
+          }
+        });
+      }
+      
+      // Cancelling - decrease commitment
+      if (data.status === 'CANCELLED' && 
+          ['ORDERED', 'APPROVED'].includes(currentStatus)) {
+        await prisma.budgetItem.update({
+          where: { id: existing.budgetItemId },
+          data: {
+            committedTotal: { decrement: totalCost }
+          }
+        });
+      }
+    }
     
     // Log activity
     await prisma.auditLog.create({
       data: {
         userId: authUser.uid,
-        action: action.toUpperCase(),
-        entity: 'PURCHASE_ORDER',
+        action: 'STATUS_UPDATE',
+        entity: 'PROCUREMENT',
         entityId: id,
         meta: {
-          poNumber: updated.poNumber,
-          previousStatus: purchaseOrder.status,
-          newStatus
+          previousStatus: currentStatus,
+          newStatus: data.status,
+          trackingNumber: data.trackingNumber,
+          actualDelivery: data.actualDelivery
         }
       }
     });
     
-    return successResponse(updated, `Purchase order ${action}d successfully`);
+    return successResponse(procurement, `Status updated to ${data.status}`);
   } catch (error) {
     return errorResponse(error);
   }
