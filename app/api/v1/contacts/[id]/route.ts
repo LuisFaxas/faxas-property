@@ -7,13 +7,14 @@ import { updateContactSchema } from '@/lib/validations/contact';
 // GET /api/v1/contacts/[id] - Get single contact
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAuth();
+    const { id } = await params;
     
     const contact = await prisma.contact.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         project: {
           select: {
@@ -46,15 +47,16 @@ export async function GET(
 // PUT /api/v1/contacts/[id] - Update contact
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
+    const { id } = await params;
     const body = await request.json();
-    const data = updateContactSchema.parse({ ...body, id: params.id });
+    const data = updateContactSchema.parse({ ...body, id });
     
     const existingContact = await prisma.contact.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
     
     if (!existingContact) {
@@ -62,7 +64,7 @@ export async function PUT(
     }
     
     const contact = await prisma.contact.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: data.name,
         email: data.email,
@@ -96,9 +98,9 @@ export async function PUT(
       data: {
         userId: authUser.uid,
         action: 'UPDATE',
-        entityType: 'CONTACT',
+        entity: 'CONTACT',
         entityId: contact.id,
-        metadata: {
+        meta: {
           changes: {
             from: existingContact,
             to: contact
@@ -116,15 +118,21 @@ export async function PUT(
 // DELETE /api/v1/contacts/[id] - Delete contact
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireRole(['ADMIN']);
+    const { id } = await params;
     
     const contact = await prisma.contact.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
-        tasks: true
+        project: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       }
     });
     
@@ -132,12 +140,21 @@ export async function DELETE(
       throw new ApiError(404, 'Contact not found');
     }
     
-    if (contact.tasks.length > 0) {
-      throw new ApiError(400, 'Cannot delete contact with associated tasks');
+    // Check if contact is referenced in any tasks
+    const tasksWithContact = await prisma.task.findMany({
+      where: {
+        relatedContactIds: {
+          has: id
+        }
+      }
+    });
+    
+    if (tasksWithContact.length > 0) {
+      throw new ApiError(400, 'Cannot delete contact that is referenced in tasks');
     }
     
     await prisma.contact.delete({
-      where: { id: params.id }
+      where: { id }
     });
     
     // Log activity
@@ -145,9 +162,9 @@ export async function DELETE(
       data: {
         userId: authUser.uid,
         action: 'DELETE',
-        entityType: 'CONTACT',
-        entityId: params.id,
-        metadata: {
+        entity: 'CONTACT',
+        entityId: id,
+        meta: {
           deletedContact: contact
         }
       }

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       .filter(item => {
         const budgetAmount = Number(item.estTotal);
         const actualAmount = Number(item.paidToDate);
-        const committedAmount = Number(item.commitment) || 0;
+        const committedAmount = Number(item.committedTotal);
         return actualAmount > budgetAmount || committedAmount > budgetAmount;
       })
       .sort((a, b) => Number(b.paidToDate) - Number(a.paidToDate));

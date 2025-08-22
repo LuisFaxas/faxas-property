@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Plus, Download, AlertCircle, TrendingUp, TrendingDown, DollarSign, FileText } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Plus, Download, AlertCircle, TrendingUp, TrendingDown, DollarSign, FileText, Edit, Trash, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -30,8 +30,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTable } from '@/components/ui/data-table';
@@ -42,234 +47,154 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { useBudget, useBudgetSummary } from '@/hooks/use-api';
+import { useBudget, useBudgetSummary, useProjects } from '@/hooks/use-api';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import apiClient from '@/lib/api-client';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import type { ColumnDef } from '@tanstack/react-table';
+
+// Form schema
+const budgetItemSchema = z.object({
+  discipline: z.string().min(1, 'Discipline is required'),
+  category: z.string().min(1, 'Category is required'),
+  item: z.string().min(1, 'Item name is required'),
+  unit: z.string().optional(),
+  qty: z.number().min(0).default(1),
+  estUnitCost: z.number().min(0).default(0),
+  estTotal: z.number().min(0).default(0),
+  committedTotal: z.number().min(0).default(0),
+  paidToDate: z.number().min(0).default(0),
+  vendorContactId: z.string().optional(),
+  status: z.enum(['BUDGETED', 'COMMITTED', 'PAID']).default('BUDGETED'),
+  projectId: z.string()
+});
+
+type BudgetItemFormValues = z.infer<typeof budgetItemSchema>;
+
+// Common disciplines and categories
+const DISCIPLINES = [
+  'General Conditions',
+  'Site Work',
+  'Concrete',
+  'Masonry',
+  'Metals',
+  'Wood & Plastics',
+  'Thermal & Moisture',
+  'Doors & Windows',
+  'Finishes',
+  'Specialties',
+  'Equipment',
+  'Furnishings',
+  'Mechanical',
+  'Electrical',
+  'Plumbing'
+];
+
+const CATEGORIES = [
+  'Labor',
+  'Materials',
+  'Equipment',
+  'Subcontractor',
+  'Permits',
+  'Insurance',
+  'Overhead',
+  'Contingency'
+];
 
 export default function AdminBudgetPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isReady = !!user;
+  
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
-
-  // Form state
-  const [formData, setFormData] = useState({
-    category: '',
-    item: '',
-    description: '',
-    budgetAmount: '',
-    actualSpent: '',
-    vendor: '',
-    status: 'PENDING',
-    paymentStatus: 'PENDING',
-    invoiceNumber: '',
-    dueDate: '',
-    notes: ''
-  });
-
-  // Fetch budget data
-  const { data: budgetItems, isLoading, refetch } = useBudget();
-  const { data: summary } = useBudgetSummary();
-
-  // Calculate metrics
-  const metrics = useMemo(() => {
-    const defaultMetrics = {
-      totalBudget: 0,
-      totalSpent: 0,
-      remaining: 0,
-      percentSpent: 0,
-      overBudgetItems: 0,
-      pendingPayments: 0
-    };
-
-    if (!summary) return defaultMetrics;
-
-    const pendingPayments = Array.isArray(budgetItems) 
-      ? budgetItems.filter((item: any) => 
-          item.paymentStatus === 'PENDING' && item.actualSpent > 0
-        ).reduce((sum: number, item: any) => sum + item.actualSpent, 0)
-      : 0;
-
-    return {
-      totalBudget: summary.totalBudget || 0,
-      totalSpent: summary.totalSpent || 0,
-      remaining: summary.remaining || 0,
-      percentSpent: summary.percentSpent || 0,
-      overBudgetItems: summary.exceptionsCount || 0,
-      pendingPayments
-    };
-  }, [summary, budgetItems]);
-
-  const handleCreate = async () => {
-    try {
-      const response = await fetch('/api/v1/budget', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          budgetAmount: parseFloat(formData.budgetAmount),
-          actualSpent: parseFloat(formData.actualSpent) || 0,
-          dueDate: formData.dueDate || null,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to create budget item');
-
-      toast({
-        title: 'Success',
-        description: 'Budget item created successfully',
-      });
-
-      setIsCreateOpen(false);
-      resetForm();
-      refetch();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create budget item',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleEdit = async () => {
-    if (!selectedItem) return;
-
-    try {
-      const response = await fetch(`/api/v1/budget/${selectedItem.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          budgetAmount: parseFloat(formData.budgetAmount),
-          actualSpent: parseFloat(formData.actualSpent) || 0,
-          dueDate: formData.dueDate || null,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to update budget item');
-
-      toast({
-        title: 'Success',
-        description: 'Budget item updated successfully',
-      });
-
-      setIsEditOpen(false);
-      setSelectedItem(null);
-      resetForm();
-      refetch();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update budget item',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!selectedItem) return;
-
-    try {
-      const response = await fetch(`/api/v1/budget/${selectedItem.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete budget item');
-
-      toast({
-        title: 'Success',
-        description: 'Budget item deleted successfully',
-      });
-
-      setIsDeleteOpen(false);
-      setSelectedItem(null);
-      refetch();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete budget item',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleExport = () => {
-    if (!budgetItems || budgetItems.length === 0) {
-      toast({
-        title: 'No data',
-        description: 'No budget items to export',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const csv = [
-      ['Category', 'Item', 'Description', 'Budget Amount', 'Actual Spent', 'Variance', 'Status', 'Payment Status', 'Vendor', 'Invoice #', 'Due Date'],
-      ...budgetItems.map((item: any) => [
-        item.category,
-        item.item,
-        item.description || '',
-        item.budgetAmount,
-        item.actualSpent || 0,
-        item.budgetAmount - (item.actualSpent || 0),
-        item.status,
-        item.paymentStatus,
-        item.vendor || '',
-        item.invoiceNumber || '',
-        item.dueDate ? new Date(item.dueDate).toLocaleDateString() : ''
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `budget-report-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
-
-  const resetForm = () => {
-    setFormData({
+  const [projectId, setProjectId] = useState<string>('');
+  
+  // Form
+  const form = useForm<BudgetItemFormValues>({
+    resolver: zodResolver(budgetItemSchema),
+    defaultValues: {
+      discipline: '',
       category: '',
       item: '',
-      description: '',
-      budgetAmount: '',
-      actualSpent: '',
-      vendor: '',
-      status: 'PENDING',
-      paymentStatus: 'PENDING',
-      invoiceNumber: '',
-      dueDate: '',
-      notes: ''
-    });
-  };
-
-  const openEditDialog = (item: any) => {
-    setSelectedItem(item);
-    setFormData({
-      category: item.category,
-      item: item.item,
-      description: item.description || '',
-      budgetAmount: item.budgetAmount.toString(),
-      actualSpent: item.actualSpent?.toString() || '0',
-      vendor: item.vendor || '',
-      status: item.status,
-      paymentStatus: item.paymentStatus,
-      invoiceNumber: item.invoiceNumber || '',
-      dueDate: item.dueDate ? new Date(item.dueDate).toISOString().split('T')[0] : '',
-      notes: item.notes || ''
-    });
-    setIsEditOpen(true);
-  };
-
+      unit: '',
+      qty: 1,
+      estUnitCost: 0,
+      estTotal: 0,
+      committedTotal: 0,
+      paidToDate: 0,
+      vendorContactId: '',
+      status: 'BUDGETED',
+      projectId: ''
+    }
+  });
+  
+  // Fetch data
+  const { data: budgetData, isLoading, refetch } = useBudget({ projectId }, isReady);
+  const { data: summary } = useBudgetSummary(projectId, isReady);
+  const { data: projectsData } = useProjects(isReady);
+  
+  // Set default projectId
+  useEffect(() => {
+    if (projectsData && Array.isArray(projectsData) && projectsData.length > 0 && !projectId) {
+      const defaultProjectId = projectsData[0].id;
+      setProjectId(defaultProjectId);
+      form.setValue('projectId', defaultProjectId);
+    }
+  }, [projectsData, projectId, form]);
+  
+  // Auto-calculate totals
+  const watchQty = form.watch('qty');
+  const watchUnitCost = form.watch('estUnitCost');
+  
+  useEffect(() => {
+    const total = watchQty * watchUnitCost;
+    form.setValue('estTotal', total);
+  }, [watchQty, watchUnitCost, form]);
+  
+  const budgetItems = Array.isArray(budgetData) ? budgetData : [];
+  
+  // Calculate metrics
+  const metrics = useMemo(() => {
+    if (!summary) {
+      return {
+        totalBudget: 0,
+        totalCommitted: 0,
+        totalPaid: 0,
+        remaining: 0,
+        variance: 0,
+        percentSpent: 0,
+        overBudgetCount: 0
+      };
+    }
+    
+    return {
+      totalBudget: summary.totalBudget || 0,
+      totalCommitted: summary.totalCommitted || 0,
+      totalPaid: summary.totalPaid || 0,
+      remaining: summary.remainingBudget || 0,
+      variance: summary.totalVariance || 0,
+      percentSpent: summary.spendRate || 0,
+      overBudgetCount: summary.overBudgetCount || 0
+    };
+  }, [summary]);
+  
+  // Columns definition
   const columns: ColumnDef<any>[] = [
     {
       id: 'select',
@@ -277,26 +202,27 @@ export default function AdminBudgetPage() {
         <Checkbox
           checked={table.getIsAllPageRowsSelected()}
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
         />
       ),
       enableSorting: false,
       enableHiding: false,
     },
     {
+      accessorKey: 'discipline',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Discipline" />
+      ),
+    },
+    {
       accessorKey: 'category',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Category" />
-      ),
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('category')}</div>
       ),
     },
     {
@@ -305,57 +231,73 @@ export default function AdminBudgetPage() {
         <DataTableColumnHeader column={column} title="Item" />
       ),
       cell: ({ row }) => (
-        <div>
-          <div className="font-medium">{row.getValue('item')}</div>
-          {row.original.description && (
-            <div className="text-sm text-white/60">{row.original.description}</div>
-          )}
+        <div className="max-w-[200px] truncate font-medium">
+          {row.getValue('item')}
         </div>
       ),
     },
     {
-      accessorKey: 'budgetAmount',
+      accessorKey: 'estTotal',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Budget" />
       ),
-      cell: ({ row }) => (
-        <div className="text-right font-medium">
-          ${row.getValue<number>('budgetAmount').toLocaleString()}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'actualSpent',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Spent" />
-      ),
       cell: ({ row }) => {
-        const spent = row.getValue<number>('actualSpent') || 0;
+        const amount = parseFloat(row.getValue('estTotal'));
         return (
-          <div className="text-right font-medium">
-            ${spent.toLocaleString()}
+          <div className="font-medium">
+            ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
         );
       },
     },
     {
-      id: 'variance',
+      accessorKey: 'committedTotal',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Committed" />
+      ),
+      cell: ({ row }) => {
+        const amount = parseFloat(row.getValue('committedTotal'));
+        return (
+          <div>
+            ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'paidToDate',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Paid" />
+      ),
+      cell: ({ row }) => {
+        const amount = parseFloat(row.getValue('paidToDate'));
+        return (
+          <div>
+            ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'varianceAmount',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Variance" />
       ),
       cell: ({ row }) => {
-        const budget = row.original.budgetAmount;
-        const spent = row.original.actualSpent || 0;
-        const variance = budget - spent;
-        const isOver = variance < 0;
-
+        const variance = row.original.varianceAmount || 0;
+        const isOverBudget = variance > 0;
+        
         return (
           <div className={cn(
-            "text-right font-medium flex items-center justify-end gap-1",
-            isOver ? "text-red-400" : "text-green-400"
+            'font-medium',
+            isOverBudget ? 'text-red-500' : 'text-green-500'
           )}>
-            {isOver ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-            ${Math.abs(variance).toLocaleString()}
+            {isOverBudget ? '+' : ''}${Math.abs(variance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            {row.original.variancePercent && (
+              <span className="text-xs ml-1">
+                ({Math.abs(row.original.variancePercent).toFixed(1)}%)
+              </span>
+            )}
           </div>
         );
       },
@@ -370,579 +312,822 @@ export default function AdminBudgetPage() {
         return (
           <Badge
             variant={
-              status === 'APPROVED' ? 'default' :
-              status === 'IN_PROGRESS' ? 'secondary' :
-              status === 'COMPLETED' ? 'outline' :
-              'destructive'
+              status === 'PAID' ? 'default' :
+              status === 'COMMITTED' ? 'secondary' :
+              'outline'
             }
           >
             {status}
           </Badge>
         );
       },
-    },
-    {
-      accessorKey: 'paymentStatus',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Payment" />
-      ),
-      cell: ({ row }) => {
-        const status = row.getValue<string>('paymentStatus');
-        return (
-          <Badge
-            variant={
-              status === 'PAID' ? 'default' :
-              status === 'PARTIAL' ? 'secondary' :
-              'destructive'
-            }
-          >
-            {status}
-          </Badge>
-        );
+      filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id));
       },
     },
     {
       id: 'actions',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openEditDialog(row.original)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSelectedItem(row.original);
-              setIsDeleteOpen(true);
-            }}
-          >
-            Delete
-          </Button>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const item = row.original;
+        
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleEdit(item)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleDelete(item)}
+                className="text-red-600"
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ];
-
-  // Loading state
+  
+  // Handlers
+  const handleCreate = async (values: BudgetItemFormValues) => {
+    try {
+      await apiClient.post('/budget', {
+        ...values,
+        projectId: projectId || values.projectId
+      });
+      
+      toast({
+        title: 'Success',
+        description: 'Budget item created successfully',
+      });
+      
+      setIsCreateOpen(false);
+      form.reset();
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to create budget item',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const handleEdit = (item: any) => {
+    setSelectedItem(item);
+    form.reset({
+      discipline: item.discipline,
+      category: item.category,
+      item: item.item,
+      unit: item.unit || '',
+      qty: Number(item.qty),
+      estUnitCost: Number(item.estUnitCost),
+      estTotal: Number(item.estTotal),
+      committedTotal: Number(item.committedTotal),
+      paidToDate: Number(item.paidToDate),
+      vendorContactId: item.vendorContactId || '',
+      status: item.status,
+      projectId: item.projectId
+    });
+    setIsEditOpen(true);
+  };
+  
+  const handleUpdate = async (values: BudgetItemFormValues) => {
+    if (!selectedItem) return;
+    
+    try {
+      await apiClient.put(`/budget/${selectedItem.id}`, values);
+      
+      toast({
+        title: 'Success',
+        description: 'Budget item updated successfully',
+      });
+      
+      setIsEditOpen(false);
+      setSelectedItem(null);
+      form.reset();
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to update budget item',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const handleDelete = (item: any) => {
+    setSelectedItem(item);
+    setIsDeleteOpen(true);
+  };
+  
+  const handleConfirmDelete = async () => {
+    if (!selectedItem) return;
+    
+    try {
+      await apiClient.delete(`/budget/${selectedItem.id}`);
+      
+      toast({
+        title: 'Success',
+        description: 'Budget item deleted successfully',
+      });
+      
+      setIsDeleteOpen(false);
+      setSelectedItem(null);
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to delete budget item',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const handleExport = () => {
+    const csv = [
+      ['Discipline', 'Category', 'Item', 'Unit', 'Qty', 'Unit Cost', 'Budget', 'Committed', 'Paid', 'Variance', 'Status'],
+      ...budgetItems.map((item: any) => [
+        item.discipline,
+        item.category,
+        item.item,
+        item.unit || '',
+        item.qty,
+        item.estUnitCost,
+        item.estTotal,
+        item.committedTotal,
+        item.paidToDate,
+        item.varianceAmount || 0,
+        item.status
+      ])
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'budget.csv';
+    a.click();
+  };
+  
   if (isLoading) {
     return (
-      <PageShell>
+      <PageShell title="Budget Management" description="Track project budget and expenses">
         <div className="p-6 space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-[400px] w-full" />
+          <div className="grid gap-4 md:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-8 w-32 mt-2" />
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+          <Skeleton className="h-96" />
         </div>
       </PageShell>
     );
   }
-
+  
   return (
-    <PageShell>
+    <PageShell title="Budget Management" description="Track project budget and expenses">
       <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white">Budget Management</h1>
-            <p className="text-white/60">Track expenses and manage project budget</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" />
-              Export Report
-            </Button>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Budget Item
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[625px] bg-gray-900 text-white border-white/10">
-                <DialogHeader>
-                  <DialogTitle>Add Budget Item</DialogTitle>
-                  <DialogDescription className="text-white/60">
-                    Create a new budget line item
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) => setFormData({ ...formData, category: value })}
-                      >
-                        <SelectTrigger className="bg-white/5 border-white/10">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="MATERIALS">Materials</SelectItem>
-                          <SelectItem value="LABOR">Labor</SelectItem>
-                          <SelectItem value="EQUIPMENT">Equipment</SelectItem>
-                          <SelectItem value="PERMITS">Permits</SelectItem>
-                          <SelectItem value="PROFESSIONAL">Professional Services</SelectItem>
-                          <SelectItem value="CONTINGENCY">Contingency</SelectItem>
-                          <SelectItem value="OTHER">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Item Name</Label>
-                      <Input
-                        value={formData.item}
-                        onChange={(e) => setFormData({ ...formData, item: e.target.value })}
-                        className="bg-white/5 border-white/10"
-                        placeholder="e.g., Kitchen Cabinets"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                      placeholder="Detailed description..."
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Budget Amount</Label>
-                      <Input
-                        type="number"
-                        value={formData.budgetAmount}
-                        onChange={(e) => setFormData({ ...formData, budgetAmount: e.target.value })}
-                        className="bg-white/5 border-white/10"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Actual Spent</Label>
-                      <Input
-                        type="number"
-                        value={formData.actualSpent}
-                        onChange={(e) => setFormData({ ...formData, actualSpent: e.target.value })}
-                        className="bg-white/5 border-white/10"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value) => setFormData({ ...formData, status: value })}
-                      >
-                        <SelectTrigger className="bg-white/5 border-white/10">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="PENDING">Pending</SelectItem>
-                          <SelectItem value="APPROVED">Approved</SelectItem>
-                          <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                          <SelectItem value="COMPLETED">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Payment Status</Label>
-                      <Select
-                        value={formData.paymentStatus}
-                        onValueChange={(value) => setFormData({ ...formData, paymentStatus: value })}
-                      >
-                        <SelectTrigger className="bg-white/5 border-white/10">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="PENDING">Pending</SelectItem>
-                          <SelectItem value="PARTIAL">Partial</SelectItem>
-                          <SelectItem value="PAID">Paid</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Vendor</Label>
-                      <Input
-                        value={formData.vendor}
-                        onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                        className="bg-white/5 border-white/10"
-                        placeholder="Vendor name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Invoice Number</Label>
-                      <Input
-                        value={formData.invoiceNumber}
-                        onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
-                        className="bg-white/5 border-white/10"
-                        placeholder="INV-001"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Due Date</Label>
-                    <Input
-                      type="date"
-                      value={formData.dueDate}
-                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreate}>Create Item</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-
         {/* KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="bg-white/5 border-white/10">
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/60">Total Budget</CardTitle>
-              <DollarSign className="h-4 w-4 text-white/40" />
+              <CardTitle className="text-sm font-medium">Total Budget</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
-                ${(metrics.totalBudget || 0).toLocaleString()}
+              <div className="text-2xl font-bold">
+                ${metrics.totalBudget.toLocaleString()}
               </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/60">Total Spent</CardTitle>
-              <TrendingUp className="h-4 w-4 text-white/40" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">
-                ${(metrics.totalSpent || 0).toLocaleString()}
-              </div>
-              <p className="text-xs text-white/60 mt-1">
-                {(metrics.percentSpent || 0).toFixed(1)}% of budget
+              <p className="text-xs text-muted-foreground">
+                Approved budget
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-white/5 border-white/10">
+          
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/60">Remaining</CardTitle>
-              <TrendingDown className="h-4 w-4 text-white/40" />
+              <CardTitle className="text-sm font-medium">Committed</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
+              <div className="text-2xl font-bold">
+                ${metrics.totalCommitted.toLocaleString()}
+              </div>
+              <Progress value={(metrics.totalCommitted / metrics.totalBudget) * 100} className="mt-2" />
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Paid to Date</CardTitle>
+              {metrics.variance < 0 ? (
+                <TrendingUp className="h-4 w-4 text-green-500" />
+              ) : (
+                <TrendingDown className="h-4 w-4 text-red-500" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${metrics.totalPaid.toLocaleString()}
+              </div>
               <div className={cn(
-                "text-2xl font-bold",
-                metrics.remaining >= 0 ? "text-green-400" : "text-red-400"
+                'text-xs',
+                metrics.variance < 0 ? 'text-green-500' : 'text-red-500'
               )}>
-                ${Math.abs(metrics.remaining || 0).toLocaleString()}
+                {metrics.variance < 0 ? 'Under' : 'Over'} by ${Math.abs(metrics.variance).toLocaleString()}
               </div>
-              <p className="text-xs text-white/60 mt-1">
-                {metrics.remaining < 0 ? 'Over budget' : 'Under budget'}
-              </p>
             </CardContent>
           </Card>
-          <Card className="bg-white/5 border-white/10">
+          
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/60">Pending Payments</CardTitle>
-              <FileText className="h-4 w-4 text-white/40" />
+              <CardTitle className="text-sm font-medium">Exceptions</CardTitle>
+              <AlertCircle className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
-                ${(metrics.pendingPayments || 0).toLocaleString()}
-              </div>
-              <p className="text-xs text-white/60 mt-1">
-                Awaiting payment
+              <div className="text-2xl font-bold">{metrics.overBudgetCount}</div>
+              <p className="text-xs text-muted-foreground">
+                Items over budget
               </p>
             </CardContent>
           </Card>
         </div>
-
-        {/* Budget Progress */}
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader>
-            <CardTitle className="text-white">Budget Progress</CardTitle>
-            <CardDescription className="text-white/60">
-              Overall project budget utilization
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-white/60">Spent</span>
-                <span className="text-white font-medium">
-                  ${(metrics.totalSpent || 0).toLocaleString()} / ${(metrics.totalBudget || 0).toLocaleString()}
-                </span>
-              </div>
-              <Progress 
-                value={metrics.percentSpent || 0} 
-                className="h-2"
-              />
-              <div className="flex items-center justify-between text-xs text-white/40">
-                <span>0%</span>
-                <span>{(metrics.percentSpent || 0).toFixed(1)}%</span>
-                <span>100%</span>
-              </div>
+        
+        {/* Main Content */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <div className="flex items-center justify-between">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="items">Budget Items</TabsTrigger>
+              <TabsTrigger value="exceptions">Exceptions</TabsTrigger>
+            </TabsList>
+            
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Item
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Add Budget Item</DialogTitle>
+                    <DialogDescription>
+                      Create a new budget line item
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="discipline"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Discipline</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select discipline" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {DISCIPLINES.map(d => (
+                                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="category"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Category</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select category" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {CATEGORIES.map(c => (
+                                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <FormField
+                        control={form.control}
+                        name="item"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Description</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Enter item description" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="grid grid-cols-4 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="unit"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Unit</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="e.g., SF, LF" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="qty"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Quantity</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  {...field} 
+                                  onChange={e => field.onChange(parseFloat(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="estUnitCost"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Unit Cost</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  {...field} 
+                                  onChange={e => field.onChange(parseFloat(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="estTotal"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Total</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  {...field} 
+                                  disabled
+                                  className="bg-muted"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="committedTotal"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Committed Amount</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  {...field} 
+                                  onChange={e => field.onChange(parseFloat(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="paidToDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Paid to Date</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  {...field} 
+                                  onChange={e => field.onChange(parseFloat(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="status"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Status</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="BUDGETED">Budgeted</SelectItem>
+                                  <SelectItem value="COMMITTED">Committed</SelectItem>
+                                  <SelectItem value="PAID">Paid</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit">Create Item</Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-white/5 border-white/10">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="exceptions">
-              Exceptions 
-              {metrics.overBudgetItems > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {metrics.overBudgetItems}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="payments">Pending Payments</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="mt-6">
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white">All Budget Items</CardTitle>
-                <CardDescription className="text-white/60">
-                  Complete list of budget line items
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+          </div>
+          
+          <TabsContent value="overview" className="space-y-4">
+            {summary?.disciplineBreakdown && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Budget by Discipline</CardTitle>
+                  <CardDescription>
+                    Breakdown of budget allocation across disciplines
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {Object.entries(summary.disciplineBreakdown).map(([discipline, data]: [string, any]) => (
+                      <div key={discipline} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{discipline}</span>
+                          <span className="text-sm text-muted-foreground">
+                            ${data.budget.toLocaleString()} budget
+                          </span>
+                        </div>
+                        <Progress 
+                          value={(data.paid / data.budget) * 100} 
+                          className="h-2"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>${data.paid.toLocaleString()} spent</span>
+                          <span>{((data.paid / data.budget) * 100).toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="items">
+            <Card>
+              <CardContent className="p-0">
                 <DataTable
                   columns={columns}
-                  data={Array.isArray(budgetItems) ? budgetItems : []}
+                  data={budgetItems}
                   searchKey="item"
                   searchPlaceholder="Search items..."
                 />
               </CardContent>
             </Card>
           </TabsContent>
-
-          <TabsContent value="exceptions" className="mt-6">
-            <Card className="bg-white/5 border-white/10">
+          
+          <TabsContent value="exceptions">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-yellow-400" />
-                  Budget Exceptions
-                </CardTitle>
-                <CardDescription className="text-white/60">
-                  Items that are over budget or require attention
+                <CardTitle>Over Budget Items</CardTitle>
+                <CardDescription>
+                  Items that have exceeded their budgeted amount
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <DataTable
-                  columns={columns}
-                  data={Array.isArray(budgetItems) 
-                    ? budgetItems.filter((item: any) => {
-                        const variance = item.budgetAmount - (item.actualSpent || 0);
-                        return variance < 0;
-                      })
-                    : []}
-                  searchKey="item"
-                  searchPlaceholder="Search exceptions..."
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="payments" className="mt-6">
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white">Pending Payments</CardTitle>
-                <CardDescription className="text-white/60">
-                  Items awaiting payment processing
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DataTable
-                  columns={columns}
-                  data={Array.isArray(budgetItems)
-                    ? budgetItems.filter((item: any) => 
-                        item.paymentStatus === 'PENDING' && item.actualSpent > 0
-                      )
-                    : []}
-                  searchKey="item"
-                  searchPlaceholder="Search pending payments..."
-                />
+                {summary?.topOverBudgetItems && summary.topOverBudgetItems.length > 0 ? (
+                  <div className="space-y-4">
+                    {summary.topOverBudgetItems.map((item: any) => (
+                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{item.item}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {item.discipline} - {item.category}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-red-500">
+                            +${item.variance.toLocaleString()}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {item.variancePercent.toFixed(1)}% over budget
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">No items are over budget</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-
+        
         {/* Edit Dialog */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-[625px] bg-gray-900 text-white border-white/10">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Edit Budget Item</DialogTitle>
-              <DialogDescription className="text-white/60">
+              <DialogDescription>
                 Update budget line item details
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  >
-                    <SelectTrigger className="bg-white/5 border-white/10">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="MATERIALS">Materials</SelectItem>
-                      <SelectItem value="LABOR">Labor</SelectItem>
-                      <SelectItem value="EQUIPMENT">Equipment</SelectItem>
-                      <SelectItem value="PERMITS">Permits</SelectItem>
-                      <SelectItem value="PROFESSIONAL">Professional Services</SelectItem>
-                      <SelectItem value="CONTINGENCY">Contingency</SelectItem>
-                      <SelectItem value="OTHER">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Item Name</Label>
-                  <Input
-                    value={formData.item}
-                    onChange={(e) => setFormData({ ...formData, item: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                    placeholder="e.g., Kitchen Cabinets"
+            
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="discipline"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Discipline</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {DISCIPLINES.map(d => (
+                              <SelectItem key={d} value={d}>{d}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {CATEGORIES.map(c => (
+                              <SelectItem key={c} value={c}>{c}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="bg-white/5 border-white/10"
-                  placeholder="Detailed description..."
+                
+                <FormField
+                  control={form.control}
+                  name="item"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Item Description</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Budget Amount</Label>
-                  <Input
-                    type="number"
-                    value={formData.budgetAmount}
-                    onChange={(e) => setFormData({ ...formData, budgetAmount: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                    placeholder="0.00"
+                
+                <div className="grid grid-cols-4 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="unit"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Unit</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="qty"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantity</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            onChange={e => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="estUnitCost"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Unit Cost</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01"
+                            {...field} 
+                            onChange={e => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="estTotal"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Total</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01"
+                            {...field} 
+                            disabled
+                            className="bg-muted"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Actual Spent</Label>
-                  <Input
-                    type="number"
-                    value={formData.actualSpent}
-                    onChange={(e) => setFormData({ ...formData, actualSpent: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                    placeholder="0.00"
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="committedTotal"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Committed Amount</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01"
+                            {...field} 
+                            onChange={e => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="paidToDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Paid to Date</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01"
+                            {...field} 
+                            onChange={e => field.onChange(parseFloat(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="BUDGETED">Budgeted</SelectItem>
+                            <SelectItem value="COMMITTED">Committed</SelectItem>
+                            <SelectItem value="PAID">Paid</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                  >
-                    <SelectTrigger className="bg-white/5 border-white/10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PENDING">Pending</SelectItem>
-                      <SelectItem value="APPROVED">Approved</SelectItem>
-                      <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                      <SelectItem value="COMPLETED">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Payment Status</Label>
-                  <Select
-                    value={formData.paymentStatus}
-                    onValueChange={(value) => setFormData({ ...formData, paymentStatus: value })}
-                  >
-                    <SelectTrigger className="bg-white/5 border-white/10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PENDING">Pending</SelectItem>
-                      <SelectItem value="PARTIAL">Partial</SelectItem>
-                      <SelectItem value="PAID">Paid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Vendor</Label>
-                  <Input
-                    value={formData.vendor}
-                    onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                    placeholder="Vendor name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Invoice Number</Label>
-                  <Input
-                    value={formData.invoiceNumber}
-                    onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                    placeholder="INV-001"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                  className="bg-white/5 border-white/10"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleEdit}>Update Item</Button>
-            </DialogFooter>
+                
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">Update Item</Button>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
-
+        
         {/* Delete Confirmation */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-          <AlertDialogContent className="bg-gray-900 text-white border-white/10">
+          <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Budget Item</AlertDialogTitle>
-              <AlertDialogDescription className="text-white/60">
+              <AlertDialogDescription>
                 Are you sure you want to delete "{selectedItem?.item}"? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="bg-white/10 text-white hover:bg-white/20">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700"
-              >
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDelete}>
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>

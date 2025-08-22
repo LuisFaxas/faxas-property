@@ -1,17 +1,20 @@
 import { z } from 'zod';
 
-// Define enums locally since Prisma enums might not be available at build time
-export const BudgetCategory = z.enum(['LABOR', 'MATERIALS', 'EQUIPMENT', 'SUBCONTRACTOR', 'PERMITS', 'OVERHEAD', 'CONTINGENCY', 'OTHER']);
-export const BudgetStatus = z.enum(['PLANNED', 'COMMITTED', 'SPENT', 'OVERRUN']);
+// Match Prisma BudgetStatus enum
+export const BudgetStatus = z.enum(['BUDGETED', 'COMMITTED', 'PAID']);
 
 export const createBudgetItemSchema = z.object({
-  name: z.string().min(1).max(200),
-  category: BudgetCategory,
-  budgetAmount: z.number().positive(),
-  committedAmount: z.number().min(0).default(0),
-  actualAmount: z.number().min(0).default(0),
-  status: BudgetStatus.default('PLANNED'),
-  notes: z.string().optional(),
+  discipline: z.string().min(1).max(100),
+  category: z.string().min(1).max(100),
+  item: z.string().min(1).max(200),
+  unit: z.string().optional(),
+  qty: z.number().min(0).default(1),
+  estUnitCost: z.number().min(0).default(0),
+  estTotal: z.number().min(0).default(0),
+  committedTotal: z.number().min(0).default(0),
+  paidToDate: z.number().min(0).default(0),
+  vendorContactId: z.string().optional(),
+  status: BudgetStatus.default('BUDGETED'),
   projectId: z.string()
 });
 
@@ -19,16 +22,11 @@ export const updateBudgetItemSchema = createBudgetItemSchema.partial().extend({
   id: z.string()
 });
 
-export const recordPaymentSchema = z.object({
-  amount: z.number().positive(),
-  description: z.string().optional(),
-  date: z.string().datetime().optional()
-});
-
 export const budgetQuerySchema = z.object({
   page: z.string().optional().transform(val => val ? parseInt(val) : 1),
   limit: z.string().optional().transform(val => val ? parseInt(val) : 20),
-  category: BudgetCategory.optional(),
+  discipline: z.string().optional(),
+  category: z.string().optional(),
   status: BudgetStatus.optional(),
   projectId: z.string().optional(),
   overBudgetOnly: z.string().optional().transform(val => val === 'true')
@@ -36,5 +34,4 @@ export const budgetQuerySchema = z.object({
 
 export type CreateBudgetItemInput = z.infer<typeof createBudgetItemSchema>;
 export type UpdateBudgetItemInput = z.infer<typeof updateBudgetItemSchema>;
-export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 export type BudgetQuery = z.infer<typeof budgetQuerySchema>;

@@ -52,7 +52,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/app/contexts/AuthContext';
-import { useContacts, useCreateContact } from '@/hooks/use-api';
+import { useContacts, useCreateContact, useProjects } from '@/hooks/use-api';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -141,15 +141,6 @@ export default function AdminContactsPage() {
     }
   }, [authLoading, user]);
 
-  // Fetch data
-  const { data: contactsData, isLoading: contactsLoading, refetch } = useContacts(
-    { projectId, limit: 100 },
-    isReady
-  );
-  
-  // Mutations
-  const createMutation = useCreateContact();
-
   // Form
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -162,9 +153,30 @@ export default function AdminContactsPage() {
       type: 'INDIVIDUAL',
       status: 'ACTIVE',
       notes: '',
-      projectId: projectId || 'default',
+      projectId: projectId || '',
     },
   });
+
+  // Fetch data
+  const { data: contactsData, isLoading: contactsLoading, refetch } = useContacts(
+    { projectId, limit: 100 },
+    isReady
+  );
+  
+  // Fetch projects
+  const { data: projectsData } = useProjects(isReady);
+  
+  // Set default projectId when projects are loaded
+  useEffect(() => {
+    if (projectsData && Array.isArray(projectsData) && projectsData.length > 0 && !projectId) {
+      const defaultProjectId = projectsData[0].id;
+      setProjectId(defaultProjectId);
+      form.setValue('projectId', defaultProjectId);
+    }
+  }, [projectsData, projectId, form]);
+  
+  // Mutations
+  const createMutation = useCreateContact();
 
   // Columns definition
   const columns: ColumnDef<any>[] = [
@@ -318,12 +330,41 @@ export default function AdminContactsPage() {
   // Handlers
   const handleCreate = async (values: ContactFormValues) => {
     try {
+      // Ensure we have a valid projectId
+      const finalProjectId = values.projectId || projectId || 
+        (projectsData && Array.isArray(projectsData) && projectsData.length > 0 ? projectsData[0].id : '');
+      
+      if (!finalProjectId) {
+        toast({
+          title: 'Error',
+          description: 'No project available. Please create a project first.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
       await createMutation.mutateAsync({
         ...values,
-        projectId: projectId || 'default',
+        projectId: finalProjectId,
       });
+      
+      toast({
+        title: 'Success',
+        description: 'Contact created successfully',
+      });
+      
       setIsCreateOpen(false);
-      form.reset();
+      form.reset({
+        name: '',
+        email: '',
+        phone: '',
+        company: '',
+        category: 'SUBCONTRACTOR',
+        type: 'INDIVIDUAL',
+        status: 'ACTIVE',
+        notes: '',
+        projectId: finalProjectId,
+      });
       refetch();
     } catch (error) {
       console.error('Error creating contact:', error);
@@ -377,18 +418,31 @@ export default function AdminContactsPage() {
     if (!selectedContact) return;
     
     try {
-      await apiClient.delete(`/contacts/${selectedContact.id}`);
+      const response = await apiClient.delete(`/contacts/${selectedContact.id}`);
+      
+      // Even if there's an audit log error, if the contact was deleted, we should update the UI
       toast({
         title: 'Success',
         description: 'Contact deleted successfully',
       });
       setIsDeleteOpen(false);
       setSelectedContact(null);
-      refetch();
+      
+      // Always refetch to update the list
+      setTimeout(() => {
+        refetch();
+      }, 100);
     } catch (error: any) {
+      console.error('Delete error:', error);
+      
+      // Still try to refetch in case the delete actually succeeded
+      setTimeout(() => {
+        refetch();
+      }, 500);
+      
       toast({
         title: 'Error',
-        description: error.error || 'Failed to delete contact',
+        description: error.error || error.message || 'Failed to delete contact',
         variant: 'destructive',
       });
     }
@@ -403,7 +457,7 @@ export default function AdminContactsPage() {
 
   const handleExport = () => {
     // Implement CSV export
-    const contacts = contactsData?.data || [];
+    const contacts = Array.isArray(contactsData) ? contactsData : [];
     const csv = [
       ['Name', 'Email', 'Phone', 'Company', 'Category', 'Status'],
       ...contacts.map((c: any) => [
@@ -445,7 +499,7 @@ export default function AdminContactsPage() {
     );
   }
 
-  const contacts = contactsData?.data || [];
+  const contacts = Array.isArray(contactsData) ? contactsData : [];
 
   return (
     <PageShell 

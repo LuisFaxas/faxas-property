@@ -13,14 +13,10 @@ export async function GET(request: NextRequest) {
     const query = budgetQuerySchema.parse(searchParams);
     
     const where: Prisma.BudgetItemWhereInput = {
-      projectId: query.projectId,
+      ...(query.projectId && { projectId: query.projectId }),
+      ...(query.discipline && { discipline: query.discipline }),
       ...(query.category && { category: query.category }),
-      ...(query.status && { status: query.status }),
-      ...(query.overBudgetOnly && {
-        paidToDate: {
-          gt: prisma.budgetItem.fields.estTotal
-        }
-      })
+      ...(query.status && { status: query.status })
     };
     
     const [items, total] = await Promise.all([
@@ -37,6 +33,7 @@ export async function GET(request: NextRequest) {
         skip: (query.page - 1) * query.limit,
         take: query.limit,
         orderBy: [
+          { discipline: 'asc' },
           { category: 'asc' },
           { item: 'asc' }
         ]
@@ -47,9 +44,8 @@ export async function GET(request: NextRequest) {
     // Calculate variance for each item
     const itemsWithVariance = items.map(item => ({
       ...item,
-      budgetAmount: Number(item.estTotal),
-      actualSpent: Number(item.paidToDate),
-      variance: Number(item.paidToDate) - Number(item.estTotal),
+      variance: Number(item.variance),
+      varianceAmount: Number(item.paidToDate) - Number(item.estTotal),
       variancePercent: Number(item.estTotal) > 0 
         ? ((Number(item.paidToDate) - Number(item.estTotal)) / Number(item.estTotal)) * 100
         : 0
@@ -72,15 +68,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createBudgetItemSchema.parse(body);
     
+    // Calculate variance if needed
+    const variance = data.estTotal > 0 
+      ? (data.paidToDate - data.estTotal) / data.estTotal
+      : 0;
+    
     const budgetItem = await prisma.budgetItem.create({
       data: {
-        item: data.item || 'New Item',
-        discipline: data.category || 'GENERAL',
-        category: data.category || 'GENERAL',
-        estTotal: data.budgetAmount || 0,
-        committedTotal: data.committedAmount || 0,
-        paidToDate: data.actualSpent || 0,
-        status: data.status || 'NEW',
+        discipline: data.discipline,
+        category: data.category,
+        item: data.item,
+        unit: data.unit,
+        qty: data.qty,
+        estUnitCost: data.estUnitCost,
+        estTotal: data.estTotal,
+        committedTotal: data.committedTotal,
+        paidToDate: data.paidToDate,
+        vendorContactId: data.vendorContactId,
+        status: data.status,
+        variance: variance,
         projectId: data.projectId
       },
       include: {
