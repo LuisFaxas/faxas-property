@@ -12,7 +12,7 @@ import {
   List,
   Kanban,
   Calendar,
-  Gantt,
+  BarChart3,
   Table2,
   ChevronDown,
 } from 'lucide-react';
@@ -30,7 +30,7 @@ const viewOptions = [
   { value: 'list' as TaskView, label: 'List', icon: List },
   { value: 'kanban' as TaskView, label: 'Kanban', icon: Kanban },
   { value: 'calendar' as TaskView, label: 'Calendar', icon: Calendar },
-  { value: 'timeline' as TaskView, label: 'Timeline', icon: Gantt },
+  { value: 'timeline' as TaskView, label: 'Timeline', icon: BarChart3 },
   { value: 'table' as TaskView, label: 'Table', icon: Table2 },
 ];
 

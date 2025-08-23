@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { PageShell } from '@/components/blocks/page-shell';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
   DialogContent,
@@ -60,8 +59,7 @@ import {
   useCreateTask, 
   useUpdateTask, 
   useUpdateTaskStatus,
-  useContacts,
-  useProjects 
+  useContacts 
 } from '@/hooks/use-api';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -75,100 +73,55 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  XCircle,
-  Filter,
-  Download,
-  Upload,
-  GitBranch,
-  Paperclip,
-  MessageSquare,
-  MapPin,
-  Shield,
-  Zap,
-  Milestone,
-  Cloud,
-  AlertTriangle,
+  XCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import apiClient from '@/lib/api-client';
 
-// Import new components
-import { ViewSwitcher, TaskView } from '@/components/tasks/view-switcher';
-import { KanbanBoard } from '@/components/tasks/kanban-board';
-import { TaskCard } from '@/components/tasks/task-card';
-
-// Enhanced form schema with all new fields
+// Form schema
 const taskFormSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   description: z.string().optional(),
   dueDate: z.string().optional(),
-  startDate: z.string().optional(),
-  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT', 'CRITICAL']),
-  status: z.enum(['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'COMPLETED', 'CANCELLED']),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']),
   assignedToId: z.string().optional(),
   projectId: z.string(),
-  
-  // New fields
-  progressPercentage: z.number().min(0).max(100).optional(),
-  estimatedHours: z.number().positive().optional(),
-  actualHours: z.number().positive().optional(),
-  
-  // Construction-specific
-  isOnCriticalPath: z.boolean().optional(),
-  isMilestone: z.boolean().optional(),
-  location: z.string().optional(),
-  trade: z.string().optional(),
-  weatherDependent: z.boolean().optional(),
-  requiresInspection: z.boolean().optional(),
-  inspectionStatus: z.string().optional(),
-  
-  // Tags
-  tags: z.array(z.string()).optional(),
-  
-  // Hierarchy
-  parentTaskId: z.string().optional(),
 });
 
 type TaskFormValues = z.infer<typeof taskFormSchema>;
 
-// Status badge component with new statuses
+// Status badge component
 function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, { variant: any; icon: any; color: string }> = {
-    TODO: { variant: 'secondary', icon: Clock, color: 'text-gray-400' },
-    IN_PROGRESS: { variant: 'default', icon: AlertCircle, color: 'text-blue-500' },
-    IN_REVIEW: { variant: 'outline', icon: Shield, color: 'text-purple-500' },
-    BLOCKED: { variant: 'destructive', icon: XCircle, color: 'text-red-500' },
-    COMPLETED: { variant: 'outline', icon: CheckCircle, color: 'text-green-500' },
-    CANCELLED: { variant: 'secondary', icon: XCircle, color: 'text-gray-500' },
+  const variants: Record<string, { variant: any; icon: any }> = {
+    TODO: { variant: 'secondary', icon: Clock },
+    IN_PROGRESS: { variant: 'default', icon: AlertCircle },
+    BLOCKED: { variant: 'destructive', icon: XCircle },
+    DONE: { variant: 'outline', icon: CheckCircle },
   };
 
-  const { variant, icon: Icon, color } = variants[status] || variants.TODO;
+  const { variant, icon: Icon } = variants[status] || variants.TODO;
 
   return (
     <Badge variant={variant} className="gap-1">
-      <Icon className={`h-3 w-3 ${color}`} />
+      <Icon className="h-3 w-3" />
       {status.replace('_', ' ')}
     </Badge>
   );
 }
 
-// Enhanced priority badge with CRITICAL level
+// Priority badge component
 function PriorityBadge({ priority }: { priority: string }) {
-  const configs: Record<string, { bg: string; text: string; icon?: any }> = {
-    LOW: { bg: 'bg-blue-500/20', text: 'text-blue-500' },
-    MEDIUM: { bg: 'bg-yellow-500/20', text: 'text-yellow-500' },
-    HIGH: { bg: 'bg-orange-500/20', text: 'text-orange-500' },
-    URGENT: { bg: 'bg-red-500/20', text: 'text-red-500', icon: AlertTriangle },
-    CRITICAL: { bg: 'bg-red-600/30', text: 'text-red-600', icon: Zap },
+  const colors: Record<string, string> = {
+    LOW: 'bg-blue-500/20 text-blue-500',
+    MEDIUM: 'bg-yellow-500/20 text-yellow-500',
+    HIGH: 'bg-orange-500/20 text-orange-500',
+    URGENT: 'bg-red-500/20 text-red-500',
   };
 
-  const config = configs[priority] || configs.MEDIUM;
-  const Icon = config.icon;
-
   return (
-    <Badge className={`${config.bg} ${config.text} gap-1`}>
-      {Icon && <Icon className="h-3 w-3" />}
+    <Badge className={colors[priority] || colors.MEDIUM}>
       {priority}
     </Badge>
   );
@@ -176,17 +129,16 @@ function PriorityBadge({ priority }: { priority: string }) {
 
 export default function AdminTasksPage() {
   const { user, loading: authLoading } = useAuth();
-  const { selectedProject } = useProjectContext();
+  const { currentProject } = useProjectContext();
   const [isReady, setIsReady] = useState(false);
-  const [currentView, setCurrentView] = useState<TaskView>('kanban');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   
-  // Use project context
-  const projectId = selectedProject?.id || '';
+  // Get project ID from context
+  const projectId = currentProject?.id || '';
 
   // Wait for auth
   useEffect(() => {
@@ -195,80 +147,32 @@ export default function AdminTasksPage() {
     }
   }, [authLoading, user]);
 
-  // Form with enhanced schema
-  const form = useForm<TaskFormValues>({
-    resolver: zodResolver(taskFormSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      dueDate: '',
-      startDate: '',
-      priority: 'MEDIUM',
-      status: 'TODO',
-      assignedToId: '',
-      projectId: projectId || '',
-      progressPercentage: 0,
-      estimatedHours: undefined,
-      actualHours: undefined,
-      isOnCriticalPath: false,
-      isMilestone: false,
-      location: '',
-      trade: '',
-      weatherDependent: false,
-      requiresInspection: false,
-      inspectionStatus: '',
-      tags: [],
-      parentTaskId: '',
-    },
-  });
-
-  // Fetch projects first
-  const { data: projectsData } = useProjects(isReady);
-  
-  // Update form when project changes
-  useEffect(() => {
-    if (projectId) {
-      form.setValue('projectId', projectId);
-    }
-  }, [projectId, form]);
-
-  // Fetch data with enhanced query
+  // Fetch data
   const { data: tasksData, isLoading: tasksLoading, refetch } = useTasks(
-    { 
-      projectId, 
-      limit: 100,
-      includeSubtasks: true,
-      view: currentView 
-    },
-    isReady && !!projectId
+    { projectId, limit: 100 },
+    isReady
   );
-  
-  const { data: contactsData } = useContacts({ projectId }, isReady && !!projectId);
+  const { data: contactsData } = useContacts({ projectId }, isReady);
   
   // Mutations
   const createMutation = useCreateTask();
   const updateMutation = useUpdateTask();
   const updateStatusMutation = useUpdateTaskStatus();
 
-  // Handle task status change (for Kanban drag-and-drop)
-  const handleTaskStatusChange = useCallback(async (taskId: string, newStatus: string) => {
-    try {
-      await updateStatusMutation.mutateAsync({
-        id: taskId,
-        status: newStatus,
-        completedAt: newStatus === 'COMPLETED' ? new Date().toISOString() : undefined,
-      });
-      refetch();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update task status',
-        variant: 'destructive',
-      });
-    }
-  }, [updateStatusMutation, refetch]);
 
-  // Enhanced columns with new fields
+  // Form
+  const form = useForm<TaskFormValues>({
+    resolver: zodResolver(taskFormSchema),
+    defaultValues: {
+      title: '',
+      description: '',
+      priority: 'MEDIUM',
+      status: 'TODO',
+      projectId: projectId || 'default',
+    },
+  });
+
+  // Columns definition
   const columns: ColumnDef<any>[] = [
     {
       id: 'select',
@@ -294,63 +198,14 @@ export default function AdminTasksPage() {
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Title" />
       ),
-      cell: ({ row }) => {
-        const task = row.original;
-        return (
-          <div className="max-w-[300px]">
-            <div className="flex items-center gap-2">
-              <p className="font-medium">{row.getValue('title')}</p>
-              {task.isMilestone && (
-                <Milestone className="h-3 w-3 text-purple-400" />
-              )}
-              {task.isOnCriticalPath && (
-                <Zap className="h-3 w-3 text-red-400" />
-              )}
-            </div>
-            {task.description && (
-              <p className="text-sm text-white/60 truncate">{task.description}</p>
-            )}
-            <div className="flex items-center gap-3 mt-1 text-xs text-white/40">
-              {task._count?.subtasks > 0 && (
-                <span className="flex items-center gap-1">
-                  <GitBranch className="h-3 w-3" />
-                  {task.completedSubtasks || 0}/{task._count.subtasks}
-                </span>
-              )}
-              {task._count?.attachments > 0 && (
-                <span className="flex items-center gap-1">
-                  <Paperclip className="h-3 w-3" />
-                  {task._count.attachments}
-                </span>
-              )}
-              {task._count?.comments > 0 && (
-                <span className="flex items-center gap-1">
-                  <MessageSquare className="h-3 w-3" />
-                  {task._count.comments}
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: 'progressPercentage',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Progress" />
+      cell: ({ row }) => (
+        <div className="max-w-[300px]">
+          <p className="font-medium">{row.getValue('title')}</p>
+          {row.original.description && (
+            <p className="text-sm text-white/60 truncate">{row.original.description}</p>
+          )}
+        </div>
       ),
-      cell: ({ row }) => {
-        const progress = row.getValue('progressPercentage') as number;
-        if (!progress) return <span className="text-white/40">-</span>;
-        return (
-          <div className="w-20">
-            <div className="flex items-center gap-2">
-              <Progress value={progress} className="h-2" />
-              <span className="text-xs">{progress}%</span>
-            </div>
-          </div>
-        );
-      },
     },
     {
       accessorKey: 'status',
@@ -384,45 +239,21 @@ export default function AdminTasksPage() {
       },
     },
     {
-      accessorKey: 'location',
-      header: 'Location',
-      cell: ({ row }) => {
-        const location = row.getValue('location') as string;
-        const task = row.original;
-        if (!location) return <span className="text-white/40">-</span>;
-        return (
-          <div className="flex items-center gap-1 text-sm">
-            <MapPin className="h-3 w-3" />
-            <span>{location}</span>
-            {task.latitude && task.longitude && (
-              <span className="text-xs text-white/40">📍</span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
       accessorKey: 'dueDate',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Due Date" />
       ),
       cell: ({ row }) => {
         const date = row.getValue('dueDate');
-        const task = row.original;
         if (!date) return <span className="text-white/40">No due date</span>;
         
         const dueDate = new Date(date as string);
-        const isOverdue = dueDate < new Date() && task.status !== 'COMPLETED';
+        const isOverdue = dueDate < new Date() && row.original.status !== 'DONE';
         
         return (
-          <div className="text-sm">
-            <span className={isOverdue ? 'text-red-500' : ''}>
-              {format(dueDate, 'MMM dd, yyyy')}
-            </span>
-            {task.weatherDependent && (
-              <Cloud className="h-3 w-3 text-sky-400 inline-block ml-1" />
-            )}
-          </div>
+          <span className={isOverdue ? 'text-red-500' : ''}>
+            {format(dueDate, 'MMM dd, yyyy')}
+          </span>
         );
       },
     },
@@ -447,16 +278,22 @@ export default function AdminTasksPage() {
                 Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleStatusChange(task.id, 'IN_PROGRESS')}>
+              <DropdownMenuItem 
+                onClick={() => handleStatusUpdate(task.id, 'IN_PROGRESS')}
+                disabled={task.status === 'IN_PROGRESS'}
+              >
                 Start Task
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusChange(task.id, 'COMPLETED')}>
-                Complete Task
+              <DropdownMenuItem 
+                onClick={() => handleStatusUpdate(task.id, 'DONE')}
+                disabled={task.status === 'DONE'}
+              >
+                Mark as Done
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={() => handleDelete(task)}
-                className="text-red-400"
+                className="text-red-500"
               >
                 <Trash className="mr-2 h-4 w-4" />
                 Delete
@@ -468,10 +305,13 @@ export default function AdminTasksPage() {
     },
   ];
 
-  // Create task handler with new fields
-  const handleCreate = async (data: TaskFormValues) => {
+  // Handlers
+  const handleCreate = async (values: TaskFormValues) => {
     try {
-      await createMutation.mutateAsync(data);
+      await createMutation.mutateAsync({
+        ...values,
+        projectId: projectId || 'default',
+      });
       setIsCreateOpen(false);
       form.reset();
       refetch();
@@ -480,27 +320,27 @@ export default function AdminTasksPage() {
     }
   };
 
-  // Edit handler
   const handleEdit = (task: any) => {
     setSelectedTask(task);
     form.reset({
-      ...task,
+      title: task.title,
+      description: task.description || '',
       dueDate: task.dueDate ? format(new Date(task.dueDate), "yyyy-MM-dd'T'HH:mm") : '',
-      startDate: task.startDate ? format(new Date(task.startDate), "yyyy-MM-dd'T'HH:mm") : '',
+      priority: task.priority,
+      status: task.status,
       assignedToId: task.assignedToId || '',
-      tags: task.tags || [],
+      projectId: task.projectId,
     });
     setIsEditOpen(true);
   };
 
-  // Update handler
-  const handleUpdate = async (data: TaskFormValues) => {
+  const handleUpdate = async (values: TaskFormValues) => {
     if (!selectedTask) return;
     
     try {
       await updateMutation.mutateAsync({
-        ...data,
         id: selectedTask.id,
+        ...values,
       });
       setIsEditOpen(false);
       setSelectedTask(null);
@@ -511,13 +351,12 @@ export default function AdminTasksPage() {
     }
   };
 
-  // Delete handler
   const handleDelete = (task: any) => {
     setSelectedTask(task);
     setIsDeleteOpen(true);
   };
 
-  const confirmDelete = async () => {
+  const handleConfirmDelete = async () => {
     if (!selectedTask) return;
     
     try {
@@ -529,145 +368,147 @@ export default function AdminTasksPage() {
       setIsDeleteOpen(false);
       setSelectedTask(null);
       refetch();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.error || 'Failed to delete task',
+        description: 'Failed to delete task',
         variant: 'destructive',
       });
     }
   };
 
-  const handleStatusChange = async (taskId: string, status: string) => {
-    await handleTaskStatusChange(taskId, status);
+  const handleStatusUpdate = async (taskId: string, status: string) => {
+    try {
+      await updateStatusMutation.mutateAsync({ id: taskId, status });
+      refetch();
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    // Implement bulk delete
+    toast({
+      title: 'Info',
+      description: `${selectedRows.length} tasks selected for deletion`,
+    });
   };
 
   // Loading state
-  if (!isReady || tasksLoading) {
+  if (tasksLoading || !isReady) {
     return (
-      <PageShell>
+      <PageShell 
+        userRole={user?.role || 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+      >
         <div className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-10 w-48" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-          <div className="grid gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-24 w-full" />
-            ))}
-          </div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-[400px] w-full" />
         </div>
       </PageShell>
     );
   }
 
-  const tasks = tasksData || [];
+  const tasks = tasksData?.data || [];
 
   return (
-    <PageShell>
+    <PageShell 
+      userRole={user?.role || 'VIEWER'} 
+      userName={user?.displayName || 'User'} 
+      userEmail={user?.email || ''}
+    >
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Tasks</h1>
-            <p className="text-white/60 mt-1">
-              Manage project tasks and track progress
-            </p>
+            <h1 className="text-3xl font-bold text-white">Tasks Management</h1>
+            <p className="text-white/60 mt-1">Manage and assign project tasks</p>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <ViewSwitcher 
-              currentView={currentView} 
-              onViewChange={setCurrentView}
-            />
-            
-            <Button
+          <div className="flex gap-2">
+            {selectedRows.length > 0 && (
+              <Button 
+                variant="destructive" 
+                onClick={handleBulkDelete}
+              >
+                Delete ({selectedRows.length})
+              </Button>
+            )}
+            <Button 
+              className="bg-accent-500 hover:bg-accent-600"
               onClick={() => setIsCreateOpen(true)}
-              className="bg-gold-500 hover:bg-gold-600 text-black gap-2"
             >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add Task</span>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
             </Button>
           </div>
         </div>
 
-        {/* View Content */}
-        {currentView === 'kanban' ? (
-          <KanbanBoard
-            tasks={tasks}
-            onTaskMove={handleTaskStatusChange}
-            onTaskEdit={handleEdit}
-            onTaskDelete={handleDelete}
-            onTaskSelect={(task) => handleEdit(task)}
+        {/* Data Table */}
+        <div className="glass-card p-6">
+          <DataTable
+            columns={columns}
+            data={tasks}
+            searchKey="title"
+            searchPlaceholder="Search tasks..."
           />
-        ) : currentView === 'list' ? (
-          <div className="space-y-3">
-            {tasks.map((task: any) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onStatusChange={handleStatusChange}
-                onSelect={() => handleEdit(task)}
-              />
-            ))}
-          </div>
-        ) : (
-          <DataTable columns={columns} data={tasks} />
-        )}
+        </div>
 
-        {/* Create Dialog - Enhanced with new fields */}
+        {/* Create Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="bg-graphite-900 border-white/10 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[525px] bg-graphite-800 border-white/10">
             <DialogHeader>
-              <DialogTitle>Create New Task</DialogTitle>
-              <DialogDescription>
-                Add a new task to your project with all details.
+              <DialogTitle className="text-white">Create New Task</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Add a new task to the project. Click save when you're done.
               </DialogDescription>
             </DialogHeader>
-            
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Basic Fields */}
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Title</FormLabel>
-                        <FormControl>
-                          <Input {...field} className="bg-graphite-800 border-white/10" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} className="bg-graphite-800 border-white/10" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
+              <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Title</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Enter task title" 
+                          className="bg-white/5 border-white/10 text-white"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Enter task description"
+                          className="bg-white/5 border-white/10 text-white resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="priority"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Priority</FormLabel>
+                        <FormLabel className="text-white">Priority</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger className="bg-graphite-800 border-white/10">
+                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
                               <SelectValue placeholder="Select priority" />
                             </SelectTrigger>
                           </FormControl>
@@ -676,229 +517,59 @@ export default function AdminTasksPage() {
                             <SelectItem value="MEDIUM">Medium</SelectItem>
                             <SelectItem value="HIGH">High</SelectItem>
                             <SelectItem value="URGENT">Urgent</SelectItem>
-                            <SelectItem value="CRITICAL">Critical</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
                   <FormField
                     control={form.control}
                     name="status"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Status</FormLabel>
+                        <FormLabel className="text-white">Status</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger className="bg-graphite-800 border-white/10">
+                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
                               <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="TODO">To Do</SelectItem>
                             <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                            <SelectItem value="IN_REVIEW">In Review</SelectItem>
                             <SelectItem value="BLOCKED">Blocked</SelectItem>
-                            <SelectItem value="COMPLETED">Completed</SelectItem>
-                            <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                            <SelectItem value="DONE">Done</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
-                  <FormField
-                    control={form.control}
-                    name="startDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Date</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="datetime-local" 
-                            {...field} 
-                            className="bg-graphite-800 border-white/10" 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Due Date</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="datetime-local" 
-                            {...field} 
-                            className="bg-graphite-800 border-white/10" 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {/* Progress and Time Tracking */}
-                  <FormField
-                    control={form.control}
-                    name="progressPercentage"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Progress %</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="0" 
-                            max="100"
-                            {...field}
-                            onChange={e => field.onChange(parseInt(e.target.value))}
-                            className="bg-graphite-800 border-white/10" 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="estimatedHours"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Estimated Hours</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.5"
-                            {...field}
-                            onChange={e => field.onChange(parseFloat(e.target.value))}
-                            className="bg-graphite-800 border-white/10" 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {/* Construction Fields */}
-                  <FormField
-                    control={form.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Location</FormLabel>
-                        <FormControl>
-                          <Input {...field} className="bg-graphite-800 border-white/10" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="trade"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Trade</FormLabel>
-                        <FormControl>
-                          <Input {...field} className="bg-graphite-800 border-white/10" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {/* Checkboxes */}
-                  <div className="md:col-span-2 space-y-3">
-                    <FormField
-                      control={form.control}
-                      name="isMilestone"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center space-x-2">
-                          <FormControl>
-                            <Checkbox 
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <FormLabel className="!mt-0">This is a milestone</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="isOnCriticalPath"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center space-x-2">
-                          <FormControl>
-                            <Checkbox 
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <FormLabel className="!mt-0">On critical path</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="weatherDependent"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center space-x-2">
-                          <FormControl>
-                            <Checkbox 
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <FormLabel className="!mt-0">Weather dependent</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="requiresInspection"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center space-x-2">
-                          <FormControl>
-                            <Checkbox 
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <FormLabel className="!mt-0">Requires inspection</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
                 </div>
-                
+                <FormField
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Due Date</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="datetime-local"
+                          className="bg-white/5 border-white/10 text-white"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateOpen(false)}
-                  >
+                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit"
-                    className="bg-gold-500 hover:bg-gold-600 text-black"
-                    disabled={createMutation.isPending}
-                  >
-                    {createMutation.isPending ? 'Creating...' : 'Create Task'}
+                  <Button type="submit" className="bg-accent-500 hover:bg-accent-600">
+                    Create Task
                   </Button>
                 </DialogFooter>
               </form>
@@ -906,37 +577,122 @@ export default function AdminTasksPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Edit Dialog - Similar to Create but with populated values */}
+        {/* Edit Dialog */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="bg-graphite-900 border-white/10 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[525px] bg-graphite-800 border-white/10">
             <DialogHeader>
-              <DialogTitle>Edit Task</DialogTitle>
-              <DialogDescription>
-                Update task details and progress.
+              <DialogTitle className="text-white">Edit Task</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Make changes to the task. Click save when you're done.
               </DialogDescription>
             </DialogHeader>
-            
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-6">
-                {/* Same form fields as create dialog */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* ... same fields as create ... */}
+              <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Title</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Enter task title" 
+                          className="bg-white/5 border-white/10 text-white"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Enter task description"
+                          className="bg-white/5 border-white/10 text-white resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Priority</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                              <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="LOW">Low</SelectItem>
+                            <SelectItem value="MEDIUM">Medium</SelectItem>
+                            <SelectItem value="HIGH">High</SelectItem>
+                            <SelectItem value="URGENT">Urgent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="TODO">To Do</SelectItem>
+                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                            <SelectItem value="BLOCKED">Blocked</SelectItem>
+                            <SelectItem value="DONE">Done</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-                
+                <FormField
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Due Date</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="datetime-local"
+                          className="bg-white/5 border-white/10 text-white"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsEditOpen(false)}
-                  >
+                  <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit"
-                    className="bg-gold-500 hover:bg-gold-600 text-black"
-                    disabled={updateMutation.isPending}
-                  >
-                    {updateMutation.isPending ? 'Updating...' : 'Update Task'}
+                  <Button type="submit" className="bg-accent-500 hover:bg-accent-600">
+                    Save Changes
                   </Button>
                 </DialogFooter>
               </form>
@@ -946,17 +702,18 @@ export default function AdminTasksPage() {
 
         {/* Delete Confirmation */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-          <AlertDialogContent className="bg-graphite-900 border-white/10">
+          <AlertDialogContent className="bg-graphite-800 border-white/10">
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Task</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete "{selectedTask?.title}"? This action cannot be undone.
+              <AlertDialogTitle className="text-white">Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription className="text-white/60">
+                This action cannot be undone. This will permanently delete the task
+                "{selectedTask?.title}".
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
+              <AlertDialogCancel className="border-white/10">Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmDelete}
                 className="bg-red-500 hover:bg-red-600"
               >
                 Delete

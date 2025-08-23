@@ -6,15 +6,16 @@ import { successResponse, errorResponse } from '@/lib/api/response';
 // POST /api/v1/projects/[id]/archive - Archive/unarchive project
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireAuth(['ADMIN', 'STAFF']);
     const body = await request.json();
     const isArchived = body.isArchived !== undefined ? body.isArchived : true;
+    const { id } = await params;
     
     const project = await prisma.project.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         isArchived,
         status: isArchived ? 'ARCHIVED' : 'ACTIVE',

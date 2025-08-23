@@ -77,7 +77,8 @@ export function useUpdateTaskStatus() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, status }: any) => apiClient.patch(`/tasks/${id}/status`, { status }),
+    mutationFn: ({ id, status, completedAt }: any) => 
+      apiClient.patch(`/tasks/${id}/status`, { status, completedAt }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task'] });
@@ -90,6 +91,134 @@ export function useUpdateTaskStatus() {
       toast({
         title: 'Error',
         description: error.error || 'Failed to update task status',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+// New Task API hooks for enhanced functionality
+export function useBulkUpdateTasks() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: any) => apiClient.patch('/tasks', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({
+        title: 'Success',
+        description: data.message || 'Tasks updated successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to update tasks',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useTaskActivities(taskId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['task', taskId, 'activities'],
+    queryFn: () => apiClient.get(`/tasks/${taskId}/activities`),
+    enabled: enabled && !!taskId
+  });
+}
+
+export function useTaskComments(taskId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['task', taskId, 'comments'],
+    queryFn: () => apiClient.get(`/tasks/${taskId}/comments`),
+    enabled: enabled && !!taskId
+  });
+}
+
+export function useCreateTaskComment() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ taskId, ...data }: any) => 
+      apiClient.post(`/tasks/${taskId}/comments`, data),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['task', variables.taskId, 'comments'] });
+      queryClient.invalidateQueries({ queryKey: ['task', variables.taskId] });
+      toast({
+        title: 'Success',
+        description: 'Comment added successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to add comment',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useCreateSubtask() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: any) => apiClient.post('/tasks', { ...data }),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task', variables.parentTaskId] });
+      toast({
+        title: 'Success',
+        description: 'Subtask created successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to create subtask',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useUpdateTaskProgress() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, progressPercentage }: any) => 
+      apiClient.patch(`/tasks/${id}`, { progressPercentage }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to update progress',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/tasks/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({
+        title: 'Success',
+        description: 'Task deleted successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to delete task',
         variant: 'destructive'
       });
     }

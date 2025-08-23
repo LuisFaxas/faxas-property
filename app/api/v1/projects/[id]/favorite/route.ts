@@ -6,15 +6,16 @@ import { successResponse, errorResponse } from '@/lib/api/response';
 // POST /api/v1/projects/[id]/favorite - Toggle favorite status
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireAuth();
     const body = await request.json();
     const isFavorite = body.isFavorite !== undefined ? body.isFavorite : true;
+    const { id } = await params;
     
     const project = await prisma.project.update({
-      where: { id: params.id },
+      where: { id },
       data: { isFavorite },
     });
     
