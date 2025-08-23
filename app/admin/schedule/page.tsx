@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import apiClient from '@/lib/api-client';
-import { Plus, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Users } from 'lucide-react';
+import { Plus, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Users, List, CalendarDays } from 'lucide-react';
+import { View as CalendarViewType } from 'react-big-calendar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -46,6 +47,8 @@ import { useSchedule, useTodaysSchedule, useProjects } from '@/hooks/use-api';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
+import { CalendarView } from '@/components/schedule/calendar-view';
+import { cn } from '@/lib/utils';
 
 // Helper functions for date and time handling
 const getDefaultDate = () => {
@@ -74,6 +77,15 @@ const splitDateTime = (datetime: string) => {
   return { date, time };
 };
 
+// Event types for filtering
+const EVENT_TYPES = [
+  { value: 'WORK', label: 'Work', color: 'bg-blue-600' },
+  { value: 'MEETING', label: 'Meeting', color: 'bg-purple-600' },
+  { value: 'SITE_VISIT', label: 'Site Visit', color: 'bg-green-600' },
+  { value: 'CALL', label: 'Call', color: 'bg-orange-600' },
+  { value: 'EMAIL_FOLLOWUP', label: 'Email', color: 'bg-gray-600' },
+];
+
 export default function AdminSchedulePage() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -85,6 +97,10 @@ export default function AdminSchedulePage() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [calendarView, setCalendarView] = useState<CalendarViewType>('month');
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
 
   // Form state with separate date and time fields
   const [formData, setFormData] = useState({
@@ -109,8 +125,8 @@ export default function AdminSchedulePage() {
   const endDateTime = combineDateAndTime(formData.endDate, formData.endTime);
 
   // Fetch schedule data
-  const { data: scheduleEvents, isLoading, refetch } = useSchedule();
-  const { data: todaysEvents } = useTodaysSchedule();
+  const { data: scheduleEvents, isLoading, refetch } = useSchedule(undefined, isReady);
+  const { data: todaysEvents } = useTodaysSchedule(undefined, isReady);
   const { data: projectsData } = useProjects(isReady);
   
   // Set default projectId when projects are loaded
@@ -121,21 +137,41 @@ export default function AdminSchedulePage() {
     }
   }, [projectsData, formData.projectId]);
 
-  // Filter events based on active tab
+  // Filter events based on active tab and type filters
   const filteredEvents = useMemo(() => {
     if (!scheduleEvents || !Array.isArray(scheduleEvents)) return [];
     
+    let events = scheduleEvents;
+    
+    // Apply tab filter
     switch (activeTab) {
       case 'today':
-        return todaysEvents || [];
+        events = todaysEvents || [];
+        break;
       case 'pending':
-        return scheduleEvents.filter((event: any) => event.status === 'REQUESTED');
+        events = scheduleEvents.filter((event: any) => event.status === 'REQUESTED');
+        break;
       case 'approved':
-        return scheduleEvents.filter((event: any) => event.status === 'PLANNED');
-      default:
-        return scheduleEvents;
+        events = scheduleEvents.filter((event: any) => event.status === 'PLANNED');
+        break;
     }
-  }, [scheduleEvents, todaysEvents, activeTab]);
+    
+    // Apply type filters
+    if (typeFilters.length > 0) {
+      events = events.filter((event: any) => typeFilters.includes(event.type));
+    }
+    
+    return events;
+  }, [scheduleEvents, todaysEvents, activeTab, typeFilters]);
+
+  // Toggle type filter
+  const toggleTypeFilter = (type: string) => {
+    setTypeFilters(prev => 
+      prev.includes(type) 
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
+  };
 
   // Calculate metrics
   const metrics = useMemo(() => {
@@ -339,6 +375,51 @@ export default function AdminSchedulePage() {
       projectId: event.projectId || (projectsData && Array.isArray(projectsData) && projectsData.length > 0 ? projectsData[0].id : '')
     });
     setIsEditOpen(true);
+  };
+
+  // Handle calendar drag and drop
+  const handleEventDrop = async ({ event, start, end }: { event: any; start: Date; end: Date }) => {
+    try {
+      await apiClient.put(`/schedule/${event.id}`, {
+        title: event.title,
+        description: event.description || event.notes,
+        type: event.type,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        location: event.location,
+        attendees: event.attendees || event.relatedContactIds || [],
+        status: event.status,
+        projectId: event.projectId
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Event rescheduled successfully',
+      });
+
+      refetch();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to reschedule event',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle calendar slot selection for quick event creation
+  const handleSelectSlot = (slotInfo: any) => {
+    const startDate = new Date(slotInfo.start);
+    const endDate = new Date(slotInfo.end);
+    
+    setFormData({
+      ...formData,
+      startDate: startDate.toISOString().split('T')[0],
+      startTime: startDate.toTimeString().substring(0, 5),
+      endDate: endDate.toISOString().split('T')[0],
+      endTime: endDate.toTimeString().substring(0, 5),
+    });
+    setIsCreateOpen(true);
   };
 
   const columns: ColumnDef<any>[] = [
@@ -764,28 +845,102 @@ export default function AdminSchedulePage() {
           </Card>
         </div>
 
-        {/* Tabs */}
+        {/* Quick Filters */}
+        <div className="flex items-center gap-4 mb-4">
+          <span className="text-sm text-white/60">Quick filters:</span>
+          <div className="flex gap-2">
+            {EVENT_TYPES.map((type) => (
+              <Button
+                key={type.value}
+                variant="outline"
+                size="sm"
+                onClick={() => toggleTypeFilter(type.value)}
+                className={cn(
+                  'border-white/10 transition-all',
+                  typeFilters.includes(type.value)
+                    ? `${type.color} text-white border-transparent`
+                    : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                )}
+              >
+                <div className={cn(
+                  'w-2 h-2 rounded-full mr-2',
+                  type.color
+                )} />
+                {type.label}
+                {typeFilters.includes(type.value) && (
+                  <XCircle className="ml-1 h-3 w-3" />
+                )}
+              </Button>
+            ))}
+            {typeFilters.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTypeFilters([])}
+                className="text-white/60 hover:text-white"
+              >
+                Clear all
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs with View Mode Toggle */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-white/5 border-white/10">
-            <TabsTrigger value="all">All Events</TabsTrigger>
-            <TabsTrigger value="today">
-              Today
-              {metrics.todayEvents > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {metrics.todayEvents}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending
-              {metrics.pendingApprovals > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {metrics.pendingApprovals}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="approved">Approved</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-4">
+            <TabsList className="bg-white/5 border-white/10">
+              <TabsTrigger value="all">All Events</TabsTrigger>
+              <TabsTrigger value="today">
+                Today
+                {metrics.todayEvents > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {metrics.todayEvents}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="pending">
+                Pending
+                {metrics.pendingApprovals > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {metrics.pendingApprovals}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="approved">Approved</TabsTrigger>
+            </TabsList>
+            
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1 border border-white/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('calendar')}
+                className={cn(
+                  'px-3 py-1.5',
+                  viewMode === 'calendar' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                )}
+              >
+                <CalendarDays className="h-4 w-4 mr-2" />
+                Calendar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  'px-3 py-1.5',
+                  viewMode === 'list' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                )}
+              >
+                <List className="h-4 w-4 mr-2" />
+                List
+              </Button>
+            </div>
+          </div>
 
           <TabsContent value={activeTab} className="mt-6">
             <Card className="bg-white/5 border-white/10">
@@ -804,12 +959,25 @@ export default function AdminSchedulePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <DataTable
-                  columns={columns}
-                  data={filteredEvents}
-                  searchKey="title"
-                  searchPlaceholder="Search events..."
-                />
+                {viewMode === 'calendar' ? (
+                  <CalendarView
+                    events={filteredEvents}
+                    onSelectEvent={openEditDialog}
+                    onSelectSlot={handleSelectSlot}
+                    onEventDrop={handleEventDrop}
+                    view={calendarView}
+                    onViewChange={setCalendarView}
+                    date={calendarDate}
+                    onNavigate={setCalendarDate}
+                  />
+                ) : (
+                  <DataTable
+                    columns={columns}
+                    data={filteredEvents}
+                    searchKey="title"
+                    searchPlaceholder="Search events..."
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
