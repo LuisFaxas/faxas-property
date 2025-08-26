@@ -47,11 +47,9 @@ import { useSchedule, useTodaysSchedule, useProjects } from '@/hooks/use-api';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
-import { CalendarView } from '@/components/schedule/calendar-view';
 import { FullCalendarView } from '@/components/schedule/fullcalendar-view';
 import { cn } from '@/lib/utils';
 import { KPICarousel } from '@/components/schedule/kpi-carousel';
-import { MobileCalendarView } from '@/components/schedule/mobile-calendar-view';
 import { Loader2 } from 'lucide-react';
 import { useIsMobile, useIsTablet } from '@/hooks/use-media-query';
 
