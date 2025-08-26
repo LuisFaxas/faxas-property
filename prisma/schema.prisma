@@ -197,7 +197,7 @@ model ScheduleEvent {
   requesterUserId   String?
   relatedContactIds String[]
   createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  updatedAt         DateTime       @default(now()) @updatedAt
   createdBy         String?
   project           Project        @relation(fields: [projectId], references: [id])
   recurrencePattern RecurrencePattern?

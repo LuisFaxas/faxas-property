@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '@/lib/api/auth-check';
 import { successResponse, errorResponse, paginationMetadata } from '@/lib/api/response';
 import { createScheduleEventSchema, scheduleQuerySchema } from '@/lib/validations/schedule';
 import { Prisma } from '@prisma/client';
+import { sanitizeScheduleEvent, prepareScheduleEventForDb } from '@/lib/api/schedule-helpers';
 
 // GET /api/v1/schedule - List schedule events with filters
 export async function GET(request: NextRequest) {

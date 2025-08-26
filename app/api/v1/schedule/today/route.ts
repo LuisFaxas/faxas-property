@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/api/auth-check';
 import { successResponse, errorResponse } from '@/lib/api/response';
+import { sanitizeScheduleEvent } from '@/lib/api/schedule-helpers';
 
 // GET /api/v1/schedule/today - Get today's schedule events
 export async function GET(request: NextRequest) {
@@ -43,20 +44,25 @@ export async function GET(request: NextRequest) {
       }
     });
     
-    // Format events for dashboard display
-    const formattedEvents = events.map(event => ({
-      id: event.id,
-      title: event.title,
-      time: new Date(event.start).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }),
-      type: event.type,
-      status: event.status,
-      location: event.location,
-      relatedContactIds: event.relatedContactIds
-    }));
+    // Sanitize events to add missing fields and format for dashboard
+    const formattedEvents = events.map(event => {
+      const sanitized = sanitizeScheduleEvent(event);
+      return {
+        id: sanitized.id,
+        title: sanitized.title,
+        time: new Date(sanitized.start).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }),
+        type: sanitized.type,
+        status: sanitized.status,
+        location: sanitized.location || null,
+        description: sanitized.description || null,
+        attendees: sanitized.attendees || [],
+        relatedContactIds: sanitized.relatedContactIds
+      };
+    });
     
     return successResponse(formattedEvents);
   } catch (error) {
