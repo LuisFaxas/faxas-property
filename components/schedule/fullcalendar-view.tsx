@@ -202,9 +202,9 @@ export function FullCalendarView({
 
   // Get calendar height based on device
   const getCalendarHeight = () => {
-    if (isMobile) return 'calc(100vh - 320px)';
-    if (isTablet) return 'calc(100vh - 280px)';
-    return 'calc(100vh - 250px)';
+    if (isMobile) return 'calc(100vh - 400px)';
+    if (isTablet) return 'calc(100vh - 350px)';
+    return 'calc(100vh - 300px)';
   };
 
   // View options for different devices
@@ -233,20 +233,20 @@ export function FullCalendarView({
   }, []);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
       {/* Custom Toolbar */}
-      <div className="mb-4 bg-white/5 rounded-lg border border-white/10 p-3">
+      <div className="mb-3 bg-white/5 rounded-lg border border-white/10 p-2 sm:p-3">
         {/* Mobile Toolbar */}
         {isMobile ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Top Row: Title and Today */}
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">{calendarTitle}</h3>
+              <h3 className="text-base font-semibold text-white truncate pr-2">{calendarTitle}</h3>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleToday}
-                className="h-8 text-xs"
+                className="h-7 text-[11px] px-2 shrink-0"
               >
                 Today
               </Button>
@@ -254,35 +254,35 @@ export function FullCalendarView({
             
             {/* Bottom Row: Navigation and View */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Button
                   size="icon"
                   variant="ghost"
                   onClick={handlePrev}
-                  className="h-8 w-8"
+                  className="h-7 w-7"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
                   onClick={handleNext}
-                  className="h-8 w-8"
+                  className="h-7 w-7"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
               
               <Select value={currentView} onValueChange={handleViewChange}>
-                <SelectTrigger className="w-24 h-8 bg-white/10">
+                <SelectTrigger className="w-20 h-7 bg-white/10 text-[11px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {viewOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <option.icon className="h-3 w-3" />
-                        <span className="text-xs">{option.label}</span>
+                        <span className="text-[11px]">{option.label}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -293,40 +293,41 @@ export function FullCalendarView({
         ) : (
           /* Desktop/Tablet Toolbar */
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleToday}
+                className="h-7 sm:h-8 text-xs sm:text-sm"
               >
                 Today
               </Button>
               
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 <Button
                   size="icon"
                   variant="ghost"
                   onClick={handlePrev}
-                  className="h-8 w-8"
+                  className="h-7 w-7 sm:h-8 sm:w-8"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
                   onClick={handleNext}
-                  className="h-8 w-8"
+                  className="h-7 w-7 sm:h-8 sm:w-8"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
               </div>
               
-              <h3 className="text-lg font-semibold text-white ml-2">
+              <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-white ml-1 sm:ml-2 truncate">
                 {calendarTitle}
               </h3>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {viewOptions.map((option) => (
                 <Button
                   key={option.value}
@@ -334,13 +335,15 @@ export function FullCalendarView({
                   variant={currentView === option.value ? 'default' : 'ghost'}
                   onClick={() => handleViewChange(option.value)}
                   className={cn(
+                    "h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3",
                     currentView === option.value
                       ? 'bg-blue-600 hover:bg-blue-700 text-white'
                       : 'text-white/70 hover:text-white hover:bg-white/10'
                   )}
                 >
-                  <option.icon className="h-4 w-4 mr-1.5" />
-                  {option.label}
+                  <option.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+                  <span className="hidden sm:inline">{option.label}</span>
+                  <span className="sm:hidden">{option.label.slice(0, 1)}</span>
                 </Button>
               ))}
             </div>
@@ -350,8 +353,8 @@ export function FullCalendarView({
 
       {/* FullCalendar Component */}
       <div 
-        className="flex-1 bg-gray-950 rounded-lg p-3 overflow-hidden"
-        style={{ minHeight: getCalendarHeight() }}
+        className="flex-1 bg-gray-950 rounded-lg p-2 sm:p-3 overflow-hidden"
+        style={{ height: getCalendarHeight(), maxHeight: getCalendarHeight() }}
       >
         <FullCalendar
           ref={calendarRef}
@@ -380,7 +383,6 @@ export function FullCalendarView({
             meridiem: 'short'
           }}
           height="100%"
-          aspectRatio={isMobile ? 1.2 : 1.8}
           contentHeight="auto"
           // Mobile-specific options
           eventLongPressDelay={500} // Long press for mobile

@@ -635,7 +635,7 @@ export default function AdminSchedulePage() {
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
       >
-        <div className="p-6 space-y-6">
+        <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6">
           {/* Header Skeleton */}
           <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
             <div>
@@ -646,7 +646,7 @@ export default function AdminSchedulePage() {
           </div>
           
           {/* KPI Cards Skeleton */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => (
               <Card key={i} className="bg-white/5 border-white/10 animate-pulse">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -681,12 +681,12 @@ export default function AdminSchedulePage() {
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
     >
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">Schedule Management</h1>
-            <p className="text-white/60 text-sm sm:text-base">Manage project calendar and events</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">Schedule Management</h1>
+            <p className="text-white/60 text-xs sm:text-sm lg:text-base">Manage project calendar and events</p>
           </div>
           {!isMobile && (
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

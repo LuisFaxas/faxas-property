@@ -67,6 +67,7 @@
 /* Day Grid */
 .fc .fc-daygrid-day {
   border-color: rgba(255, 255, 255, 0.1);
+  min-height: 3rem;
 }
 
 .fc .fc-daygrid-day:hover {
@@ -83,7 +84,12 @@
 }
 
 .fc .fc-day-today {
-  background-color: rgba(59, 130, 246, 0.1) !important;
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 /* Time Grid */
@@ -136,8 +142,9 @@
 }
 
 .fc .fc-list-day {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .fc .fc-list-day-cushion {
@@ -150,6 +157,7 @@
   background: transparent;
   cursor: pointer;
   transition: background-color 0.2s;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .fc .fc-list-event:hover {
@@ -158,10 +166,12 @@
 
 .fc .fc-list-event-title {
   color: white;
+  font-weight: 500;
 }
 
 .fc .fc-list-event-time {
   color: rgba(255, 255, 255, 0.7);
+  min-width: 5rem;
 }
 
 .fc .fc-list-empty {
@@ -169,6 +179,7 @@
   color: rgba(255, 255, 255, 0.5);
   text-align: center;
   padding: 2rem;
+  font-size: 0.875rem;
 }
 
 /* Scrollbars */
@@ -192,31 +203,50 @@
 }
 
 /* Mobile Specific Styles */
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .fc .fc-toolbar-title {
-    font-size: 1rem;
+    font-size: 0.875rem;
   }
   
   .fc .fc-col-header-cell {
     font-size: 0.625rem;
-    padding: 0.25rem 0;
+    padding: 0.125rem 0;
   }
   
   .fc .fc-daygrid-day-number {
-    font-size: 0.75rem;
+    font-size: 0.625rem;
+    padding: 0.125rem;
+  }
+  
+  .fc .fc-daygrid-day-top {
+    padding: 0.125rem;
   }
   
   .fc .fc-event {
     font-size: 0.625rem;
+    padding: 1px 2px;
+    border-radius: 2px;
   }
   
   .fc .fc-timegrid-slot {
-    height: 2rem;
+    height: 1.75rem;
+  }
+  
+  .fc .fc-timegrid-slot-label {
+    font-size: 0.625rem;
   }
   
   .fc .fc-list-day-cushion {
-    padding: 0.375rem 0.75rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+  }
+  
+  .fc .fc-list-event-title {
     font-size: 0.75rem;
+  }
+  
+  .fc .fc-list-event-time {
+    font-size: 0.625rem;
   }
   
   /* Hide time in day grid on mobile */
@@ -231,7 +261,45 @@
   
   .fc-daygrid-event {
     padding: 0 2px;
-    min-height: 16px;
+    min-height: 14px;
+  }
+  
+  /* More compact day cells */
+  .fc .fc-daygrid-day {
+    min-height: 2.5rem;
+  }
+  
+  /* List view adjustments */
+  .fc .fc-list-event {
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+  
+  .fc .fc-col-header-cell {
+    font-size: 0.6875rem;
+    padding: 0.25rem 0;
+  }
+  
+  .fc .fc-daygrid-day-number {
+    font-size: 0.75rem;
+  }
+  
+  .fc .fc-event {
+    font-size: 0.6875rem;
+  }
+  
+  .fc .fc-timegrid-slot {
+    height: 2rem;
+  }
+  
+  .fc .fc-list-day-cushion {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
   }
 }
 
