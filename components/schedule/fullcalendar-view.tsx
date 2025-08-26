@@ -17,7 +17,6 @@ import {
   CalendarDays,
   CalendarRange,
   List,
-  Plus,
   MoreHorizontal,
   ChevronDown
 } from 'lucide-react';
@@ -35,6 +34,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useCalendarSwipe } from '@/hooks/use-swipe-gestures';
+import { AdaptiveToolbar } from '@/components/ui/adaptive-toolbar';
 
 interface ScheduleEvent {
   id: string;
@@ -79,24 +80,41 @@ export function FullCalendarView({
   const calendarRef = useRef<FullCalendar>(null);
   const [currentView, setCurrentView] = useState('dayGridMonth');
   const [calendarTitle, setCalendarTitle] = useState('');
-  const { isMobile, isTablet, isSmallDesktop, isCompact } = useResponsive();
-  const [isTouch, setIsTouch] = useState(false);
+  const { 
+    isMobile, 
+    isTablet, 
+    isSmallDesktop,
+    isInCriticalZone,
+    needsDropdownMenu,
+    isCompact,
+    isTouch,
+    isPortrait,
+    toolbarLayout,
+    optimalCalendarView 
+  } = useResponsive();
+  const [mounted, setMounted] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [showHint, setShowHint] = useState(true);
 
-  // Detect touch capability
+  // Component mounted state for client-side rendering
   useEffect(() => {
-    setIsTouch('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    setMounted(true);
+    // Hide hint after 3 seconds
+    const timer = setTimeout(() => {
+      setShowHint(false);
+    }, 3000);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Get responsive default view
+  // Get responsive default view using enhanced responsive hook
   const getDefaultView = useCallback(() => {
-    const width = window.innerWidth;
-    const isPortrait = window.innerHeight > window.innerWidth;
-    
-    if (width < 480) return 'dayGridMonth'; // Show month view on small mobile
-    if (width < 768) return isPortrait ? 'dayGridMonth' : 'timeGridWeek';
-    if (width < 1024) return 'timeGridWeek';
+    // Use the optimal view from responsive hook if mounted
+    if (mounted && optimalCalendarView) {
+      return optimalCalendarView;
+    }
+    // Fallback for SSR
     return 'dayGridMonth';
-  }, []);
+  }, [mounted, optimalCalendarView]);
 
   // Transform events to FullCalendar format
   const calendarEvents = useMemo(() => {
@@ -126,17 +144,23 @@ export function FullCalendarView({
   }, [events]);
 
   // Handle calendar navigation
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
     const calendarApi = calendarRef.current?.getApi();
     calendarApi?.prev();
     updateTitle(calendarApi);
-  };
+    setTimeout(() => setIsTransitioning(false), 300);
+  }, [isTransitioning]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
     const calendarApi = calendarRef.current?.getApi();
     calendarApi?.next();
     updateTitle(calendarApi);
-  };
+    setTimeout(() => setIsTransitioning(false), 300);
+  }, [isTransitioning]);
 
   const handleToday = () => {
     const calendarApi = calendarRef.current?.getApi();
@@ -144,12 +168,15 @@ export function FullCalendarView({
     updateTitle(calendarApi);
   };
 
-  const handleViewChange = (view: string) => {
+  const handleViewChange = useCallback((view: string) => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
     const calendarApi = calendarRef.current?.getApi();
     calendarApi?.changeView(view);
     setCurrentView(view);
     updateTitle(calendarApi);
-  };
+    setTimeout(() => setIsTransitioning(false), 300);
+  }, [isTransitioning]);
 
   const updateTitle = (calendarApi?: CalendarApi | null) => {
     if (calendarApi) {
@@ -187,25 +214,41 @@ export function FullCalendarView({
     }
   };
 
-  // Get calendar height based on device
-  const getCalendarHeight = () => {
-    if (isMobile) return 'calc(100vh - 400px)';
-    if (isTablet) return 'calc(100vh - 350px)';
-    return 'calc(100vh - 300px)';
-  };
+  // Removed getCalendarHeight - using flexbox for dynamic sizing
 
-  // View options for different devices
-  const viewOptions = isMobile ? [
-    { value: 'dayGridMonth', label: 'Month', icon: CalendarRange },
-    { value: 'timeGridWeek', label: 'Week', icon: CalendarDays },
-    { value: 'timeGridDay', label: 'Day', icon: Calendar },
-    { value: 'listWeek', label: 'List', icon: List },
-  ] : [
-    { value: 'dayGridMonth', label: 'Month', icon: CalendarRange },
-    { value: 'timeGridWeek', label: 'Week', icon: CalendarDays },
-    { value: 'timeGridDay', label: 'Day', icon: Calendar },
-    { value: 'listWeek', label: 'List', icon: List },
-  ];
+  // Swipe gesture handlers for mobile navigation
+  const handleViewCycle = useCallback((direction: 'up' | 'down') => {
+    const views = ['dayGridMonth', 'timeGridWeek', 'timeGridDay', 'listWeek'];
+    const currentIndex = views.indexOf(currentView);
+    let newIndex;
+    
+    if (direction === 'up') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : views.length - 1;
+    } else {
+      newIndex = currentIndex < views.length - 1 ? currentIndex + 1 : 0;
+    }
+    
+    handleViewChange(views[newIndex]);
+  }, [currentView, handleViewChange]);
+
+  // Add swipe gestures for mobile
+  const swipeHandlers = useCalendarSwipe(
+    handlePrev,
+    handleNext,
+    isMobile ? handleViewCycle : undefined,
+    {
+      enabled: isTouch && !isTransitioning,
+      preventScrollOnSwipe: true,
+    }
+  );
+
+  // View options for calendar - renamed List to Agenda for clarity
+  const viewOptions = useMemo(() => [
+    { value: 'dayGridMonth', label: 'Month', shortLabel: 'Mo', icon: CalendarRange, tooltip: 'Month grid view' },
+    { value: 'timeGridWeek', label: 'Week', shortLabel: 'Wk', icon: CalendarDays, tooltip: 'Week time grid' },
+    { value: 'timeGridDay', label: 'Day', shortLabel: 'D', icon: Calendar, tooltip: 'Single day view' },
+    { value: 'listWeek', label: 'Agenda', shortLabel: 'A', icon: List, tooltip: 'Weekly agenda list' },
+  ], []);
 
   useEffect(() => {
     const calendarApi = calendarRef.current?.getApi();
@@ -221,65 +264,73 @@ export function FullCalendarView({
   }, []);
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+    <div className="flex flex-col h-full min-h-[400px] sm:min-h-[500px]">
       {/* Custom Toolbar */}
-      <div className="mb-3 bg-white/5 rounded-lg border border-white/10 p-2 sm:p-3">
-        {/* Mobile Toolbar */}
+      <div className="mb-3 bg-white/5 rounded-lg border border-white/10 p-2 sm:p-3 flex-shrink-0">
+        {/* Mobile Toolbar - Compact single-row layout */}
         {isMobile ? (
-          <div className="space-y-2">
-            {/* Top Row: Title and Today */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-white truncate pr-2">{calendarTitle}</h3>
+          <div className="flex items-center justify-between gap-1">
+            {/* Left: Navigation */}
+            <div className="flex items-center gap-0.5">
               <Button
-                size="sm"
-                variant="outline"
-                onClick={handleToday}
-                className="h-7 text-[11px] px-2 shrink-0"
+                size="icon"
+                variant="ghost"
+                onClick={handlePrev}
+                className="h-7 w-7"
               >
-                Today
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleNext}
+                className="h-7 w-7"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
             
-            {/* Bottom Row: Navigation and View */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handlePrev}
-                  className="h-7 w-7"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleNext}
-                  className="h-7 w-7"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              
-              <Select value={currentView} onValueChange={handleViewChange}>
-                <SelectTrigger className="w-20 h-7 bg-white/10 text-[11px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+            {/* Center: Month/Year */}
+            <h3 className="text-xs font-semibold text-white truncate flex-1 text-center px-2 min-w-0">
+              {calendarTitle}
+            </h3>
+            
+            {/* Right: Today and View */}
+            <div className="flex items-center gap-0.5">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleToday}
+                className="h-7 text-xs px-1.5"
+              >
+                Today
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
                   {viewOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex items-center gap-1.5">
-                        <option.icon className="h-3 w-3" />
-                        <span className="text-[11px]">{option.label}</span>
-                      </div>
-                    </SelectItem>
+                    <DropdownMenuItem
+                      key={option.value}
+                      onClick={() => handleViewChange(option.value)}
+                      className={cn(
+                        "gap-2",
+                        currentView === option.value && "bg-blue-600/20"
+                      )}
+                    >
+                      <option.icon className="h-4 w-4" />
+                      {option.label}
+                    </DropdownMenuItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         ) : (
-          /* Desktop/Tablet Toolbar */
+          /* Tablet and Desktop Toolbar */
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
               <Button
@@ -315,11 +366,15 @@ export function FullCalendarView({
               </h3>
             </div>
             
-            {/* Use dropdown menu for small desktop screens (1024-1280px) */}
-            {isSmallDesktop ? (
+            {/* Smart responsive view selector - Correct logic: dropdown for smaller screens */}
+            {(isTablet || isInCriticalZone || needsDropdownMenu || toolbarLayout === 'dropdown' || toolbarLayout === 'compact') ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2 min-w-[120px] justify-between"
+                  >
                     {viewOptions.find(o => o.value === currentView)?.icon && (
                       React.createElement(viewOptions.find(o => o.value === currentView)!.icon, {
                         className: "h-4 w-4"
@@ -346,6 +401,7 @@ export function FullCalendarView({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
+              /* Full button layout - Only for large desktop screens (>1100px) */
               <div className="flex items-center gap-1 sm:gap-2">
                 {viewOptions.map((option) => (
                   <Button
@@ -370,42 +426,65 @@ export function FullCalendarView({
         )}
       </div>
 
-      {/* FullCalendar Component */}
+      {/* FullCalendar Component with Swipe Support */}
       <div 
-        className="flex-1 bg-gray-950 rounded-lg p-2 sm:p-3 overflow-hidden"
-        style={{ height: getCalendarHeight(), maxHeight: getCalendarHeight() }}
+        {...swipeHandlers}
+        className={cn(
+          "flex-1 min-h-0 bg-gray-950 rounded-lg p-2 sm:p-3",
+          "relative transition-opacity duration-300",
+          isTransitioning && "opacity-70"
+        )}
       >
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-          initialView={getDefaultView()}
-          headerToolbar={false} // We use our custom toolbar
-          events={calendarEvents}
-          editable={!isMobile || !isTouch} // Disable drag on mobile touch
-          droppable={true}
-          selectable={true}
-          selectMirror={true}
-          dayMaxEvents={isMobile ? 2 : true}
-          eventDisplay="block"
-          weekends={true}
-          select={handleDateSelect}
-          eventClick={handleEventClick}
-          eventChange={handleEventChange}
-          eventTimeFormat={{
-            hour: 'numeric',
-            minute: '2-digit',
-            meridiem: 'short'
-          }}
-          slotLabelFormat={{
-            hour: 'numeric',
-            minute: '2-digit',
-            meridiem: 'short'
-          }}
-          height="100%"
-          contentHeight="auto"
-          // Mobile-specific options
-          eventLongPressDelay={500} // Long press for mobile
-          selectLongPressDelay={500}
+        {/* Mobile interaction hints - fade out after 3 seconds */}
+        {isMobile && isTouch && showHint && (
+          <div className={cn(
+            "absolute top-1 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none",
+            "transition-opacity duration-500",
+            !showHint && "opacity-0"
+          )}>
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-1 bg-black/60 rounded-full px-2 py-0.5 text-[9px] text-white/60">
+                <ChevronLeft className="h-2.5 w-2.5" />
+                Swipe
+                <ChevronRight className="h-2.5 w-2.5" />
+              </div>
+              <div className="bg-blue-600/80 rounded-full px-2 py-0.5 text-[9px] text-white animate-pulse">
+                Hold date to add event
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="h-full">
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+            initialView={getDefaultView()}
+            headerToolbar={false} // We use our custom toolbar
+            events={calendarEvents}
+            editable={!isMobile} // Disable drag on mobile
+            droppable={true}
+            selectable={true}
+            selectMirror={true}
+            dayMaxEvents={isMobile ? 3 : true}
+            eventDisplay="block"
+            weekends={true}
+            select={handleDateSelect}
+            eventClick={handleEventClick}
+            eventChange={handleEventChange}
+            eventTimeFormat={{
+              hour: 'numeric',
+              minute: '2-digit',
+              meridiem: 'short'
+            }}
+            slotLabelFormat={{
+              hour: 'numeric',
+              minute: '2-digit',
+              meridiem: 'short'
+            }}
+            height="auto"
+          // Mobile-specific options - balanced for swipe vs select
+          eventLongPressDelay={300} // Reasonable delay for mobile
+          selectLongPressDelay={500} // Hold 500ms to select, allows swipe navigation
           // Responsive options
           views={{
             dayGridMonth: {
@@ -451,9 +530,10 @@ export function FullCalendarView({
               </div>
             );
           }}
-          // Theming
-          themeSystem="standard"
-        />
+            // Theming
+            themeSystem="standard"
+          />
+        </div>
       </div>
     </div>
   );

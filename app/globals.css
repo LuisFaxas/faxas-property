@@ -117,4 +117,37 @@
     background-color: rgba(255, 255, 255, 0.1);
     border-radius: 3px;
   }
+
+  /* Navigation Rail Animations */
+  aside {
+    transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  aside span {
+    transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  aside button {
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Smooth icon rotation for collapse button */
+  aside button svg {
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Prevent text wrapping during animation */
+  aside nav span {
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* Mobile landscape optimizations */
+  @media (max-width: 932px) and (orientation: landscape) {
+    aside {
+      will-change: width;
+      transform: translateZ(0); /* Hardware acceleration */
+    }
+  }
 }

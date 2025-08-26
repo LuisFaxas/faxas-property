@@ -90,11 +90,12 @@ const EVENT_TYPES = [
 ];
 
 export default function AdminSchedulePage() {
-  const isMobile = useMediaQuery('(max-width: 640px)');
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   const { toast } = useToast();
   const { user } = useAuth();
   const isReady = !!user;
-;
+  // No need for extra state - media queries handle this
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -665,6 +666,135 @@ export default function AdminSchedulePage() {
     );
   }
 
+  // Landscape-specific layout for mobile phones
+  if (isLandscape) {
+    return (
+      <PageShell 
+        pageTitle="Schedule"
+        userRole={user?.role || 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+      >
+        <div className="h-full flex flex-col relative overflow-hidden">
+          {/* Floating view toggle - absolute positioned */}
+          <div className="absolute top-1 right-1 z-20 flex gap-1">
+            <Button 
+              size="icon" 
+              variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+              className="h-6 w-6 bg-black/50 backdrop-blur-sm"
+              onClick={() => setViewMode('calendar')}
+            >
+              <CalendarDays className="h-3 w-3" />
+            </Button>
+            <Button 
+              size="icon"
+              variant={viewMode === 'table' ? 'default' : 'ghost'} 
+              className="h-6 w-6 bg-black/50 backdrop-blur-sm"
+              onClick={() => setViewMode('table')}
+            >
+              <List className="h-3 w-3" />
+            </Button>
+          </div>
+          
+          {/* Calendar takes ALL remaining space */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {viewMode === 'calendar' ? (
+              <FullCalendarView
+                events={filteredEvents}
+                onSelectEvent={openEditDialog}
+                onSelectSlot={(start, end) => {
+                  setFormData({
+                    ...formData,
+                    startDate: start.toISOString().split('T')[0],
+                    startTime: start.toTimeString().substring(0, 5),
+                    endDate: end.toISOString().split('T')[0],
+                    endTime: end.toTimeString().substring(0, 5),
+                  });
+                  setIsCreateOpen(true);
+                }}
+                onEventDrop={(event, start, end) => {
+                  handleUpdateEvent(event.id, { 
+                    start: start.toISOString(), 
+                    end: end.toISOString() 
+                  });
+                }}
+                onEventResize={(event, start, end) => {
+                  handleUpdateEvent(event.id, { 
+                    start: start.toISOString(), 
+                    end: end.toISOString() 
+                  });
+                }}
+              />
+            ) : (
+              <div className="h-full overflow-auto">
+                <DataTable 
+                  columns={columns} 
+                  data={filteredEvents} 
+                  className="text-xs"
+                />
+              </div>
+            )}
+          </div>
+          
+          {/* Compact FAB */}
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button
+                className="fixed bottom-2 right-2 z-50 rounded-full h-10 w-10 shadow-lg bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-full h-full bg-gray-900 text-white border-0 rounded-none">
+              <DialogHeader className="flex-shrink-0">
+                <DialogTitle>Create Schedule Event</DialogTitle>
+                <DialogDescription className="text-white/60">
+                  Add a new event to the project calendar
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto px-1">
+                {/* Form content - same as mobile form */}
+                <div className="grid gap-4 py-4 pr-2">
+                  {/* ... existing form fields ... */}
+                </div>
+              </div>
+              <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate} disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Event'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          {/* FAB also in landscape mode for consistency */}
+          <Button
+            size="lg"
+            className="fixed bottom-3 right-3 z-[9999] rounded-full h-10 w-10 shadow-md bg-blue-600 hover:bg-blue-700 active:scale-95 transition-transform border border-white/10 glass"
+            aria-label="Add new event"
+            onClick={() => setIsCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4 text-white" />
+          </Button>
+        </div>
+      </PageShell>
+    );
+  }
+
+  // Regular portrait layout
   return (
     <PageShell 
       pageTitle="Schedule"
@@ -869,19 +999,13 @@ export default function AdminSchedulePage() {
         </div>
         )}
 
-        {/* Mobile FAB for Add Event */}
-        {isMobile && (
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="lg"
-                className="fixed bottom-6 right-6 z-50 rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700"
-              >
-                <Plus className="h-6 w-6" />
-                <span className="sr-only">Add Event</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-full h-full sm:max-w-[500px] sm:max-h-[85vh] sm:h-auto overflow-hidden flex flex-col bg-gray-900 text-white border-0 sm:border sm:border-white/10 rounded-none sm:rounded-lg">
+        
+        {/* Mobile Dialog for creating events */}
+        {isMobile && !isLandscape && (
+          <>
+            
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogContent className="w-full h-full sm:max-w-[500px] sm:max-h-[85vh] sm:h-auto overflow-hidden flex flex-col bg-gray-900 text-white border-0 sm:border sm:border-white/10 rounded-none sm:rounded-lg">
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle>Create Schedule Event</DialogTitle>
                 <DialogDescription className="text-white/60">
@@ -1057,11 +1181,13 @@ export default function AdminSchedulePage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </>
         )}
 
-        {/* KPI Cards - Now with Carousel for Mobile */}
-        <KPICarousel
-          cards={[
+        {/* KPI Cards - Hidden in landscape */}
+        {!isLandscape && (
+          <KPICarousel
+            cards={[
             {
               title: 'Total Events',
               value: metrics.totalEvents,
@@ -1091,10 +1217,10 @@ export default function AdminSchedulePage() {
               iconColor: 'text-white/40',
             },
           ]}
-        />
+          />
+        )}
 
-
-        {/* Tabs with View Mode Toggle */}
+        {/* Tabs with View Mode Toggle - Hidden in landscape */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
           {/* Mobile: Combined row for tabs and view toggle */}
           <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
@@ -1391,14 +1517,17 @@ export default function AdminSchedulePage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Mobile Floating Action Button */}
-        {isMobile && (
+        {/* Mobile Floating Action Button - Remove duplicate */}
+        
+        {/* Mobile FAB for Add Event - Theme matched design */}
+        {isMobile && !isLandscape && (
           <Button
-            size="icon"
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg z-50 sm:hidden"
+            size="lg"
+            className="fixed bottom-5 right-5 z-[9999] rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700 active:scale-95 transition-transform border border-white/10 glass"
+            aria-label="Add new event"
             onClick={() => setIsCreateOpen(true)}
           >
-            <Plus className="h-6 w-6" />
+            <Plus className="h-6 w-6 text-white" />
           </Button>
         )}
       </div>

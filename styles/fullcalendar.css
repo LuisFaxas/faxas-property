@@ -225,7 +225,20 @@
 }
 
 /* Mobile Specific Styles - Optimized for single-screen experience */
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+  /* Visual feedback only after holding (not instant tap) */
+  .fc-daygrid-day.fc-day-selected,
+  .fc-timegrid-slot.fc-selected {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+    transition: background-color 0.3s;
+  }
+  
+  /* Show that days can be selected with long press */
+  .fc-daygrid-day-frame {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent; /* Remove iOS tap highlight */
+  }
+  
   .fc .fc-toolbar-title {
     font-size: 0.875rem;
   }
@@ -517,4 +530,175 @@
 
 .calendar-view-selector {
   transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Ultra-compact landscape mode for phones only */
+@media (max-width: 932px) and (orientation: landscape) and (max-height: 430px) {
+  /* Reduce all spacing to absolute minimum */
+  .fc {
+    font-size: 10px !important;
+  }
+  
+  /* Ultra-compact toolbar */
+  .fc .fc-toolbar {
+    padding: 2px 4px !important;
+    margin: 0 !important;
+    min-height: 24px !important;
+    gap: 4px !important;
+  }
+  
+  .fc .fc-toolbar-chunk {
+    gap: 2px !important;
+  }
+  
+  .fc .fc-toolbar-title {
+    font-size: 11px !important;
+    margin: 0 4px !important;
+    font-weight: 600 !important;
+  }
+  
+  .fc .fc-button {
+    padding: 1px 4px !important;
+    font-size: 9px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    border-radius: 2px !important;
+  }
+  
+  .fc .fc-button .fc-icon {
+    font-size: 10px !important;
+  }
+  
+  /* Ultra-compact header */
+  .fc .fc-col-header {
+    font-size: 9px !important;
+    background: transparent !important;
+  }
+  
+  .fc .fc-col-header-cell {
+    padding: 1px 0 !important;
+    min-height: 14px !important;
+    font-weight: 500 !important;
+  }
+  
+  .fc .fc-col-header-cell-cushion {
+    padding: 1px !important;
+  }
+  
+  /* Minimum viable day cells for landscape */
+  .fc .fc-daygrid-day {
+    min-height: 24px !important;
+    max-height: 28px !important;
+    border-width: 0.5px !important;
+  }
+  
+  .fc .fc-daygrid-day-number {
+    font-size: 9px !important;
+    padding: 1px 2px !important;
+    font-weight: 500 !important;
+  }
+  
+  .fc .fc-daygrid-day-top {
+    min-height: 12px !important;
+    padding: 0 !important;
+  }
+  
+  .fc .fc-daygrid-day-frame {
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Events as tiny dots only in landscape */
+  .fc .fc-daygrid-event {
+    display: none !important;
+  }
+  
+  .fc .fc-daygrid-event-harness {
+    margin: 0 !important;
+    position: absolute !important;
+    bottom: 1px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+  }
+  
+  .fc .fc-daygrid-dot-event {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  .fc .fc-daygrid-event-dot {
+    width: 3px !important;
+    height: 3px !important;
+    margin: 0 1px !important;
+    border-radius: 50% !important;
+  }
+  
+  /* More events link */
+  .fc .fc-daygrid-more-link {
+    font-size: 8px !important;
+    padding: 0 1px !important;
+    margin: 0 !important;
+  }
+  
+  /* Today highlight - subtle in landscape */
+  .fc .fc-day-today {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+  }
+  
+  .fc .fc-day-today .fc-daygrid-day-number {
+    color: #3b82f6 !important;
+    font-weight: 700 !important;
+  }
+  
+  /* Hide all non-essential elements */
+  .fc .fc-daygrid-day-bg,
+  .fc .fc-daygrid-week-number,
+  .fc .fc-timegrid-axis,
+  .fc .fc-list-day-cushion,
+  .fc .fc-daygrid-day-events,
+  .fc-daygrid-event-time,
+  .fc-event-time {
+    display: none !important;
+  }
+  
+  /* Remove all unnecessary margins and paddings */
+  .fc-view-harness,
+  .fc-view,
+  .fc-daygrid,
+  .fc-scrollgrid,
+  .fc-daygrid-body,
+  .fc-scrollgrid-section,
+  .fc-scrollgrid-section-body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Ensure calendar fills container exactly */
+  .fc-view-harness {
+    height: 100% !important;
+  }
+  
+  .fc-daygrid-body {
+    height: 100% !important;
+  }
+  
+  .fc-scrollgrid-sync-table {
+    height: 100% !important;
+  }
+  
+  /* Force 6 weeks to always show for consistency */
+  .fc .fc-daygrid-body-balanced {
+    height: 100% !important;
+  }
+  
+  /* Scrollbar hidden in landscape */
+  .fc-scroller {
+    overflow: hidden !important;
+  }
+  
+  .fc-scroller-liquid-absolute {
+    overflow: hidden !important;
+  }
 }

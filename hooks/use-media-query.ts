@@ -48,3 +48,8 @@ export function useIsTablet() {
 export function useIsDesktop() {
   return useMediaQuery('(min-width: 1024px)');
 }
+
+// Detect landscape orientation on mobile phones only
+export function useIsLandscape() {
+  return useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
+}
