@@ -48,6 +48,7 @@ import { useAuth } from '@/app/contexts/AuthContext';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 import { CalendarView } from '@/components/schedule/calendar-view';
+import { FullCalendarView } from '@/components/schedule/fullcalendar-view';
 import { cn } from '@/lib/utils';
 import { KPICarousel } from '@/components/schedule/kpi-carousel';
 import { MobileCalendarView } from '@/components/schedule/mobile-calendar-view';
@@ -1220,32 +1221,24 @@ export default function AdminSchedulePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {isMobile ? (
-                  // Mobile Calendar View
-                  <MobileCalendarView
+                {viewMode === 'calendar' ? (
+                  // New FullCalendar View - Responsive for all devices
+                  <FullCalendarView
                     events={filteredEvents}
                     onSelectEvent={openEditDialog}
-                    onAddEvent={(date) => {
+                    onSelectSlot={(start, end) => {
                       setFormData({
                         ...formData,
-                        startDate: date.toISOString().split('T')[0],
-                        startTime: '09:00',
-                        endDate: date.toISOString().split('T')[0],
-                        endTime: '10:00',
+                        startDate: start.toISOString().split('T')[0],
+                        startTime: start.toTimeString().substring(0, 5),
+                        endDate: end.toISOString().split('T')[0],
+                        endTime: end.toTimeString().substring(0, 5),
                       });
                       setIsCreateOpen(true);
                     }}
-                  />
-                ) : viewMode === 'calendar' ? (
-                  <CalendarView
-                    events={filteredEvents}
-                    onSelectEvent={openEditDialog}
-                    onSelectSlot={handleSelectSlot}
-                    onEventDrop={handleEventDrop}
-                    view={calendarView}
-                    onViewChange={setCalendarView}
-                    date={calendarDate}
-                    onNavigate={setCalendarDate}
+                    onEventDrop={(event, start, end) => {
+                      handleEventDrop({ event, start, end });
+                    }}
                   />
                 ) : (
                   <DataTable
