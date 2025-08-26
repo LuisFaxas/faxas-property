@@ -12,8 +12,8 @@ model User {
   email     String   @unique
   role      Role
   createdAt DateTime @default(now())
-  tasks     Task[]   @relation("AssignedTasks")
   contact   Contact?
+  tasks     Task[]   @relation("AssignedTasks")
 }
 
 model Project {
@@ -21,32 +21,28 @@ model Project {
   name          String
   status        String
   createdAt     DateTime           @default(now())
-  
-  // New fields for comprehensive project management
-  description   String?
-  projectType   ProjectType        @default(RENOVATION)
-  startDate     DateTime?
-  targetEndDate DateTime?
   actualEndDate DateTime?
   address       String?
-  siteDetails   String?
-  totalBudget   Decimal?           @db.Decimal(12, 2)
-  contingency   Decimal?           @db.Decimal(5, 2)
-  managerId     String?
-  clientName    String?
   clientEmail   String?
+  clientName    String?
   clientPhone   String?
-  permitNumbers String[]
-  timezone      String             @default("America/New_York")
-  workingHours  Json?
-  settings      Json?
+  color         String?
+  contingency   Decimal?           @db.Decimal(5, 2)
+  description   String?
+  icon          String?
   isArchived    Boolean            @default(false)
   isFavorite    Boolean            @default(false)
-  color         String?
-  icon          String?
+  managerId     String?
+  permitNumbers String[]
+  projectType   ProjectType        @default(RENOVATION)
+  settings      Json?
+  siteDetails   String?
+  startDate     DateTime?
+  targetEndDate DateTime?
+  timezone      String             @default("America/New_York")
+  totalBudget   Decimal?           @db.Decimal(12, 2)
   updatedAt     DateTime           @default(now()) @updatedAt
-  
-  // Relations
+  workingHours  Json?
   budgets       BudgetItem[]
   contacts      Contact[]
   decisions     Decision[]
@@ -56,120 +52,95 @@ model Project {
   procurement   Procurement[]
   risks         Risk[]
   schedule      ScheduleEvent[]
-  eventTemplates EventTemplate[]
   tasks         Task[]
   access        UserModuleAccess[]
 }
 
 model Contact {
-  id              String        @id @default(cuid())
-  projectId       String
-  name            String
-  company         String?
-  specialty       String?
-  category        String
-  referredById    String?
-  status          String
-  emails          String[]
-  phones          String[]
-  notes           String?
-  
-  // Portal access fields
-  userId          String?       @unique
-  portalStatus    String        @default("NONE") // NONE, INVITED, ACTIVE, BLOCKED
-  inviteToken     String?       @unique
-  inviteExpiry    DateTime?
-  lastLoginAt     DateTime?
-  lastActivityAt  DateTime?
-  
-  // Relations
-  project         Project       @relation(fields: [projectId], references: [id])
-  user            User?         @relation(fields: [userId], references: [id])
-  procurements    Procurement[]
-  assignedTasks   Task[]        @relation("ContactTasks")
-  
-  // Timestamps
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @default(now()) @updatedAt
-  
+  id             String        @id @default(cuid())
+  projectId      String
+  name           String
+  company        String?
+  specialty      String?
+  category       String
+  referredById   String?
+  status         String
+  emails         String[]
+  phones         String[]
+  notes          String?
+  userId         String?       @unique
+  createdAt      DateTime      @default(now())
+  inviteExpiry   DateTime?
+  inviteToken    String?       @unique
+  lastActivityAt DateTime?
+  lastLoginAt    DateTime?
+  portalStatus   String        @default("NONE")
+  updatedAt      DateTime      @default(now()) @updatedAt
+  project        Project       @relation(fields: [projectId], references: [id])
+  user           User?         @relation(fields: [userId], references: [id])
+  procurements   Procurement[]
+  assignedTasks  Task[]        @relation("ContactTasks")
+
   @@index([projectId, portalStatus])
   @@index([inviteToken])
 }
 
 model Task {
-  id                String         @id @default(cuid())
-  projectId         String
-  title             String
-  description       String?
-  status            TaskStatus     @default(TODO)
-  priority          TaskPriority   @default(MEDIUM)
-  dueDate           DateTime?
-  assignedToId      String?
-  assignedContactId String?        // New: for Contact assignments
-  relatedContactIds String[]
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  
-  // Progress and time tracking
-  progressPercentage Int           @default(0)
-  estimatedHours    Float?
-  actualHours       Float?
-  startDate         DateTime?
-  completedAt       DateTime?
-  
-  // Construction-specific fields
-  isOnCriticalPath  Boolean        @default(false)
-  isMilestone       Boolean        @default(false)
-  location          String?
-  trade             String?
-  weatherDependent  Boolean        @default(false)
-  requiresInspection Boolean       @default(false)
-  inspectionStatus  String?
-  
-  // Mobile and location fields
-  latitude          Float?
-  longitude         Float?
-  locationName      String?
-  offlineCreated    Boolean        @default(false)
-  lastSyncedAt      DateTime?
-  localId           String?
-  thumbnailUrl      String?
-  voiceNoteUrl      String?
-  quickTemplate     String?
-  mobileMetadata    Json?
-  
-  // Additional metadata
-  tags              String[]       @default([])
-  customFields      Json?
-  isRecurring       Boolean        @default(false)
-  recurringPattern  String?
-  
-  // Relations
-  assignedTo        User?          @relation("AssignedTasks", fields: [assignedToId], references: [id])
-  assignedContact   Contact?       @relation("ContactTasks", fields: [assignedContactId], references: [id])
-  project           Project        @relation(fields: [projectId], references: [id])
-  
-  // Hierarchical relations
-  subtasks          Task[]         @relation("TaskSubtasks")
-  parentTask        Task?          @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
-  parentTaskId      String?
-  
-  // Dependencies
-  dependencies      TaskDependency[] @relation("DependentTask")
-  dependents        TaskDependency[] @relation("PredecessorTask")
-  
-  // Associated data
-  attachments       TaskAttachment[]
-  comments          TaskComment[]
-  watchers          TaskWatcher[]
-  photos            TaskPhoto[]
-  activities        TaskActivity[]
-  checklistItems    TaskChecklistItem[]
-  
-  // Links to other entities
-  rfiLinks          RFITaskLink[]
-  submittalLinks    SubmittalTaskLink[]
-  changeOrderLinks  ChangeOrderTaskLink[]
+  id                 String                @id @default(cuid())
+  projectId          String
+  title              String
+  description        String?
+  dueDate            DateTime?
+  assignedToId       String?
+  relatedContactIds  String[]
+  createdAt          DateTime              @default(now())
+  actualHours        Float?
+  completedAt        DateTime?
+  customFields       Json?
+  estimatedHours     Float?
+  inspectionStatus   String?
+  isMilestone        Boolean               @default(false)
+  isOnCriticalPath   Boolean               @default(false)
+  isRecurring        Boolean               @default(false)
+  lastSyncedAt       DateTime?
+  latitude           Float?
+  localId            String?
+  location           String?
+  locationName       String?
+  longitude          Float?
+  mobileMetadata     Json?
+  offlineCreated     Boolean               @default(false)
+  parentTaskId       String?
+  priority           TaskPriority          @default(MEDIUM)
+  progressPercentage Int                   @default(0)
+  quickTemplate      String?
+  recurringPattern   String?
+  requiresInspection Boolean               @default(false)
+  startDate          DateTime?
+  tags               String[]              @default([])
+  thumbnailUrl       String?
+  trade              String?
+  updatedAt          DateTime              @updatedAt
+  voiceNoteUrl       String?
+  weatherDependent   Boolean               @default(false)
+  status             TaskStatus            @default(TODO)
+  assignedContactId  String?
+  changeOrderLinks   ChangeOrderTaskLink[]
+  rfiLinks           RFITaskLink[]
+  submittalLinks     SubmittalTaskLink[]
+  assignedContact    Contact?              @relation("ContactTasks", fields: [assignedContactId], references: [id])
+  assignedTo         User?                 @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  parentTask         Task?                 @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  subtasks           Task[]                @relation("TaskSubtasks")
+  project            Project               @relation(fields: [projectId], references: [id])
+  activities         TaskActivity[]
+  attachments        TaskAttachment[]
+  checklistItems     TaskChecklistItem[]
+  comments           TaskComment[]
+  dependencies       TaskDependency[]      @relation("DependentTask")
+  dependents         TaskDependency[]      @relation("PredecessorTask")
+  photos             TaskPhoto[]
+  watchers           TaskWatcher[]
 
   @@index([projectId, status, dueDate])
   @@index([projectId, assignedToId])
@@ -188,61 +159,12 @@ model ScheduleEvent {
   googleEventId     String?
   replied           Boolean        @default(false)
   notes             String?
-  description       String?
-  location          String?
-  attendees         String[]
-  isAllDay          Boolean        @default(false)
-  timezone          String         @default("America/New_York")
-  recurringEventId  String?
   requesterUserId   String?
   relatedContactIds String[]
   createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @default(now()) @updatedAt
-  createdBy         String?
   project           Project        @relation(fields: [projectId], references: [id])
-  recurrencePattern RecurrencePattern?
 
   @@index([projectId, start(sort: Desc)])
-  @@index([recurringEventId])
-  @@index([status])
-  @@index([type])
-}
-
-model RecurrencePattern {
-  id          String      @id @default(cuid())
-  eventId     String      @unique
-  type        RecurrenceType
-  interval    Int         @default(1)
-  daysOfWeek  Int[]       // 0=Sunday, 1=Monday, etc.
-  dayOfMonth  Int?        // For monthly recurrence
-  month       Int?        // For yearly recurrence
-  endDate     DateTime?
-  occurrences Int?        // Number of occurrences
-  exceptions  DateTime[]  // Dates to skip
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  event       ScheduleEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-}
-
-model EventTemplate {
-  id            String      @id @default(cuid())
-  projectId     String
-  name          String
-  type          ScheduleType
-  title         String
-  description   String?
-  location      String?
-  duration      Int         // Duration in minutes
-  attendees     String[]
-  notes         String?
-  isActive      Boolean     @default(true)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  createdBy     String?
-  project       Project     @relation(fields: [projectId], references: [id])
-  
-  @@index([projectId, isActive])
-  @@unique([projectId, name])
 }
 
 model BudgetItem {
@@ -411,6 +333,209 @@ model AuditLog {
   createdAt DateTime @default(now())
 }
 
+model TaskDependency {
+  id                String         @id @default(cuid())
+  dependentTaskId   String
+  predecessorTaskId String
+  type              DependencyType @default(FINISH_TO_START)
+  lagDays           Int            @default(0)
+  createdAt         DateTime       @default(now())
+  dependentTask     Task           @relation("DependentTask", fields: [dependentTaskId], references: [id], onDelete: Cascade)
+  predecessorTask   Task           @relation("PredecessorTask", fields: [predecessorTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([dependentTaskId, predecessorTaskId])
+  @@index([dependentTaskId])
+  @@index([predecessorTaskId])
+}
+
+model TaskAttachment {
+  id         String   @id @default(cuid())
+  taskId     String
+  fileName   String
+  fileUrl    String
+  fileSize   Int
+  mimeType   String
+  uploadedBy String
+  uploadedAt DateTime @default(now())
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model TaskComment {
+  id          String   @id @default(cuid())
+  taskId      String
+  content     String
+  authorId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  mentions    String[] @default([])
+  attachments String[] @default([])
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt(sort: Desc)])
+}
+
+model TaskWatcher {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model TaskPhoto {
+  id           String   @id @default(cuid())
+  taskId       String
+  originalUrl  String
+  thumbnailUrl String
+  mediumUrl    String
+  latitude     Float?
+  longitude    Float?
+  takenAt      DateTime
+  deviceInfo   String?
+  annotations  Json?
+  uploadedBy   String
+  createdAt    DateTime @default(now())
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model TaskActivity {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt(sort: Desc)])
+}
+
+model TaskChecklistItem {
+  id          String    @id @default(cuid())
+  taskId      String
+  title       String
+  isCompleted Boolean   @default(false)
+  completedBy String?
+  completedAt DateTime?
+  order       Int
+  createdAt   DateTime  @default(now())
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, order])
+}
+
+model RFI {
+  id          String        @id @default(cuid())
+  projectId   String
+  rfiNumber   String        @unique
+  subject     String
+  question    String
+  status      String
+  priority    String
+  submittedBy String
+  submittedAt DateTime
+  respondBy   DateTime?
+  response    String?
+  respondedAt DateTime?
+  attachments String[]      @default([])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  taskLinks   RFITaskLink[]
+
+  @@index([projectId, status])
+  @@index([rfiNumber])
+}
+
+model RFITaskLink {
+  id        String   @id @default(cuid())
+  rfiId     String
+  taskId    String
+  createdAt DateTime @default(now())
+  rfi       RFI      @relation(fields: [rfiId], references: [id], onDelete: Cascade)
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([rfiId, taskId])
+  @@index([rfiId])
+  @@index([taskId])
+}
+
+model Submittal {
+  id              String              @id @default(cuid())
+  projectId       String
+  submittalNumber String              @unique
+  title           String
+  description     String?
+  status          String
+  submittedBy     String
+  submittedAt     DateTime
+  reviewBy        DateTime?
+  approvedAt      DateTime?
+  approvedBy      String?
+  attachments     String[]            @default([])
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  taskLinks       SubmittalTaskLink[]
+
+  @@index([projectId, status])
+  @@index([submittalNumber])
+}
+
+model SubmittalTaskLink {
+  id          String    @id @default(cuid())
+  submittalId String
+  taskId      String
+  createdAt   DateTime  @default(now())
+  submittal   Submittal @relation(fields: [submittalId], references: [id], onDelete: Cascade)
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([submittalId, taskId])
+  @@index([submittalId])
+  @@index([taskId])
+}
+
+model ChangeOrder {
+  id             String                @id @default(cuid())
+  projectId      String
+  coNumber       String                @unique
+  title          String
+  description    String
+  costImpact     Decimal               @db.Decimal(12, 2)
+  scheduleImpact Int?
+  status         String
+  requestedBy    String
+  requestedAt    DateTime
+  approvedAt     DateTime?
+  approvedBy     String?
+  attachments    String[]              @default([])
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  taskLinks      ChangeOrderTaskLink[]
+
+  @@index([projectId, status])
+  @@index([coNumber])
+}
+
+model ChangeOrderTaskLink {
+  id            String      @id @default(cuid())
+  changeOrderId String
+  taskId        String
+  createdAt     DateTime    @default(now())
+  changeOrder   ChangeOrder @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([changeOrderId, taskId])
+  @@index([changeOrderId])
+  @@index([taskId])
+}
+
 enum Role {
   ADMIN
   STAFF
@@ -432,15 +557,6 @@ enum ScheduleStatus {
   DONE
   CANCELED
   RESCHEDULE_NEEDED
-  PENDING
-}
-
-enum RecurrenceType {
-  DAILY
-  WEEKLY
-  MONTHLY
-  YEARLY
-  CUSTOM
 }
 
 enum BudgetStatus {
@@ -487,7 +603,6 @@ enum ProjectType {
   MIXED_USE
 }
 
-// Task-related enums
 enum TaskStatus {
   TODO
   IN_PROGRESS
@@ -510,222 +625,4 @@ enum DependencyType {
   START_TO_START
   FINISH_TO_FINISH
   START_TO_FINISH
-}
-
-// Task-related models
-model TaskDependency {
-  id               String         @id @default(cuid())
-  dependentTaskId  String
-  predecessorTaskId String
-  type             DependencyType @default(FINISH_TO_START)
-  lagDays          Int            @default(0)
-  createdAt        DateTime       @default(now())
-  
-  dependentTask    Task           @relation("DependentTask", fields: [dependentTaskId], references: [id], onDelete: Cascade)
-  predecessorTask  Task           @relation("PredecessorTask", fields: [predecessorTaskId], references: [id], onDelete: Cascade)
-  
-  @@unique([dependentTaskId, predecessorTaskId])
-  @@index([dependentTaskId])
-  @@index([predecessorTaskId])
-}
-
-model TaskAttachment {
-  id           String   @id @default(cuid())
-  taskId       String
-  fileName     String
-  fileUrl      String
-  fileSize     Int
-  mimeType     String
-  uploadedBy   String
-  uploadedAt   DateTime @default(now())
-  
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@index([taskId])
-}
-
-model TaskComment {
-  id           String   @id @default(cuid())
-  taskId       String
-  content      String
-  authorId     String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  mentions     String[] @default([])
-  attachments  String[] @default([])
-  
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@index([taskId, createdAt(sort: Desc)])
-}
-
-model TaskWatcher {
-  id           String   @id @default(cuid())
-  taskId       String
-  userId       String
-  createdAt    DateTime @default(now())
-  
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@unique([taskId, userId])
-  @@index([taskId])
-  @@index([userId])
-}
-
-model TaskPhoto {
-  id           String   @id @default(cuid())
-  taskId       String
-  originalUrl  String
-  thumbnailUrl String
-  mediumUrl    String
-  latitude     Float?
-  longitude    Float?
-  takenAt      DateTime
-  deviceInfo   String?
-  annotations  Json?
-  uploadedBy   String
-  createdAt    DateTime @default(now())
-  
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@index([taskId])
-}
-
-model TaskActivity {
-  id           String   @id @default(cuid())
-  taskId       String
-  userId       String
-  action       String
-  details      Json?
-  createdAt    DateTime @default(now())
-  
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@index([taskId, createdAt(sort: Desc)])
-}
-
-model TaskChecklistItem {
-  id           String   @id @default(cuid())
-  taskId       String
-  title        String
-  isCompleted  Boolean  @default(false)
-  completedBy  String?
-  completedAt  DateTime?
-  order        Int
-  createdAt    DateTime @default(now())
-  
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@index([taskId, order])
-}
-
-// Construction-specific models
-model RFI {
-  id           String   @id @default(cuid())
-  projectId    String
-  rfiNumber    String   @unique
-  subject      String
-  question     String
-  status       String
-  priority     String
-  submittedBy  String
-  submittedAt  DateTime
-  respondBy    DateTime?
-  response     String?
-  respondedAt  DateTime?
-  attachments  String[] @default([])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  taskLinks    RFITaskLink[]
-  
-  @@index([projectId, status])
-  @@index([rfiNumber])
-}
-
-model RFITaskLink {
-  id           String   @id @default(cuid())
-  rfiId        String
-  taskId       String
-  createdAt    DateTime @default(now())
-  
-  rfi          RFI      @relation(fields: [rfiId], references: [id], onDelete: Cascade)
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@unique([rfiId, taskId])
-  @@index([rfiId])
-  @@index([taskId])
-}
-
-model Submittal {
-  id              String   @id @default(cuid())
-  projectId       String
-  submittalNumber String   @unique
-  title           String
-  description     String?
-  status          String
-  submittedBy     String
-  submittedAt     DateTime
-  reviewBy        DateTime?
-  approvedAt      DateTime?
-  approvedBy      String?
-  attachments     String[] @default([])
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  taskLinks       SubmittalTaskLink[]
-  
-  @@index([projectId, status])
-  @@index([submittalNumber])
-}
-
-model SubmittalTaskLink {
-  id           String   @id @default(cuid())
-  submittalId  String
-  taskId       String
-  createdAt    DateTime @default(now())
-  
-  submittal    Submittal @relation(fields: [submittalId], references: [id], onDelete: Cascade)
-  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@unique([submittalId, taskId])
-  @@index([submittalId])
-  @@index([taskId])
-}
-
-model ChangeOrder {
-  id           String   @id @default(cuid())
-  projectId    String
-  coNumber     String   @unique
-  title        String
-  description  String
-  costImpact   Decimal  @db.Decimal(12, 2)
-  scheduleImpact Int?   // days
-  status       String
-  requestedBy  String
-  requestedAt  DateTime
-  approvedAt   DateTime?
-  approvedBy   String?
-  attachments  String[] @default([])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  taskLinks    ChangeOrderTaskLink[]
-  
-  @@index([projectId, status])
-  @@index([coNumber])
-}
-
-model ChangeOrderTaskLink {
-  id            String      @id @default(cuid())
-  changeOrderId String
-  taskId        String
-  createdAt     DateTime    @default(now())
-  
-  changeOrder   ChangeOrder @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
-  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
-  @@unique([changeOrderId, taskId])
-  @@index([changeOrderId])
-  @@index([taskId])
 }

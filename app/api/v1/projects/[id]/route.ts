@@ -34,13 +34,14 @@ const updateProjectSchema = z.object({
 // GET /api/v1/projects/[id] - Get single project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAuth();
+    const { id } = await params;
     
     const project = await prisma.project.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -70,10 +71,11 @@ export async function GET(
 // PUT /api/v1/projects/[id] - Update project
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireAuth();
+    const { id } = await params;
     const body = await request.json();
     
     // Validate request body
@@ -86,7 +88,7 @@ export async function PUT(
     if (validated.actualEndDate) updateData.actualEndDate = new Date(validated.actualEndDate);
     
     const project = await prisma.project.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
     
@@ -115,14 +117,15 @@ export async function PUT(
 // DELETE /api/v1/projects/[id] - Delete project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireAuth(['ADMIN']);
+    const { id } = await params;
     
     // Check if project has related data
     const project = await prisma.project.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -157,7 +160,7 @@ export async function DELETE(
     
     // Delete the project
     await prisma.project.delete({
-      where: { id: params.id },
+      where: { id },
     });
     
     // Log activity
@@ -166,7 +169,7 @@ export async function DELETE(
         userId: authUser.uid,
         action: 'DELETE',
         entity: 'PROJECT',
-        entityId: params.id,
+        entityId: id,
         meta: {
           projectName: project.name,
         },

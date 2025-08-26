@@ -7,13 +7,14 @@ import { updateScheduleEventSchema } from '@/lib/validations/schedule';
 // GET /api/v1/schedule/[id] - Get single schedule event
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireAuth();
+    const { id } = await params;
     
     const event = await prisma.scheduleEvent.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         project: {
           select: {
@@ -46,15 +47,16 @@ export async function GET(
 // PUT /api/v1/schedule/[id] - Update schedule event
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
+    const { id } = await params;
     const body = await request.json();
-    const data = updateScheduleEventSchema.parse({ ...body, id: params.id });
+    const data = updateScheduleEventSchema.parse({ ...body, id });
     
     const existingEvent = await prisma.scheduleEvent.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
     
     if (!existingEvent) {
@@ -62,7 +64,7 @@ export async function PUT(
     }
     
     const event = await prisma.scheduleEvent.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title: data.title,
         start: data.startTime ? new Date(data.startTime) : undefined,
@@ -109,13 +111,14 @@ export async function PUT(
 // DELETE /api/v1/schedule/[id] - Delete schedule event
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireRole(['ADMIN']);
+    const { id } = await params;
     
     const event = await prisma.scheduleEvent.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
     
     if (!event) {
@@ -123,7 +126,7 @@ export async function DELETE(
     }
     
     await prisma.scheduleEvent.delete({
-      where: { id: params.id }
+      where: { id }
     });
     
     // Log activity
@@ -132,7 +135,7 @@ export async function DELETE(
         userId: authUser.uid,
         action: 'DELETE',
         entity: 'SCHEDULE_EVENT',
-        entityId: params.id,
+        entityId: id,
         meta: {
           deletedEvent: event
         }
@@ -148,14 +151,15 @@ export async function DELETE(
 // PATCH /api/v1/schedule/[id]/approve - Approve or reject schedule event
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
+    const { id } = await params;
     const body = await request.json();
     
     const existingEvent = await prisma.scheduleEvent.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
     
     if (!existingEvent) {
@@ -169,7 +173,7 @@ export async function PATCH(
     const newStatus = body.approved ? 'PLANNED' : 'CANCELED';
     
     const event = await prisma.scheduleEvent.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: newStatus,
         approverUserId: authUser.uid,

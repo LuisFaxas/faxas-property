@@ -7,15 +7,16 @@ import { approveScheduleEventSchema } from '@/lib/validations/schedule';
 // PATCH /api/v1/schedule/[id]/approve - Approve or reject schedule request
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
+    const { id } = await params;
     const body = await request.json();
     const data = approveScheduleEventSchema.parse(body);
     
     const existingEvent = await prisma.scheduleEvent.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
     
     if (!existingEvent) {
@@ -29,7 +30,7 @@ export async function PATCH(
     const newStatus = data.approved ? 'PLANNED' : 'CANCELED';
     
     const event = await prisma.scheduleEvent.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: newStatus,
         notes: data.notes

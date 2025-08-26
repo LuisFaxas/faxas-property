@@ -625,6 +625,9 @@ export default function AdminSchedulePage() {
         userRole={user?.role || 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
+        fabIcon={Plus}
+        fabLabel="Add Event"
+        onFabClick={() => setIsCreateOpen(true)}
       >
         <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6">
           {/* Header Skeleton */}
@@ -674,6 +677,9 @@ export default function AdminSchedulePage() {
         userRole={user?.role || 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
+        fabIcon={Plus}
+        fabLabel="Add Event"
+        onFabClick={() => setIsCreateOpen(true)}
       >
         <div className="h-full flex flex-col relative overflow-hidden">
           {/* Floating view toggle - absolute positioned */}
@@ -801,6 +807,9 @@ export default function AdminSchedulePage() {
       userRole={user?.role || 'VIEWER'} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
+      fabIcon={Plus}
+      fabLabel="Add Event"
+      onFabClick={() => setIsCreateOpen(true)}
     >
       <div className={cn(
         "p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 h-full flex flex-col",
@@ -1517,19 +1526,6 @@ export default function AdminSchedulePage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Mobile Floating Action Button - Remove duplicate */}
-        
-        {/* Mobile FAB for Add Event - Theme matched design */}
-        {isMobile && !isLandscape && (
-          <Button
-            size="lg"
-            className="fixed bottom-5 right-5 z-[9999] rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700 active:scale-95 transition-transform border border-white/10 glass"
-            aria-label="Add new event"
-            onClick={() => setIsCreateOpen(true)}
-          >
-            <Plus className="h-6 w-6 text-white" />
-          </Button>
-        )}
       </div>
     </PageShell>
   );

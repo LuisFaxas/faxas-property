@@ -26,13 +26,17 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  Plus,
+  LucideIcon
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { ProjectSwitcher } from '@/components/blocks/project-switcher'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { MobileBottomNav } from '@/components/blocks/mobile-bottom-nav'
+import { BottomSheet } from '@/components/ui/bottom-sheet'
 
 interface PageShellProps {
   children: React.ReactNode
@@ -40,6 +44,9 @@ interface PageShellProps {
   userRole?: 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'
   userName?: string
   userEmail?: string
+  fabIcon?: LucideIcon
+  fabLabel?: string
+  onFabClick?: () => void
 }
 
 const adminNavItems = [
@@ -63,14 +70,25 @@ const contractorNavItems = [
   { href: '/contractor/plans', label: 'Plans', icon: FileText },
 ]
 
-export function PageShell({ children, pageTitle, userRole: propUserRole, userName: propUserName, userEmail: propUserEmail }: PageShellProps) {
+export function PageShell({ 
+  children, 
+  pageTitle, 
+  userRole: propUserRole, 
+  userName: propUserName, 
+  userEmail: propUserEmail,
+  fabIcon,
+  fabLabel,
+  onFabClick
+}: PageShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout, userRole: authUserRole } = useAuth()
+  const isMobile = useMediaQuery('(max-width: 768px)')
   const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape)')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarHovered, setSidebarHovered] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
   
   // Auto-collapse sidebar when entering landscape
   useEffect(() => {
@@ -220,71 +238,92 @@ export function PageShell({ children, pageTitle, userRole: propUserRole, userNam
         </div>
       </aside>
 
-      {/* Mobile Header */}
+      {/* Simplified Mobile Header */}
       <div className={cn(
-        "md:hidden fixed top-0 left-0 right-0 z-50 glass border-b border-white/10",
+        "md:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-white/10",
         isLandscape && "py-0"
       )}>
         <div className={cn(
           "flex items-center justify-between p-4",
           isLandscape && "p-2"
         )}>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className={cn(
-              "text-white/70 hover:text-white",
-              isLandscape && "h-6 w-6"
-            )}
-          >
-            <Menu className={isLandscape ? "h-3.5 w-3.5" : "h-5 w-5"} />
-          </Button>
+          {/* Project Switcher on mobile */}
+          <ProjectSwitcher />
+          
           <h2 className={cn(
-            "font-bold text-accent-500",
+            "font-bold text-accent-500 flex-1 text-center",
             isLandscape ? "text-sm" : "text-lg"
           )}>{pageTitle || 'Control Center'}</h2>
-          <Avatar className={isLandscape ? "h-6 w-6" : "h-8 w-8"}>
-            <AvatarImage src="" />
-            <AvatarFallback className={cn(
-              "bg-accent-500/20 text-accent-500",
-              isLandscape && "text-[10px]"
-            )}>{initials}</AvatarFallback>
-          </Avatar>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                <Avatar className={isLandscape ? "h-6 w-6" : "h-8 w-8"}>
+                  <AvatarImage src="" />
+                  <AvatarFallback className={cn(
+                    "bg-accent-500/20 text-accent-500",
+                    isLandscape && "text-[10px]"
+                  )}>{initials}</AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 glass-card">
+              <DropdownMenuLabel>{userName}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
-          <aside className="w-64 h-full glass border-r border-white/10" onClick={(e) => e.stopPropagation()}>
-            <nav className="p-4 space-y-1 mt-16">
-              {navItems.map((item) => {
-                const Icon = item.icon
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg transition-colors",
-                      isLandscape ? "px-2 py-1.5" : "px-3 py-2",
-                      "hover:bg-white/10",
-                      isActive && "bg-accent-500/20 text-accent-500",
-                      !isActive && "text-white/70 hover:text-white"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-            </nav>
-          </aside>
-        </div>
+      {/* Mobile Bottom Navigation */}
+      {isMobile && !isLandscape && (
+        <MobileBottomNav
+          onFabClick={onFabClick}
+          fabIcon={fabIcon}
+          fabLabel={fabLabel}
+          onMoreClick={() => setBottomSheetOpen(true)}
+        />
       )}
+
+      {/* Bottom Sheet for More Items */}
+      <BottomSheet
+        open={bottomSheetOpen}
+        onOpenChange={setBottomSheetOpen}
+        title="More Options"
+      >
+        <nav className="space-y-1">
+          {/* Show remaining nav items that aren't in bottom nav */}
+          {navItems.slice(3).map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setBottomSheetOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg transition-colors px-3 py-3",
+                  "hover:bg-white/10",
+                  isActive && "bg-accent-500/20 text-accent-500",
+                  !isActive && "text-white/70 hover:text-white"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+        </nav>
+      </BottomSheet>
 
       {/* Main Content */}
       <main className={cn(
@@ -308,7 +347,8 @@ export function PageShell({ children, pageTitle, userRole: propUserRole, userNam
         
         <div className={cn(
           "md:pt-0 pt-16",
-          isLandscape && "pt-10"
+          isLandscape && "pt-10",
+          isMobile && !isLandscape && "pb-[60px]" // Account for bottom nav height
         )}>
           {children}
         </div>
