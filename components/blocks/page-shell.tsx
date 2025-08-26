@@ -35,6 +35,7 @@ import { ProjectSwitcher } from '@/components/blocks/project-switcher'
 
 interface PageShellProps {
   children: React.ReactNode
+  pageTitle?: string
   userRole?: 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'
   userName?: string
   userEmail?: string
@@ -61,7 +62,7 @@ const contractorNavItems = [
   { href: '/contractor/plans', label: 'Plans', icon: FileText },
 ]
 
-export function PageShell({ children, userRole: propUserRole, userName: propUserName, userEmail: propUserEmail }: PageShellProps) {
+export function PageShell({ children, pageTitle, userRole: propUserRole, userName: propUserName, userEmail: propUserEmail }: PageShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout, userRole: authUserRole } = useAuth()
@@ -174,7 +175,7 @@ export function PageShell({ children, userRole: propUserRole, userName: propUser
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <h2 className="text-lg font-bold text-accent-500">Control Center</h2>
+          <h2 className="text-lg font-bold text-accent-500">{pageTitle || 'Control Center'}</h2>
           <Avatar className="h-8 w-8">
             <AvatarImage src="" />
             <AvatarFallback className="bg-accent-500/20 text-accent-500">{initials}</AvatarFallback>

@@ -26,6 +26,7 @@ export function KPICarousel({ cards, className }: KPICarouselProps) {
     dragFree: false,
     skipSnaps: false,
     loop: true,
+    slidesToScroll: 1,
     // Show 1.2 cards on mobile for peek effect
     breakpoints: {
       '(min-width: 640px)': { active: false }, // Disable carousel on larger screens
@@ -61,8 +62,8 @@ export function KPICarousel({ cards, className }: KPICarouselProps) {
     <div className={cn('relative', className)}>
       {/* Mobile Carousel View */}
       <div className="sm:hidden">
-        <div className="overflow-hidden px-2" ref={emblaRef}>
-          <div className="flex gap-3">
+        <div className="overflow-hidden" ref={emblaRef}>
+          <div className="flex gap-3 pl-2 pr-5">
             {cards.map((card, index) => (
               <div
                 key={index}
@@ -75,9 +76,9 @@ export function KPICarousel({ cards, className }: KPICarouselProps) {
                     </CardTitle>
                     <card.icon className={cn('h-3.5 w-3.5', card.iconColor || 'text-white/40')} />
                   </CardHeader>
-                  <CardContent className="px-3 pb-3">
-                    <div className="text-xl font-bold text-white">{card.value}</div>
-                    <p className="text-[11px] text-white/60 mt-0.5">{card.subtitle}</p>
+                  <CardContent className="px-3 pb-3 pt-0">
+                    <div className="text-lg font-bold text-white">{card.value}</div>
+                    <p className="text-[10px] text-white/60 mt-0.5">{card.subtitle}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -87,15 +88,15 @@ export function KPICarousel({ cards, className }: KPICarouselProps) {
 
         {/* Pagination Dots */}
         {scrollSnaps.length > 1 && (
-          <div className="flex justify-center gap-1 mt-2">
+          <div className="flex justify-center gap-1 mt-1.5">
             {scrollSnaps.map((_, index) => (
               <button
                 key={index}
                 className={cn(
-                  'h-1.5 rounded-full transition-all duration-200',
+                  'h-1 rounded-full transition-all duration-200',
                   index === selectedIndex
-                    ? 'w-5 bg-blue-500'
-                    : 'w-1.5 bg-white/30 hover:bg-white/50'
+                    ? 'w-4 bg-blue-500'
+                    : 'w-1 bg-white/30 hover:bg-white/50'
                 )}
                 onClick={() => scrollTo(index)}
                 aria-label={`Go to card ${index + 1}`}
@@ -109,13 +110,13 @@ export function KPICarousel({ cards, className }: KPICarouselProps) {
       <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((card, index) => (
           <Card key={index} className="bg-white/5 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
               <CardTitle className="text-sm font-medium text-white/60">
                 {card.title}
               </CardTitle>
               <card.icon className={cn('h-4 w-4', card.iconColor || 'text-white/40')} />
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-0">
               <div className="text-2xl font-bold text-white">{card.value}</div>
               <p className="text-xs text-white/60 mt-1">{card.subtitle}</p>
             </CardContent>

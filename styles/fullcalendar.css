@@ -202,30 +202,75 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* Mobile Specific Styles */
+/* Critical Breakpoint Fix - Prevents button overflow at 1050px */
+@media (min-width: 1024px) and (max-width: 1100px) {
+  .fc-toolbar-chunk {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .calendar-view-buttons {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* Force dropdown usage in this range */
+  .calendar-toolbar-buttons {
+    display: none !important;
+  }
+  
+  .calendar-toolbar-dropdown {
+    display: flex !important;
+  }
+}
+
+/* Mobile Specific Styles - Optimized for single-screen experience */
 @media (max-width: 480px) {
   .fc .fc-toolbar-title {
     font-size: 0.875rem;
   }
   
   .fc .fc-col-header-cell {
-    font-size: 0.625rem;
-    padding: 0.125rem 0;
+    font-size: 0.65rem;
+    padding: 0.125rem 0;  /* Reduced padding */
+    font-weight: 600;
+    text-transform: uppercase;
   }
   
   .fc .fc-daygrid-day-number {
-    font-size: 0.625rem;
-    padding: 0.125rem;
+    font-size: 0.75rem;  /* Slightly smaller */
+    padding: 0.125rem;  /* Reduced padding */
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
   }
   
   .fc .fc-daygrid-day-top {
-    padding: 0.125rem;
+    padding: 0.125rem;  /* Reduced padding */
+    min-height: 20px;  /* Reduced from 24px */
+  }
+  
+  .fc .fc-daygrid-day {
+    min-height: 38px; /* Reduced from 44px but still good touch target */
+    cursor: pointer;
+  }
+  
+  .fc .fc-day-today .fc-daygrid-day-number {
+    background: #3b82f6;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
   }
   
   .fc .fc-event {
-    font-size: 0.625rem;
-    padding: 1px 2px;
-    border-radius: 2px;
+    font-size: 0.65rem;
+    padding: 2px 4px;
+    border-radius: 3px;
+    min-height: 20px;
   }
   
   .fc .fc-timegrid-slot {
@@ -264,9 +309,21 @@
     min-height: 14px;
   }
   
-  /* More compact day cells */
-  .fc .fc-daygrid-day {
-    min-height: 2.5rem;
+  /* Already defined above, removing duplicate */
+  
+  /* Event dots for mobile */
+  .fc .fc-daygrid-event {
+    margin: 1px 2px;
+  }
+  
+  .fc .fc-daygrid-dot-event {
+    padding: 0;
+  }
+  
+  .fc .fc-daygrid-event-dot {
+    width: 6px;
+    height: 6px;
+    margin: 0 2px;
   }
   
   /* List view adjustments */
@@ -307,6 +364,25 @@
 @media (min-width: 768px) and (max-width: 1024px) {
   .fc .fc-toolbar-title {
     font-size: 1.125rem;
+  }
+}
+
+/* Fix for 840px breakpoint where tabs break */
+@media (min-width: 768px) and (max-width: 860px) {
+  /* Ensure tabs don't cause horizontal scrolling */
+  .tabs-list {
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+  }
+  
+  /* Make calendar toolbar more compact */
+  .calendar-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .calendar-toolbar > * {
+    width: 100%;
   }
 }
 
@@ -351,4 +427,94 @@
 
 .fc .fc-timegrid-now-indicator-arrow {
   border-color: #ef4444;
+}
+
+/* Touch-optimized styles */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets for mobile */
+  .fc .fc-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .fc .fc-event {
+    min-height: 28px;
+    cursor: pointer;
+  }
+  
+  /* Better spacing for touch */
+  .fc .fc-daygrid-event {
+    margin: 2px 1px;
+  }
+}
+
+/* Smooth scrolling for calendar */
+.fc-scroller {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Animation for view changes */
+.fc-view-harness {
+  transition: opacity 0.2s ease;
+  height: 100% !important;
+}
+
+.fc-view-harness-active {
+  opacity: 1;
+  height: 100% !important;
+}
+
+/* Ensure calendar fills container properly */
+.fc {
+  height: 100% !important;
+}
+
+/* Mobile single-screen optimization */
+@media (max-width: 640px) {
+  /* Ensure calendar uses all available space */
+  .fc-view-harness {
+    height: 100% !important;
+  }
+  
+  /* More compact toolbar */
+  .fc .fc-toolbar {
+    padding: 0.25rem 0;
+    margin-bottom: 0.25rem;
+  }
+  
+  /* Tighter month view for single screen */
+  .fc .fc-daygrid-body {
+    height: 100% !important;
+  }
+  
+  .fc-daygrid-day-frame {
+    min-height: 0;
+  }
+  
+  /* Reduce event margins */
+  .fc-daygrid-event-harness {
+    margin: 0;
+  }
+}
+
+/* Responsive event display */
+@media (max-width: 1100px) {
+  .fc-daygrid-event .fc-event-time {
+    display: none;
+  }
+  
+  .fc-daygrid-dot-event .fc-event-title {
+    font-size: 0.7rem;
+  }
+}
+
+/* Smooth transitions for toolbar */
+.calendar-toolbar,
+.fc-toolbar {
+  transition: all 0.3s ease;
+}
+
+.calendar-view-selector {
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }

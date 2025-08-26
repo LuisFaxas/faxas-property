@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import apiClient from '@/lib/api-client';
-import { Plus, Calendar, Clock, CheckCircle, XCircle, AlertCircle, Users, List, CalendarDays } from 'lucide-react';
+import { Plus, Calendar, CalendarDays, List, CheckCircle, XCircle, Clock, AlertCircle, Users } from 'lucide-react';
 import { View as CalendarViewType } from 'react-big-calendar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,7 +51,7 @@ import { FullCalendarView } from '@/components/schedule/fullcalendar-view';
 import { cn } from '@/lib/utils';
 import { KPICarousel } from '@/components/schedule/kpi-carousel';
 import { Loader2 } from 'lucide-react';
-import { useIsMobile, useIsTablet } from '@/hooks/use-media-query';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 // Helper functions for date and time handling
 const getDefaultDate = () => {
@@ -90,22 +90,19 @@ const EVENT_TYPES = [
 ];
 
 export default function AdminSchedulePage() {
-  const isMobile = useIsMobile();
-  const isTablet = useIsTablet();
+  const isMobile = useMediaQuery('(max-width: 640px)');
   const { toast } = useToast();
   const { user } = useAuth();
   const isReady = !!user;
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('all');
-  const [dateFilter, setDateFilter] = useState('');
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
-  const [calendarView, setCalendarView] = useState<CalendarViewType>('month');
-  const [calendarDate, setCalendarDate] = useState(new Date());
   const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
+  const [filters, setFilters] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state with separate date and time fields
@@ -145,22 +142,16 @@ export default function AdminSchedulePage() {
 
   // Filter events based on active tab and type filters
   const filteredEvents = useMemo(() => {
-    if (!scheduleEvents || !Array.isArray(scheduleEvents)) return [];
+    let events = [];
     
-    let events = scheduleEvents;
-    
-    // Apply tab filter
-    switch (activeTab) {
-      case 'today':
-        events = todaysEvents || [];
-        break;
-      case 'pending':
-        events = scheduleEvents.filter((event: any) => event.status === 'REQUESTED');
-        break;
-      case 'approved':
-        events = scheduleEvents.filter((event: any) => event.status === 'PLANNED');
-        break;
+    // Get events based on active tab
+    if (activeTab === 'today') {
+      events = todaysEvents || [];
+    } else {
+      events = scheduleEvents || [];
     }
+    
+    if (!Array.isArray(events)) return [];
     
     // Apply type filters
     if (typeFilters.length > 0) {
@@ -629,6 +620,7 @@ export default function AdminSchedulePage() {
   if (isLoading) {
     return (
       <PageShell 
+        pageTitle="Schedule"
         userRole={user?.role || 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
@@ -675,18 +667,22 @@ export default function AdminSchedulePage() {
 
   return (
     <PageShell 
+      pageTitle="Schedule"
       userRole={user?.role || 'VIEWER'} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
     >
-      <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">Schedule Management</h1>
-            <p className="text-white/60 text-xs sm:text-sm lg:text-base">Manage project calendar and events</p>
-          </div>
-          {!isMobile && (
+      <div className={cn(
+        "p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 h-full flex flex-col",
+        isMobile && "p-2 space-y-2" // Tighter spacing on mobile
+      )}>
+        {/* Header - Hidden on mobile since title is in navbar */}
+        {!isMobile && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-2 sm:mb-4">
+            <div>
+              <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-white">Schedule Management</h1>
+              <p className="text-white/60 text-xs sm:text-sm lg:text-base">Manage project calendar and events</p>
+            </div>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="sm:size-default w-full sm:w-auto">
@@ -870,8 +866,8 @@ export default function AdminSchedulePage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          )}
         </div>
+        )}
 
         {/* Mobile FAB for Add Event */}
         {isMobile && (
@@ -1063,7 +1059,7 @@ export default function AdminSchedulePage() {
           </Dialog>
         )}
 
-        {/* KPI Cards - Now with Carousel on Mobile */}
+        {/* KPI Cards - Now with Carousel for Mobile */}
         <KPICarousel
           cards={[
             {
@@ -1097,128 +1093,107 @@ export default function AdminSchedulePage() {
           ]}
         />
 
-        {/* Quick Filters - Mobile Optimized */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-white/60">Quick filters:</span>
-            {typeFilters.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTypeFilters([])}
-                className="text-white/60 hover:text-white h-7 px-2 text-xs sm:text-sm sm:px-3"
-              >
-                Clear all
-              </Button>
-            )}
-          </div>
-          {/* Mobile - Horizontal scroll */}
-          <div className="overflow-x-auto pb-2 sm:overflow-visible">
-            <div className="flex gap-2 sm:flex-wrap min-w-max sm:min-w-0">
-              {EVENT_TYPES.map((type) => (
-                <Button
-                  key={type.value}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => toggleTypeFilter(type.value)}
-                  className={cn(
-                    'border-white/10 transition-all flex-shrink-0 h-8 text-xs sm:text-sm',
-                    typeFilters.includes(type.value)
-                      ? `${type.color} text-white border-transparent`
-                      : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
-                  )}
-                >
-                  <div className={cn(
-                    'w-2 h-2 rounded-full mr-1.5',
-                    type.color
-                  )} />
-                  <span className="hidden sm:inline">{type.label}</span>
-                  <span className="sm:hidden">{type.label.slice(0, 4)}</span>
-                  {typeFilters.includes(type.value) && (
-                    <XCircle className="ml-1 h-3 w-3" />
-                  )}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
 
         {/* Tabs with View Mode Toggle */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <TabsList className="bg-white/5 border-white/10 w-full sm:w-auto overflow-x-auto">
-              <TabsTrigger value="all">All Events</TabsTrigger>
-              <TabsTrigger value="today">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
+          {/* Mobile: Combined row for tabs and view toggle */}
+          <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
+            <TabsList className="bg-white/5 border-white/10 flex flex-nowrap gap-1 h-8 sm:h-10 p-1">
+              <TabsTrigger value="all" className="text-[11px] sm:text-sm px-2 sm:px-3 py-1 min-w-fit">
+                <span className="sm:hidden">All</span>
+                <span className="hidden sm:inline">All Events</span>
+              </TabsTrigger>
+              <TabsTrigger value="today" className="text-[11px] sm:text-sm px-2 sm:px-3 py-1 min-w-fit">
                 Today
                 {metrics.todayEvents > 0 && (
-                  <Badge variant="secondary" className="ml-2">
+                  <Badge variant="secondary" className="ml-1 sm:ml-2 text-[9px] sm:text-xs h-3.5 sm:h-5 px-1 sm:px-1.5">
                     {metrics.todayEvents}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="pending">
+              <TabsTrigger value="pending" className="text-[11px] sm:text-sm px-2 sm:px-3 py-1 min-w-fit">
                 Pending
                 {metrics.pendingApprovals > 0 && (
-                  <Badge variant="destructive" className="ml-2">
+                  <Badge variant="destructive" className="ml-1 sm:ml-2 text-[9px] sm:text-xs h-3.5 sm:h-5 px-1 sm:px-1.5">
                     {metrics.pendingApprovals}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="approved">Approved</TabsTrigger>
+              <TabsTrigger value="approved" className="text-[11px] sm:text-sm px-2 sm:px-3 py-1 min-w-fit">
+                <span className="sm:hidden">OK</span>
+                <span className="hidden sm:inline">Approved</span>
+              </TabsTrigger>
             </TabsList>
             
-            {/* View Mode Toggle - Mobile Optimized */}
-            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/10 self-end sm:self-auto">
+            {/* View Mode Toggle - Better spacing and alignment */}
+            <div className="flex gap-0 bg-white/5 rounded-lg p-1 border border-white/10 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setViewMode('calendar')}
                 className={cn(
-                  'px-2 sm:px-3 py-1.5',
+                  'h-6 px-2 sm:h-7 sm:px-3 rounded-md',
                   viewMode === 'calendar' 
                     ? 'bg-blue-600 text-white hover:bg-blue-700' 
                     : 'text-white/60 hover:text-white hover:bg-white/10'
                 )}
                 title="Calendar View"
               >
-                <CalendarDays className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Calendar</span>
+                <CalendarDays className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden sm:inline text-xs ml-1.5">Calendar</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setViewMode('list')}
+                onClick={() => setViewMode('table')}
                 className={cn(
-                  'px-2 sm:px-3 py-1.5',
-                  viewMode === 'list' 
+                  'h-6 px-2 sm:h-7 sm:px-3 rounded-md',
+                  viewMode === 'table' 
                     ? 'bg-blue-600 text-white hover:bg-blue-700' 
                     : 'text-white/60 hover:text-white hover:bg-white/10'
                 )}
-                title="List View"
+                title="Table View"
               >
-                <List className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">List</span>
+                <List className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden sm:inline text-xs ml-1.5">Table</span>
               </Button>
             </div>
           </div>
 
-          <TabsContent value={activeTab} className="mt-6">
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white">
-                  {activeTab === 'all' && 'All Schedule Events'}
-                  {activeTab === 'today' && "Today's Schedule"}
-                  {activeTab === 'pending' && 'Pending Approvals'}
-                  {activeTab === 'approved' && 'Approved Events'}
-                </CardTitle>
-                <CardDescription className="text-white/60">
-                  {activeTab === 'all' && 'Complete list of all scheduled events'}
-                  {activeTab === 'today' && 'Events happening today'}
-                  {activeTab === 'pending' && 'Events awaiting approval'}
-                  {activeTab === 'approved' && 'Events that have been approved'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+          <TabsContent value={activeTab} className="mt-1 sm:mt-2 flex-1 min-h-0 flex flex-col">
+            <Card className="bg-white/5 border-white/10 flex-1 flex flex-col min-h-0">
+              <CardContent className="flex-1 flex flex-col p-1 sm:p-3">
+                {/* Compact Quick Filters */}
+                <div className="mb-2 sm:mb-4">
+                  <div className="overflow-x-auto pb-2 sm:overflow-visible">
+                    <div className="flex gap-2 sm:flex-wrap min-w-max sm:min-w-0">
+                      {EVENT_TYPES.map((type) => (
+                        <Button
+                          key={type.value}
+                          variant={typeFilters.includes(type.value) ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            const newFilters = typeFilters.includes(type.value)
+                              ? typeFilters.filter(t => t !== type.value)
+                              : [...typeFilters, type.value];
+                            setTypeFilters(newFilters);
+                          }}
+                          className={cn(
+                            'border-white/10 transition-all flex-shrink-0 h-8 text-xs sm:text-sm',
+                            typeFilters.includes(type.value)
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                          )}
+                        >
+                          <div className={cn("w-2 h-2 rounded-full mr-1.5", type.color)} />
+                          <span className="hidden sm:inline">{type.label}</span>
+                          <span className="sm:hidden">{type.label.slice(0, 4)}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
                 {viewMode === 'calendar' ? (
                   // New FullCalendar View - Responsive for all devices
                   <FullCalendarView
@@ -1415,6 +1390,17 @@ export default function AdminSchedulePage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Mobile Floating Action Button */}
+        {isMobile && (
+          <Button
+            size="icon"
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg z-50 sm:hidden"
+            onClick={() => setIsCreateOpen(true)}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        )}
       </div>
     </PageShell>
   );
