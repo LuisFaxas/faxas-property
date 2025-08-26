@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import { EventApi, DateSelectArg, EventClickArg, EventChangeArg, CalendarApi } from '@fullcalendar/core';
 import '@/styles/fullcalendar.css';
@@ -18,7 +18,8 @@ import {
   CalendarRange,
   List,
   Plus,
-  MoreHorizontal
+  MoreHorizontal,
+  ChevronDown
 } from 'lucide-react';
 import {
   Select,
@@ -33,6 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useResponsive } from '@/hooks/use-responsive';
 
 interface ScheduleEvent {
   id: string;
@@ -77,27 +79,12 @@ export function FullCalendarView({
   const calendarRef = useRef<FullCalendar>(null);
   const [currentView, setCurrentView] = useState('dayGridMonth');
   const [calendarTitle, setCalendarTitle] = useState('');
-  const [isMobile, setIsMobile] = useState(false);
-  const [isTablet, setIsTablet] = useState(false);
+  const { isMobile, isTablet, isSmallDesktop, isCompact } = useResponsive();
   const [isTouch, setIsTouch] = useState(false);
 
-  // Detect device type and touch capability
+  // Detect touch capability
   useEffect(() => {
-    const checkDevice = () => {
-      const width = window.innerWidth;
-      setIsMobile(width < 768);
-      setIsTablet(width >= 768 && width < 1024);
-      setIsTouch('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    };
-
-    checkDevice();
-    window.addEventListener('resize', checkDevice);
-    window.addEventListener('orientationchange', checkDevice);
-
-    return () => {
-      window.removeEventListener('resize', checkDevice);
-      window.removeEventListener('orientationchange', checkDevice);
-    };
+    setIsTouch('ontouchstart' in window || navigator.maxTouchPoints > 0);
   }, []);
 
   // Get responsive default view
@@ -105,8 +92,8 @@ export function FullCalendarView({
     const width = window.innerWidth;
     const isPortrait = window.innerHeight > window.innerWidth;
     
-    if (width < 480) return 'listWeek';
-    if (width < 768) return isPortrait ? 'timeGridDay' : 'timeGridWeek';
+    if (width < 480) return 'dayGridMonth'; // Show month view on small mobile
+    if (width < 768) return isPortrait ? 'dayGridMonth' : 'timeGridWeek';
     if (width < 1024) return 'timeGridWeek';
     return 'dayGridMonth';
   }, []);
@@ -209,9 +196,10 @@ export function FullCalendarView({
 
   // View options for different devices
   const viewOptions = isMobile ? [
-    { value: 'listWeek', label: 'List', icon: List },
-    { value: 'timeGridDay', label: 'Day', icon: Calendar },
+    { value: 'dayGridMonth', label: 'Month', icon: CalendarRange },
     { value: 'timeGridWeek', label: 'Week', icon: CalendarDays },
+    { value: 'timeGridDay', label: 'Day', icon: Calendar },
+    { value: 'listWeek', label: 'List', icon: List },
   ] : [
     { value: 'dayGridMonth', label: 'Month', icon: CalendarRange },
     { value: 'timeGridWeek', label: 'Week', icon: CalendarDays },
@@ -327,26 +315,57 @@ export function FullCalendarView({
               </h3>
             </div>
             
-            <div className="flex items-center gap-1 sm:gap-2">
-              {viewOptions.map((option) => (
-                <Button
-                  key={option.value}
-                  size="sm"
-                  variant={currentView === option.value ? 'default' : 'ghost'}
-                  onClick={() => handleViewChange(option.value)}
-                  className={cn(
-                    "h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3",
-                    currentView === option.value
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                      : 'text-white/70 hover:text-white hover:bg-white/10'
-                  )}
-                >
-                  <option.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
-                  <span className="hidden sm:inline">{option.label}</span>
-                  <span className="sm:hidden">{option.label.slice(0, 1)}</span>
-                </Button>
-              ))}
-            </div>
+            {/* Use dropdown menu for small desktop screens (1024-1280px) */}
+            {isSmallDesktop ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    {viewOptions.find(o => o.value === currentView)?.icon && (
+                      React.createElement(viewOptions.find(o => o.value === currentView)!.icon, {
+                        className: "h-4 w-4"
+                      })
+                    )}
+                    {viewOptions.find(o => o.value === currentView)?.label}
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {viewOptions.map((option) => (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onClick={() => handleViewChange(option.value)}
+                      className={cn(
+                        "gap-2",
+                        currentView === option.value && "bg-blue-600/20"
+                      )}
+                    >
+                      <option.icon className="h-4 w-4" />
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center gap-1 sm:gap-2">
+                {viewOptions.map((option) => (
+                  <Button
+                    key={option.value}
+                    size="sm"
+                    variant={currentView === option.value ? 'default' : 'ghost'}
+                    onClick={() => handleViewChange(option.value)}
+                    className={cn(
+                      "h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3",
+                      currentView === option.value
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    )}
+                  >
+                    <option.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+                    <span>{option.label}</span>
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -38,9 +38,28 @@ export async function requireAuth(): Promise<AuthenticatedUser> {
       role: user.role,
       user
     };
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError(401, 'Invalid or expired token');
+    
+    // More specific error messages for better debugging
+    if (error?.code === 'auth/id-token-expired') {
+      console.error('Token expired for user');
+      throw new ApiError(401, 'Token expired - please refresh your session');
+    }
+    
+    if (error?.code === 'auth/argument-error') {
+      console.error('Invalid token format:', error.message);
+      throw new ApiError(401, 'Invalid token format');
+    }
+    
+    if (error?.code === 'auth/id-token-revoked') {
+      console.error('Token has been revoked');
+      throw new ApiError(401, 'Token has been revoked - please sign in again');
+    }
+    
+    // Log the actual error for debugging
+    console.error('Auth verification error:', error?.code || error?.message || error);
+    throw new ApiError(401, 'Authentication failed - please sign in again');
   }
 }
 
