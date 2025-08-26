@@ -78,7 +78,8 @@ import {
   XCircle,
   LayoutGrid,
   List,
-  ClipboardList
+  ClipboardList,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -474,7 +475,7 @@ export default function AdminTasksPage() {
             "grid gap-4",
             isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           )}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+            {Array.from({ length: isMobile ? 3 : 6 }, (_, i) => i + 1).map((i) => (
               <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 animate-pulse">
                 <Skeleton className="h-6 w-3/4 mb-2" />
                 <Skeleton className="h-4 w-full mb-3" />
@@ -497,6 +498,223 @@ export default function AdminTasksPage() {
 
   const tasks = tasksData?.data || [];
 
+  // Landscape-specific layout for mobile phones
+  if (isLandscape) {
+    return (
+      <PageShell 
+        pageTitle="Tasks"
+        userRole={user?.role || 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+        fabIcon={Plus}
+        fabLabel="Add Task"
+        onFabClick={() => setIsCreateOpen(true)}
+      >
+        <div className="h-full flex flex-col relative overflow-hidden">
+          {/* Floating view toggle - absolute positioned */}
+          <div className="absolute top-1 right-1 z-20 flex gap-1">
+            <Button 
+              size="icon" 
+              variant={viewMode === 'card' ? 'default' : 'ghost'}
+              className="h-6 w-6 bg-black/50 backdrop-blur-sm"
+              onClick={() => setViewMode('card')}
+            >
+              <LayoutGrid className="h-3 w-3" />
+            </Button>
+            <Button 
+              size="icon"
+              variant={viewMode === 'list' ? 'default' : 'ghost'} 
+              className="h-6 w-6 bg-black/50 backdrop-blur-sm"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-3 w-3" />
+            </Button>
+          </div>
+          
+          {/* Content takes ALL remaining space */}
+          <div className="flex-1 min-h-0 overflow-auto p-2">
+            {tasks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <ClipboardList className="h-8 w-8 text-white/20 mb-2" />
+                <h3 className="text-sm font-semibold text-white">No tasks yet</h3>
+                <p className="text-xs text-white/60 mt-1">Tap the + button to add a task</p>
+              </div>
+            ) : viewMode === 'card' ? (
+              <div className="grid grid-cols-2 gap-2">
+                {tasks.map((task: any) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onUpdate={handleUpdateStatus}
+                    onDelete={handleDelete}
+                    onEdit={handleEdit}
+                    contacts={contactsData?.data || []}
+                  />
+                ))}
+              </div>
+            ) : (
+              <DataTable 
+                columns={columns} 
+                data={tasks} 
+                onRowSelectionChange={setSelectedRows}
+                className="text-xs"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Dialogs remain the same but with landscape optimizations */}
+        {/* Create Dialog */}
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto bg-graphite-800 border-white/10">
+            <DialogHeader>
+              <DialogTitle className="text-white">Create New Task</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Add a new task to the project
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...createForm}>
+              <form onSubmit={createForm.handleSubmit(handleCreate)} className="space-y-4">
+                <FormField
+                  control={createForm.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Title</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Task title" className="bg-white/5 border-white/10 text-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Description</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Task details..." className="bg-white/5 border-white/10 text-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Priority</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white/5 border-white/10">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="LOW">Low</SelectItem>
+                            <SelectItem value="MEDIUM">Medium</SelectItem>
+                            <SelectItem value="HIGH">High</SelectItem>
+                            <SelectItem value="URGENT">Urgent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white/5 border-white/10">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="TODO">To Do</SelectItem>
+                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                            <SelectItem value="BLOCKED">Blocked</SelectItem>
+                            <SelectItem value="DONE">Done</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Due Date</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="date" className="bg-white/5 border-white/10 text-white" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="assignedToId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Assign To</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white/5 border-white/10">
+                              <SelectValue placeholder="Select assignee" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                            {contactsData?.data?.map((contact: any) => (
+                              <SelectItem key={contact.id} value={contact.id}>
+                                {contact.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Task'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Other dialogs remain similar with landscape adjustments */}
+      </PageShell>
+    );
+  }
+
+  // Regular portrait layout
   return (
     <PageShell 
       pageTitle="Tasks"

@@ -71,13 +71,13 @@ const budgetItemSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   item: z.string().min(1, 'Item name is required'),
   unit: z.string().optional(),
-  qty: z.number().min(0).optional().default(1),
-  estUnitCost: z.number().min(0).optional().default(0),
-  estTotal: z.number().min(0).optional().default(0),
-  committedTotal: z.number().min(0).optional().default(0),
-  paidToDate: z.number().min(0).optional().default(0),
+  qty: z.number().min(0).default(1),
+  estUnitCost: z.number().min(0).default(0),
+  estTotal: z.number().min(0).default(0),
+  committedTotal: z.number().min(0).default(0),
+  paidToDate: z.number().min(0).default(0),
   vendorContactId: z.string().optional(),
-  status: z.enum(['BUDGETED', 'COMMITTED', 'PAID']).optional().default('BUDGETED'),
+  status: z.enum(['BUDGETED', 'COMMITTED', 'PAID']).default('BUDGETED'),
   projectId: z.string()
 });
 
