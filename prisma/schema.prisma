@@ -13,6 +13,7 @@ model User {
   role      Role
   createdAt DateTime @default(now())
   tasks     Task[]   @relation("AssignedTasks")
+  contact   Contact?
 }
 
 model Project {
@@ -60,20 +61,38 @@ model Project {
 }
 
 model Contact {
-  id           String        @id @default(cuid())
-  projectId    String
-  name         String
-  company      String?
-  specialty    String?
-  category     String
-  referredById String?
-  status       String
-  emails       String[]
-  phones       String[]
-  notes        String?
-  userId       String?
-  project      Project       @relation(fields: [projectId], references: [id])
-  procurements Procurement[]
+  id              String        @id @default(cuid())
+  projectId       String
+  name            String
+  company         String?
+  specialty       String?
+  category        String
+  referredById    String?
+  status          String
+  emails          String[]
+  phones          String[]
+  notes           String?
+  
+  // Portal access fields
+  userId          String?       @unique
+  portalStatus    String        @default("NONE") // NONE, INVITED, ACTIVE, BLOCKED
+  inviteToken     String?       @unique
+  inviteExpiry    DateTime?
+  lastLoginAt     DateTime?
+  lastActivityAt  DateTime?
+  
+  // Relations
+  project         Project       @relation(fields: [projectId], references: [id])
+  user            User?         @relation(fields: [userId], references: [id])
+  procurements    Procurement[]
+  assignedTasks   Task[]        @relation("ContactTasks")
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+  
+  @@index([projectId, portalStatus])
+  @@index([inviteToken])
 }
 
 model Task {
@@ -85,6 +104,7 @@ model Task {
   priority          TaskPriority   @default(MEDIUM)
   dueDate           DateTime?
   assignedToId      String?
+  assignedContactId String?        // New: for Contact assignments
   relatedContactIds String[]
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
@@ -125,6 +145,7 @@ model Task {
   
   // Relations
   assignedTo        User?          @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  assignedContact   Contact?       @relation("ContactTasks", fields: [assignedContactId], references: [id])
   project           Project        @relation(fields: [projectId], references: [id])
   
   // Hierarchical relations

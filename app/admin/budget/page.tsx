@@ -124,6 +124,7 @@ export default function AdminBudgetPage() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [projectId, setProjectId] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form
   const form = useForm<BudgetItemFormValues>({
@@ -358,6 +359,7 @@ export default function AdminBudgetPage() {
   
   // Handlers
   const handleCreate = async (values: BudgetItemFormValues) => {
+    setIsSubmitting(true);
     try {
       await apiClient.post('/budget', {
         ...values,
@@ -378,6 +380,8 @@ export default function AdminBudgetPage() {
         description: error.error || 'Failed to create budget item',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -403,6 +407,7 @@ export default function AdminBudgetPage() {
   const handleUpdate = async (values: BudgetItemFormValues) => {
     if (!selectedItem) return;
     
+    setIsSubmitting(true);
     try {
       await apiClient.put(`/budget/${selectedItem.id}`, values);
       
@@ -421,6 +426,8 @@ export default function AdminBudgetPage() {
         description: error.error || 'Failed to update budget item',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -432,6 +439,7 @@ export default function AdminBudgetPage() {
   const handleConfirmDelete = async () => {
     if (!selectedItem) return;
     
+    setIsSubmitting(true);
     try {
       await apiClient.delete(`/budget/${selectedItem.id}`);
       
@@ -449,6 +457,8 @@ export default function AdminBudgetPage() {
         description: error.error || 'Failed to delete budget item',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -480,29 +490,77 @@ export default function AdminBudgetPage() {
   
   if (isLoading) {
     return (
-      <PageShell title="Budget Management" description="Track project budget and expenses">
+      <PageShell 
+        userRole={user?.role || 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+      >
         <div className="p-6 space-y-6">
-          <div className="grid gap-4 md:grid-cols-4">
+          {/* Header Skeleton */}
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-32" />
+            </div>
+          </div>
+          
+          {/* KPI Cards Skeleton */}
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-32 mt-2" />
+              <Card key={i} className="animate-pulse">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-4" />
                 </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-32 mb-2" />
+                  <Skeleton className="h-2 w-full" />
+                </CardContent>
               </Card>
             ))}
           </div>
-          <Skeleton className="h-96" />
+          
+          {/* Tabs Skeleton */}
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-80" />
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-96 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                      <Skeleton className="h-2 w-full" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </PageShell>
     );
   }
   
   return (
-    <PageShell title="Budget Management" description="Track project budget and expenses">
+    <PageShell 
+      userRole={user?.role || 'VIEWER'} 
+      userName={user?.displayName || 'User'} 
+      userEmail={user?.email || ''}
+    >
       <div className="p-6 space-y-6">
         {/* KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Budget</CardTitle>
@@ -569,23 +627,24 @@ export default function AdminBudgetPage() {
         
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <div className="flex items-center justify-between">
-            <TabsList>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <TabsList className="w-full lg:w-auto overflow-x-auto">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="items">Budget Items</TabsTrigger>
               <TabsTrigger value="exceptions">Exceptions</TabsTrigger>
             </TabsList>
             
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Export
+            <div className="flex items-center gap-2 justify-end">
+              <Button variant="outline" size="sm" className="sm:size-default" onClick={handleExport}>
+                <Download className="mr-0 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Export</span>
               </Button>
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button size="sm" className="sm:size-default">
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Item
+                    <span className="hidden sm:inline">Add Item</span>
+                    <span className="sm:hidden">Add</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
@@ -598,7 +657,7 @@ export default function AdminBudgetPage() {
                   
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="discipline"
@@ -660,7 +719,7 @@ export default function AdminBudgetPage() {
                         )}
                       />
                       
-                      <div className="grid grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <FormField
                           control={form.control}
                           name="unit"
@@ -733,7 +792,7 @@ export default function AdminBudgetPage() {
                         />
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <FormField
                           control={form.control}
                           name="committedTotal"
@@ -797,10 +856,24 @@ export default function AdminBudgetPage() {
                       </div>
                       
                       <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => setIsCreateOpen(false)}
+                          disabled={isSubmitting}
+                        >
                           Cancel
                         </Button>
-                        <Button type="submit">Create Item</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                          {isSubmitting ? (
+                            <>
+                              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              Creating...
+                            </>
+                          ) : (
+                            'Create Item'
+                          )}
+                        </Button>
                       </DialogFooter>
                     </form>
                   </Form>
@@ -845,16 +918,32 @@ export default function AdminBudgetPage() {
           </TabsContent>
           
           <TabsContent value="items">
-            <Card>
-              <CardContent className="p-0">
-                <DataTable
-                  columns={columns}
-                  data={budgetItems}
-                  searchKey="item"
-                  searchPlaceholder="Search items..."
-                />
-              </CardContent>
-            </Card>
+            {budgetItems.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <DollarSign className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No budget items yet</h3>
+                  <p className="text-muted-foreground mb-6 text-center max-w-md">
+                    Start tracking your project budget by adding your first line item.
+                  </p>
+                  <Button onClick={() => setIsCreateOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Your First Budget Item
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <DataTable
+                    columns={columns}
+                    data={budgetItems}
+                    searchKey="item"
+                    searchPlaceholder="Search items..."
+                  />
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
           
           <TabsContent value="exceptions">
@@ -907,7 +996,7 @@ export default function AdminBudgetPage() {
             
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="discipline"
@@ -969,7 +1058,7 @@ export default function AdminBudgetPage() {
                   )}
                 />
                 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <FormField
                     control={form.control}
                     name="unit"
@@ -1042,7 +1131,7 @@ export default function AdminBudgetPage() {
                   />
                 </div>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="committedTotal"
@@ -1106,10 +1195,24 @@ export default function AdminBudgetPage() {
                 </div>
                 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsEditOpen(false)}
+                    disabled={isSubmitting}
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit">Update Item</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Item'
+                    )}
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -1126,9 +1229,16 @@ export default function AdminBudgetPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmDelete}>
-                Delete
+              <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDelete} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -68,6 +68,15 @@ export async function GET(request: NextRequest) {
               email: true
             }
           },
+          assignedContact: {
+            select: {
+              id: true,
+              name: true,
+              company: true,
+              emails: true,
+              phones: true
+            }
+          },
           project: {
             select: {
               id: true,
@@ -170,6 +179,7 @@ export async function POST(request: NextRequest) {
         
         // Assignment
         assignedToId: data.assignedToId && data.assignedToId !== '' ? data.assignedToId : undefined,
+        assignedContactId: data.assignedContactId && data.assignedContactId !== '' ? data.assignedContactId : undefined,
         projectId: data.projectId,
         relatedContactIds: data.relatedContactIds || [],
         
@@ -214,6 +224,15 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             email: true
+          }
+        },
+        assignedContact: {
+          select: {
+            id: true,
+            name: true,
+            company: true,
+            emails: true,
+            phones: true
           }
         },
         project: {

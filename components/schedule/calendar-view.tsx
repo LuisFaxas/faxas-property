@@ -81,7 +81,7 @@ const CustomEvent = ({ event }: { event: any }) => {
   );
 };
 
-// Custom toolbar component
+// Custom toolbar component - Mobile optimized
 const CustomToolbar = (toolbar: any) => {
   const goToBack = () => toolbar.onNavigate('PREV');
   const goToNext = () => toolbar.onNavigate('NEXT');
@@ -90,54 +90,131 @@ const CustomToolbar = (toolbar: any) => {
   const label = () => {
     const date = moment(toolbar.date);
     return (
-      <span className="text-white text-lg font-semibold">
+      <span className="text-white text-sm sm:text-lg font-semibold">
         {date.format('MMMM YYYY')}
       </span>
     );
   };
 
+  // Mobile view icons
+  const viewIcons: Record<string, JSX.Element> = {
+    month: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+    week: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 2v20M10 2v20M14 2v20M18 2v20" />
+      </svg>
+    ),
+    day: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    agenda: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+    ),
+  };
+
   return (
-    <div className="flex items-center justify-between mb-4 p-4 bg-white/5 rounded-lg border border-white/10">
-      <div className="flex items-center gap-2">
-        <button
-          onClick={goToToday}
-          className="px-3 py-1.5 text-sm bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
-        >
-          Today
-        </button>
-        <button
-          onClick={goToBack}
-          className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <button
-          onClick={goToNext}
-          className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-        {label()}
-      </div>
-      <div className="flex items-center gap-2">
-        {Object.values(Views).map((view) => (
+    <div className="mb-4 p-2 sm:p-4 bg-white/5 rounded-lg border border-white/10">
+      {/* Mobile Layout - Stacked */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        {/* Navigation Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToBack}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            {label()}
+            <button
+              onClick={goToNext}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
           <button
-            key={view}
-            onClick={() => toolbar.onView(view)}
-            className={cn(
-              'px-3 py-1.5 text-sm rounded-md transition-colors capitalize',
-              toolbar.view === view
-                ? 'bg-blue-600 text-white'
-                : 'bg-white/10 hover:bg-white/20 text-white'
-            )}
+            onClick={goToToday}
+            className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
           >
-            {view}
+            Today
           </button>
-        ))}
+        </div>
+        {/* View Selection Row - Icon only on mobile */}
+        <div className="flex items-center justify-center gap-1">
+          {Object.values(Views).map((view) => (
+            <button
+              key={view}
+              onClick={() => toolbar.onView(view)}
+              className={cn(
+                'p-2 rounded-md transition-colors',
+                toolbar.view === view
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              )}
+              title={view}
+            >
+              {viewIcons[view]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tablet/Desktop Layout - Original */}
+      <div className="hidden sm:flex sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goToToday}
+            className="px-3 py-1.5 text-sm bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
+          >
+            Today
+          </button>
+          <button
+            onClick={goToBack}
+            className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            onClick={goToNext}
+            className="p-1.5 bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          {label()}
+        </div>
+        <div className="flex items-center gap-2">
+          {Object.values(Views).map((view) => (
+            <button
+              key={view}
+              onClick={() => toolbar.onView(view)}
+              className={cn(
+                'px-3 py-1.5 text-sm rounded-md transition-colors capitalize',
+                toolbar.view === view
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              )}
+            >
+              {view}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -205,7 +282,7 @@ export function CalendarView({
   );
 
   return (
-    <div className="h-[700px] bg-gray-950 rounded-lg p-4">
+    <div className="h-[400px] sm:h-[500px] lg:h-[700px] bg-gray-950 rounded-lg p-2 sm:p-4">
       <style jsx global>{`
         .rbc-calendar {
           background: transparent;

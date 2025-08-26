@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ContactCard } from '@/components/contacts/contact-card';
+import { AssignTaskDialog } from '@/components/contacts/assign-task-dialog';
 import { PageShell } from '@/components/blocks/page-shell';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
@@ -57,6 +59,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ColumnDef } from '@tanstack/react-table';
+import { useMemo } from 'react';
 import { 
   Plus, 
   MoreHorizontal, 
@@ -66,11 +69,21 @@ import {
   Mail,
   Building,
   User,
+  Users,
   UserPlus,
-  Download
+  Download,
+  LayoutGrid,
+  List,
+  Filter,
+  X,
+  ClipboardList,
+  Unlock,
+  Clock,
+  Lock
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import apiClient from '@/lib/api-client';
+import { cn } from '@/lib/utils';
 
 // Form schema
 const contactFormSchema = z.object({
@@ -129,7 +142,11 @@ export default function AdminContactsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isAssignTaskOpen, setIsAssignTaskOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card'); // Default to card view for mobile
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   
   // Get default project ID
   const [projectId, setProjectId] = useState<string>('');
@@ -448,11 +465,62 @@ export default function AdminContactsPage() {
     }
   };
 
-  const handleInvite = (contact: any) => {
-    toast({
-      title: 'Invite Contractor',
-      description: `Invitation feature coming soon for ${contact.name}`,
-    });
+  const handleInvite = async (contact: any) => {
+    try {
+      const response = await apiClient.post(`/contacts/${contact.id}/invite`, {
+        expiryDays: 7,
+        accessLevel: 'standard',
+      });
+      
+      toast({
+        title: 'Success',
+        description: `Portal invitation sent to ${contact.name}`,
+      });
+      
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.error || error.message || 'Failed to send invitation',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Get contacts array
+  const contacts = Array.isArray(contactsData) ? contactsData : [];
+  
+  // Filter contacts based on active filters
+  const filteredContacts = useMemo(() => {
+    let filtered = contacts;
+    
+    if (activeFilters.includes('portal')) {
+      filtered = filtered.filter((c: any) => c.portalStatus === 'ACTIVE');
+    }
+    if (activeFilters.includes('pending')) {
+      filtered = filtered.filter((c: any) => c.portalStatus === 'INVITED');
+    }
+    if (activeFilters.includes('no-portal')) {
+      filtered = filtered.filter((c: any) => !c.portalStatus || c.portalStatus === 'NONE');
+    }
+    if (activeFilters.includes('has-tasks')) {
+      filtered = filtered.filter((c: any) => c._count?.assignedTasks > 0);
+    }
+    
+    return filtered;
+  }, [contacts, activeFilters]);
+
+  const handleAssignTask = (contact: any) => {
+    setSelectedContact(contact);
+    setIsAssignTaskOpen(true);
+  };
+  
+  const toggleFilter = (filter: string) => {
+    setActiveFilters(prev => 
+      prev.includes(filter) 
+        ? prev.filter(f => f !== filter)
+        : [...prev, filter]
+    );
   };
 
   const handleExport = () => {
@@ -499,8 +567,6 @@ export default function AdminContactsPage() {
     );
   }
 
-  const contacts = Array.isArray(contactsData) ? contactsData : [];
-
   return (
     <PageShell 
       userRole={user?.role || 'VIEWER'} 
@@ -509,21 +575,24 @@ export default function AdminContactsPage() {
     >
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white">Contacts Management</h1>
-            <p className="text-white/60 mt-1">Manage project contacts and contractors</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Contacts Management</h1>
+            <p className="text-white/60 mt-1 text-sm sm:text-base">Manage project contacts and contractors</p>
           </div>
           <div className="flex gap-2">
             <Button 
               variant="outline"
+              size="sm"
+              className="sm:size-default"
               onClick={handleExport}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              <Download className="h-4 w-4 mr-0 sm:mr-2" />
+              <span className="hidden sm:inline">Export CSV</span>
             </Button>
             <Button 
               className="bg-accent-500 hover:bg-accent-600"
+              size="sm"
               onClick={() => setIsCreateOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -532,15 +601,187 @@ export default function AdminContactsPage() {
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="glass-card p-6">
-          <DataTable
-            columns={columns}
-            data={contacts}
-            searchKey="name"
-            searchPlaceholder="Search contacts..."
-          />
+        {/* Quick Filters */}
+        <div className="flex flex-wrap items-start gap-2">
+          <span className="text-sm text-white/60 w-full sm:w-auto mb-2 sm:mb-0">Quick filters:</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => toggleFilter('portal')}
+            className={cn(
+              'transition-all',
+              activeFilters.includes('portal') && 'bg-blue-600 text-white border-blue-600'
+            )}
+          >
+            <Unlock className="h-3 w-3 mr-1" />
+            Has Portal
+            {activeFilters.includes('portal') && (
+              <X className="h-3 w-3 ml-1" />
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => toggleFilter('pending')}
+            className={cn(
+              'transition-all',
+              activeFilters.includes('pending') && 'bg-yellow-600 text-white border-yellow-600'
+            )}
+          >
+            <Clock className="h-3 w-3 mr-1" />
+            Pending Invites
+            {activeFilters.includes('pending') && (
+              <X className="h-3 w-3 ml-1" />
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => toggleFilter('no-portal')}
+            className={cn(
+              'transition-all',
+              activeFilters.includes('no-portal') && 'bg-gray-600 text-white border-gray-600'
+            )}
+          >
+            <Lock className="h-3 w-3 mr-1" />
+            No Portal
+            {activeFilters.includes('no-portal') && (
+              <X className="h-3 w-3 ml-1" />
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => toggleFilter('has-tasks')}
+            className={cn(
+              'transition-all',
+              activeFilters.includes('has-tasks') && 'bg-green-600 text-white border-green-600'
+            )}
+          >
+            <ClipboardList className="h-3 w-3 mr-1" />
+            Has Tasks
+            {activeFilters.includes('has-tasks') && (
+              <X className="h-3 w-3 ml-1" />
+            )}
+          </Button>
+          {activeFilters.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setActiveFilters([])}
+              className="text-white/60"
+            >
+              Clear all
+            </Button>
+          )}
         </div>
+
+        {/* View Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">
+            {filteredContacts.length} Contacts
+          </h2>
+          <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1 border border-white/10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('card')}
+              className={cn(
+                'px-3 py-1.5',
+                viewMode === 'card' 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              )}
+            >
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Cards
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className={cn(
+                'px-3 py-1.5',
+                viewMode === 'list' 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              )}
+            >
+              <List className="h-4 w-4 mr-2" />
+              List
+            </Button>
+          </div>
+        </div>
+
+        {/* Data Display - Card or List View */}
+        {contactsLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 min-h-[120px]">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="h-12 w-12 rounded-full bg-white/10 animate-pulse" />
+                    <div className="flex-1">
+                      <div className="h-4 w-32 bg-white/10 rounded animate-pulse mb-2" />
+                      <div className="h-3 w-24 bg-white/10 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+                <div className="h-6 w-20 bg-white/10 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        ) : filteredContacts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Users className="h-12 w-12 text-white/20 mb-4" />
+            <h3 className="text-lg font-semibold text-white mb-2">
+              {activeFilters.length > 0 ? 'No contacts match your filters' : 'No contacts yet'}
+            </h3>
+            <p className="text-white/60 mb-6 max-w-md">
+              {activeFilters.length > 0 
+                ? 'Try adjusting your filters or clearing them to see all contacts.'
+                : 'Get started by adding your first contact to the project.'}
+            </p>
+            {activeFilters.length > 0 ? (
+              <Button
+                variant="outline"
+                onClick={() => setActiveFilters([])}
+              >
+                Clear Filters
+              </Button>
+            ) : (
+              <Button
+                className="bg-accent-500 hover:bg-accent-600"
+                onClick={() => setIsCreateOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Contact
+              </Button>
+            )}
+          </div>
+        ) : viewMode === 'card' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredContacts.map((contact: any) => (
+              <ContactCard
+                key={contact.id}
+                contact={contact}
+                onInvite={handleInvite}
+                onAssignTask={handleAssignTask}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="glass-card p-6">
+            <DataTable
+              columns={columns}
+              data={filteredContacts}
+              searchKey="name"
+              searchPlaceholder="Search contacts..."
+            />
+          </div>
+        )}
 
         {/* Create Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -810,6 +1051,19 @@ export default function AdminContactsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Assign Task Dialog */}
+        {selectedContact && (
+          <AssignTaskDialog
+            isOpen={isAssignTaskOpen}
+            onClose={() => {
+              setIsAssignTaskOpen(false);
+              setSelectedContact(null);
+            }}
+            contact={selectedContact}
+            projectId={projectId}
+          />
+        )}
       </div>
     </PageShell>
   );

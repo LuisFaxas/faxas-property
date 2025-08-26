@@ -16,6 +16,7 @@ export const createTaskSchema = z.object({
   
   // Assignment and project
   assignedToId: z.string().optional(),
+  assignedContactId: z.string().optional(),
   projectId: z.string(),
   relatedContactIds: z.array(z.string()).optional(),
   

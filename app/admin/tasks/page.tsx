@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { PageShell } from '@/components/blocks/page-shell';
 import { DataTable } from '@/components/ui/data-table';
+import { TaskCard } from '@/components/tasks/task-card';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -73,11 +74,15 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  XCircle
+  XCircle,
+  LayoutGrid,
+  List,
+  ClipboardList
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import apiClient from '@/lib/api-client';
+import { cn } from '@/lib/utils';
 
 // Form schema
 const taskFormSchema = z.object({
@@ -136,6 +141,8 @@ export default function AdminTasksPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card'); // Default to card view for mobile
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Get project ID from context
   const projectId = currentProject?.id || '';
@@ -307,16 +314,28 @@ export default function AdminTasksPage() {
 
   // Handlers
   const handleCreate = async (values: TaskFormValues) => {
+    setIsSubmitting(true);
     try {
       await createMutation.mutateAsync({
         ...values,
         projectId: projectId || 'default',
+      });
+      toast({
+        title: 'Success',
+        description: 'Task created successfully',
       });
       setIsCreateOpen(false);
       form.reset();
       refetch();
     } catch (error) {
       console.error('Error creating task:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create task',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -337,10 +356,15 @@ export default function AdminTasksPage() {
   const handleUpdate = async (values: TaskFormValues) => {
     if (!selectedTask) return;
     
+    setIsSubmitting(true);
     try {
       await updateMutation.mutateAsync({
         id: selectedTask.id,
         ...values,
+      });
+      toast({
+        title: 'Success',
+        description: 'Task updated successfully',
       });
       setIsEditOpen(false);
       setSelectedTask(null);
@@ -348,6 +372,13 @@ export default function AdminTasksPage() {
       refetch();
     } catch (error) {
       console.error('Error updating task:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update task',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -359,6 +390,7 @@ export default function AdminTasksPage() {
   const handleConfirmDelete = async () => {
     if (!selectedTask) return;
     
+    setIsSubmitting(true);
     try {
       await apiClient.delete(`/tasks/${selectedTask.id}`);
       toast({
@@ -374,6 +406,8 @@ export default function AdminTasksPage() {
         description: 'Failed to delete task',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -403,8 +437,39 @@ export default function AdminTasksPage() {
         userEmail={user?.email || ''}
       >
         <div className="p-6 space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-[400px] w-full" />
+          {/* Header Skeleton */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </div>
+          
+          {/* View Toggle Skeleton */}
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="h-10 w-40" />
+          </div>
+          
+          {/* Task Cards Skeleton */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 animate-pulse">
+                <Skeleton className="h-6 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-full mb-3" />
+                <Skeleton className="h-3 w-1/2 mb-3" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                </div>
+                <div className="mt-3 flex justify-between items-center">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </PageShell>
     );
@@ -420,10 +485,10 @@ export default function AdminTasksPage() {
     >
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white">Tasks Management</h1>
-            <p className="text-white/60 mt-1">Manage and assign project tasks</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Tasks Management</h1>
+            <p className="text-white/60 mt-1 text-sm sm:text-base">Manage and assign project tasks</p>
           </div>
           <div className="flex gap-2">
             {selectedRows.length > 0 && (
@@ -444,15 +509,83 @@ export default function AdminTasksPage() {
           </div>
         </div>
 
-        {/* Data Table */}
-        <div className="glass-card p-6">
-          <DataTable
-            columns={columns}
-            data={tasks}
-            searchKey="title"
-            searchPlaceholder="Search tasks..."
-          />
+        {/* View Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">
+            {tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'}
+          </h2>
+          <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1 border border-white/10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('card')}
+              className={cn(
+                'px-3 py-1.5',
+                viewMode === 'card' 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              )}
+            >
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Cards
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className={cn(
+                'px-3 py-1.5',
+                viewMode === 'list' 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              )}
+            >
+              <List className="h-4 w-4 mr-2" />
+              List
+            </Button>
+          </div>
         </div>
+
+        {/* Data Display - Card or List View with Empty State */}
+        {tasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <ClipboardList className="h-12 w-12 text-white/20 mb-4" />
+            <h3 className="text-lg font-semibold text-white mb-2">
+              No tasks yet
+            </h3>
+            <p className="text-white/60 mb-6 max-w-md">
+              Get started by creating your first task to track your project progress.
+            </p>
+            <Button
+              className="bg-accent-500 hover:bg-accent-600"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First Task
+            </Button>
+          </div>
+        ) : viewMode === 'card' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {tasks.map((task: any) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onStatusChange={handleStatusUpdate}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="glass-card p-6">
+            <DataTable
+              columns={columns}
+              data={tasks}
+              searchKey="title"
+              searchPlaceholder="Search tasks..."
+            />
+          </div>
+        )}
 
         {/* Create Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -565,11 +698,27 @@ export default function AdminTasksPage() {
                   )}
                 />
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsCreateOpen(false)}
+                    disabled={isSubmitting}
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit" className="bg-accent-500 hover:bg-accent-600">
-                    Create Task
+                  <Button 
+                    type="submit" 
+                    className="bg-accent-500 hover:bg-accent-600"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Task'
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
@@ -688,11 +837,27 @@ export default function AdminTasksPage() {
                   )}
                 />
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsEditOpen(false)}
+                    disabled={isSubmitting}
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit" className="bg-accent-500 hover:bg-accent-600">
-                    Save Changes
+                  <Button 
+                    type="submit" 
+                    className="bg-accent-500 hover:bg-accent-600"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
@@ -711,12 +876,20 @@ export default function AdminTasksPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="border-white/10">Cancel</AlertDialogCancel>
+              <AlertDialogCancel className="border-white/10" disabled={isSubmitting}>Cancel</AlertDialogCancel>
               <AlertDialogAction 
                 onClick={handleConfirmDelete}
                 className="bg-red-500 hover:bg-red-600"
+                disabled={isSubmitting}
               >
-                Delete
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

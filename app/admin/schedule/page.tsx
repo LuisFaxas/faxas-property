@@ -49,6 +49,10 @@ import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 import { CalendarView } from '@/components/schedule/calendar-view';
 import { cn } from '@/lib/utils';
+import { KPICarousel } from '@/components/schedule/kpi-carousel';
+import { MobileCalendarView } from '@/components/schedule/mobile-calendar-view';
+import { Loader2 } from 'lucide-react';
+import { useIsMobile, useIsTablet } from '@/hooks/use-media-query';
 
 // Helper functions for date and time handling
 const getDefaultDate = () => {
@@ -87,6 +91,8 @@ const EVENT_TYPES = [
 ];
 
 export default function AdminSchedulePage() {
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
   const { toast } = useToast();
   const { user } = useAuth();
   const isReady = !!user;
@@ -101,6 +107,7 @@ export default function AdminSchedulePage() {
   const [calendarView, setCalendarView] = useState<CalendarViewType>('month');
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state with separate date and time fields
   const [formData, setFormData] = useState({
@@ -201,6 +208,7 @@ export default function AdminSchedulePage() {
   }, [scheduleEvents, todaysEvents]);
 
   const handleCreate = async () => {
+    setIsSubmitting(true);
     try {
       await apiClient.post('/schedule', {
         title: formData.title,
@@ -228,12 +236,15 @@ export default function AdminSchedulePage() {
         description: 'Failed to create event',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleEdit = async () => {
     if (!selectedEvent) return;
 
+    setIsSubmitting(true);
     try {
       await apiClient.put(`/schedule/${selectedEvent.id}`, {
         title: formData.title,
@@ -262,12 +273,15 @@ export default function AdminSchedulePage() {
         description: 'Failed to update event',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
     if (!selectedEvent) return;
 
+    setIsSubmitting(true);
     try {
       await apiClient.delete(`/schedule/${selectedEvent.id}`);
 
@@ -285,6 +299,8 @@ export default function AdminSchedulePage() {
         description: 'Failed to delete event',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -613,40 +629,82 @@ export default function AdminSchedulePage() {
   // Loading state
   if (isLoading) {
     return (
-      <PageShell>
+      <PageShell 
+        userRole={user?.role || 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+      >
         <div className="p-6 space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-[400px] w-full" />
+          {/* Header Skeleton */}
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </div>
+          
+          {/* KPI Cards Skeleton */}
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i} className="bg-white/5 border-white/10 animate-pulse">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-4" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-16 mb-1" />
+                  <Skeleton className="h-3 w-32" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          {/* Tabs & Calendar Skeleton */}
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-96" />
+            <Card className="bg-white/5 border-white/10">
+              <CardContent className="p-0">
+                <Skeleton className="h-[500px] w-full" />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </PageShell>
     );
   }
 
   return (
-    <PageShell>
+    <PageShell 
+      userRole={user?.role || 'VIEWER'} 
+      userName={user?.displayName || 'User'} 
+      userEmail={user?.email || ''}
+    >
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white">Schedule Management</h1>
-            <p className="text-white/60">Manage project calendar and events</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Schedule Management</h1>
+            <p className="text-white/60 text-sm sm:text-base">Manage project calendar and events</p>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Event
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[625px] bg-gray-900 text-white border-white/10">
-              <DialogHeader>
+          {!isMobile && (
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="sm:size-default w-full sm:w-auto">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Event
+                </Button>
+              </DialogTrigger>
+            <DialogContent className="w-full h-full sm:max-w-[500px] sm:max-h-[85vh] sm:h-auto overflow-hidden flex flex-col bg-gray-900 text-white border-0 sm:border sm:border-white/10 rounded-none sm:rounded-lg">
+              <DialogHeader className="flex-shrink-0">
                 <DialogTitle>Create Schedule Event</DialogTitle>
                 <DialogDescription className="text-white/60">
                   Add a new event to the project calendar
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="flex-1 overflow-y-auto px-1">
+                <div className="grid gap-4 py-4 pr-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Event Title</Label>
                     <Input
@@ -686,7 +744,7 @@ export default function AdminSchedulePage() {
                   />
                 </div>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Start Date</Label>
                       <Input
@@ -708,7 +766,7 @@ export default function AdminSchedulePage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>End Date</Label>
                       <Input
@@ -731,7 +789,7 @@ export default function AdminSchedulePage() {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Location</Label>
                     <Input
@@ -770,7 +828,7 @@ export default function AdminSchedulePage() {
                     placeholder="John Doe, Jane Smith"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Requested By</Label>
                     <Input
@@ -790,105 +848,306 @@ export default function AdminSchedulePage() {
                     />
                   </div>
                 </div>
+                </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+              <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isSubmitting}
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleCreate}>Create Event</Button>
+                <Button onClick={handleCreate} disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Event'
+                  )}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/60">Total Events</CardTitle>
-              <Calendar className="h-4 w-4 text-white/40" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{metrics.totalEvents}</div>
-              <p className="text-xs text-white/60 mt-1">All scheduled events</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/60">Today&apos;s Events</CardTitle>
-              <Clock className="h-4 w-4 text-white/40" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{metrics.todayEvents}</div>
-              <p className="text-xs text-white/60 mt-1">Events scheduled today</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/60">Pending Approvals</CardTitle>
-              <AlertCircle className="h-4 w-4 text-yellow-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{metrics.pendingApprovals}</div>
-              <p className="text-xs text-white/60 mt-1">Awaiting approval</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/5 border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white/60">Upcoming Work</CardTitle>
-              <Users className="h-4 w-4 text-white/40" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{metrics.upcomingWork}</div>
-              <p className="text-xs text-white/60 mt-1">Work sessions scheduled</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Filters */}
-        <div className="flex items-center gap-4 mb-4">
-          <span className="text-sm text-white/60">Quick filters:</span>
-          <div className="flex gap-2">
-            {EVENT_TYPES.map((type) => (
+        {/* Mobile FAB for Add Event */}
+        {isMobile && (
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
               <Button
-                key={type.value}
-                variant="outline"
-                size="sm"
-                onClick={() => toggleTypeFilter(type.value)}
-                className={cn(
-                  'border-white/10 transition-all',
-                  typeFilters.includes(type.value)
-                    ? `${type.color} text-white border-transparent`
-                    : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
-                )}
+                size="lg"
+                className="fixed bottom-6 right-6 z-50 rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700"
               >
-                <div className={cn(
-                  'w-2 h-2 rounded-full mr-2',
-                  type.color
-                )} />
-                {type.label}
-                {typeFilters.includes(type.value) && (
-                  <XCircle className="ml-1 h-3 w-3" />
-                )}
+                <Plus className="h-6 w-6" />
+                <span className="sr-only">Add Event</span>
               </Button>
-            ))}
+            </DialogTrigger>
+            <DialogContent className="w-full h-full sm:max-w-[500px] sm:max-h-[85vh] sm:h-auto overflow-hidden flex flex-col bg-gray-900 text-white border-0 sm:border sm:border-white/10 rounded-none sm:rounded-lg">
+              <DialogHeader className="flex-shrink-0">
+                <DialogTitle>Create Schedule Event</DialogTitle>
+                <DialogDescription className="text-white/60">
+                  Add a new event to the project calendar
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto px-1">
+                <div className="grid gap-4 py-4 pr-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Event Title</Label>
+                    <Input
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      placeholder="e.g., Site Inspection"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Event Type</Label>
+                    <Select
+                      value={formData.type}
+                      onValueChange={(value) => setFormData({ ...formData, type: value })}
+                    >
+                      <SelectTrigger className="bg-white/5 border-white/10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CALL">Call</SelectItem>
+                        <SelectItem value="MEETING">Meeting</SelectItem>
+                        <SelectItem value="SITE_VISIT">Site Visit</SelectItem>
+                        <SelectItem value="WORK">Work</SelectItem>
+                        <SelectItem value="EMAIL_FOLLOWUP">Email Followup</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="bg-white/5 border-white/10"
+                    placeholder="Event details..."
+                  />
+                </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <Input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="bg-white/5 border-white/10 text-white"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Start Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.startTime}
+                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                        className="bg-white/5 border-white/10 text-white"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>End Date</Label>
+                      <Input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        className="bg-white/5 border-white/10 text-white"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.endTime}
+                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                        className="bg-white/5 border-white/10 text-white"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Location</Label>
+                    <Input
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      className="bg-white/5 border-white/10"
+                      placeholder="e.g., Main Site"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    >
+                      <SelectTrigger className="bg-white/5 border-white/10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PENDING">Pending Approval</SelectItem>
+                        <SelectItem value="REQUESTED">Requested</SelectItem>
+                        <SelectItem value="PLANNED">Planned</SelectItem>
+                        <SelectItem value="DONE">Done</SelectItem>
+                        <SelectItem value="CANCELED">Canceled</SelectItem>
+                        <SelectItem value="RESCHEDULE_NEEDED">Reschedule Needed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Attendees (comma-separated)</Label>
+                  <Input
+                    value={formData.attendees}
+                    onChange={(e) => setFormData({ ...formData, attendees: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                    placeholder="John Doe, Jane Smith"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Requested By</Label>
+                    <Input
+                      value={formData.requestedBy}
+                      onChange={(e) => setFormData({ ...formData, requestedBy: e.target.value })}
+                      className="bg-white/5 border-white/10"
+                      placeholder="Name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Approved By</Label>
+                    <Input
+                      value={formData.approvedBy}
+                      onChange={(e) => setFormData({ ...formData, approvedBy: e.target.value })}
+                      className="bg-white/5 border-white/10"
+                      placeholder="Name"
+                    />
+                  </div>
+                </div>
+                </div>
+              </div>
+              <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate} disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Event'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* KPI Cards - Now with Carousel on Mobile */}
+        <KPICarousel
+          cards={[
+            {
+              title: 'Total Events',
+              value: metrics.totalEvents,
+              subtitle: 'All scheduled events',
+              icon: Calendar,
+              iconColor: 'text-white/40',
+            },
+            {
+              title: "Today's Events",
+              value: metrics.todayEvents,
+              subtitle: 'Events scheduled today',
+              icon: Clock,
+              iconColor: 'text-white/40',
+            },
+            {
+              title: 'Pending Approvals',
+              value: metrics.pendingApprovals,
+              subtitle: 'Awaiting approval',
+              icon: AlertCircle,
+              iconColor: 'text-yellow-400',
+            },
+            {
+              title: 'Upcoming Work',
+              value: metrics.upcomingWork,
+              subtitle: 'Work sessions scheduled',
+              icon: Users,
+              iconColor: 'text-white/40',
+            },
+          ]}
+        />
+
+        {/* Quick Filters - Mobile Optimized */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-white/60">Quick filters:</span>
             {typeFilters.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setTypeFilters([])}
-                className="text-white/60 hover:text-white"
+                className="text-white/60 hover:text-white h-7 px-2 text-xs sm:text-sm sm:px-3"
               >
                 Clear all
               </Button>
             )}
           </div>
+          {/* Mobile - Horizontal scroll */}
+          <div className="overflow-x-auto pb-2 sm:overflow-visible">
+            <div className="flex gap-2 sm:flex-wrap min-w-max sm:min-w-0">
+              {EVENT_TYPES.map((type) => (
+                <Button
+                  key={type.value}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toggleTypeFilter(type.value)}
+                  className={cn(
+                    'border-white/10 transition-all flex-shrink-0 h-8 text-xs sm:text-sm',
+                    typeFilters.includes(type.value)
+                      ? `${type.color} text-white border-transparent`
+                      : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                  )}
+                >
+                  <div className={cn(
+                    'w-2 h-2 rounded-full mr-1.5',
+                    type.color
+                  )} />
+                  <span className="hidden sm:inline">{type.label}</span>
+                  <span className="sm:hidden">{type.label.slice(0, 4)}</span>
+                  {typeFilters.includes(type.value) && (
+                    <XCircle className="ml-1 h-3 w-3" />
+                  )}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Tabs with View Mode Toggle */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex items-center justify-between mb-4">
-            <TabsList className="bg-white/5 border-white/10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <TabsList className="bg-white/5 border-white/10 w-full sm:w-auto overflow-x-auto">
               <TabsTrigger value="all">All Events</TabsTrigger>
               <TabsTrigger value="today">
                 Today
@@ -909,35 +1168,37 @@ export default function AdminSchedulePage() {
               <TabsTrigger value="approved">Approved</TabsTrigger>
             </TabsList>
             
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1 border border-white/10">
+            {/* View Mode Toggle - Mobile Optimized */}
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/10 self-end sm:self-auto">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setViewMode('calendar')}
                 className={cn(
-                  'px-3 py-1.5',
+                  'px-2 sm:px-3 py-1.5',
                   viewMode === 'calendar' 
                     ? 'bg-blue-600 text-white hover:bg-blue-700' 
                     : 'text-white/60 hover:text-white hover:bg-white/10'
                 )}
+                title="Calendar View"
               >
-                <CalendarDays className="h-4 w-4 mr-2" />
-                Calendar
+                <CalendarDays className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Calendar</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setViewMode('list')}
                 className={cn(
-                  'px-3 py-1.5',
+                  'px-2 sm:px-3 py-1.5',
                   viewMode === 'list' 
                     ? 'bg-blue-600 text-white hover:bg-blue-700' 
                     : 'text-white/60 hover:text-white hover:bg-white/10'
                 )}
+                title="List View"
               >
-                <List className="h-4 w-4 mr-2" />
-                List
+                <List className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">List</span>
               </Button>
             </div>
           </div>
@@ -959,7 +1220,23 @@ export default function AdminSchedulePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {viewMode === 'calendar' ? (
+                {isMobile ? (
+                  // Mobile Calendar View
+                  <MobileCalendarView
+                    events={filteredEvents}
+                    onSelectEvent={openEditDialog}
+                    onAddEvent={(date) => {
+                      setFormData({
+                        ...formData,
+                        startDate: date.toISOString().split('T')[0],
+                        startTime: '09:00',
+                        endDate: date.toISOString().split('T')[0],
+                        endTime: '10:00',
+                      });
+                      setIsCreateOpen(true);
+                    }}
+                  />
+                ) : viewMode === 'calendar' ? (
                   <CalendarView
                     events={filteredEvents}
                     onSelectEvent={openEditDialog}
@@ -985,15 +1262,16 @@ export default function AdminSchedulePage() {
 
         {/* Edit Dialog */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-[625px] bg-gray-900 text-white border-white/10">
-            <DialogHeader>
+          <DialogContent className="w-full h-full sm:max-w-[500px] sm:max-h-[85vh] sm:h-auto overflow-hidden flex flex-col bg-gray-900 text-white border-0 sm:border sm:border-white/10 rounded-none sm:rounded-lg">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>Edit Schedule Event</DialogTitle>
               <DialogDescription className="text-white/60">
                 Update event details
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="flex-1 overflow-y-auto px-1">
+              <div className="grid gap-4 py-4 pr-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Event Title</Label>
                   <Input
@@ -1031,7 +1309,7 @@ export default function AdminSchedulePage() {
                 />
               </div>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Start Date</Label>
                     <Input
@@ -1053,7 +1331,7 @@ export default function AdminSchedulePage() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>End Date</Label>
                     <Input
@@ -1076,7 +1354,7 @@ export default function AdminSchedulePage() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Location</Label>
                   <Input
@@ -1113,8 +1391,9 @@ export default function AdminSchedulePage() {
                   className="bg-white/5 border-white/10 text-white"
                 />
               </div>
+              </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>
                 Cancel
               </Button>

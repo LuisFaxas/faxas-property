@@ -35,3 +35,16 @@ export function useMediaQuery(query: string): boolean {
 
   return matches;
 }
+
+// Preset breakpoints matching Tailwind
+export function useIsMobile() {
+  return useMediaQuery('(max-width: 639px)');
+}
+
+export function useIsTablet() {
+  return useMediaQuery('(min-width: 640px) and (max-width: 1023px)');
+}
+
+export function useIsDesktop() {
+  return useMediaQuery('(min-width: 1024px)');
+}
