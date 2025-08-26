@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { Plus, Download, AlertCircle, TrendingUp, TrendingDown, DollarSign, FileText, Edit, Trash, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -116,6 +117,8 @@ export default function AdminBudgetPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isReady = !!user;
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -125,6 +128,7 @@ export default function AdminBudgetPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [projectId, setProjectId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('card'); // Default to card for mobile
   
   // Form
   const form = useForm<BudgetItemFormValues>({
@@ -167,6 +171,13 @@ export default function AdminBudgetPage() {
     const total = watchQty * watchUnitCost;
     form.setValue('estTotal', total);
   }, [watchQty, watchUnitCost, form]);
+  
+  // Auto-switch to card view on mobile
+  useEffect(() => {
+    if (isMobile && viewMode === 'table') {
+      setViewMode('card');
+    }
+  }, [isMobile, viewMode]);
   
   const budgetItems = Array.isArray(budgetData) ? budgetData : [];
   

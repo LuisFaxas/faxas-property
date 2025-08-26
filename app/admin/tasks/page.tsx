@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { PageShell } from '@/components/blocks/page-shell';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { DataTable } from '@/components/ui/data-table';
 import { TaskCard } from '@/components/tasks/task-card';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
@@ -135,6 +136,8 @@ function PriorityBadge({ priority }: { priority: string }) {
 export default function AdminTasksPage() {
   const { user, loading: authLoading } = useAuth();
   const { currentProject } = useProjectContext();
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   const [isReady, setIsReady] = useState(false);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -153,6 +156,13 @@ export default function AdminTasksPage() {
       setTimeout(() => setIsReady(true), 500);
     }
   }, [authLoading, user]);
+
+  // Auto-switch to card view on mobile
+  useEffect(() => {
+    if (isMobile && viewMode === 'list') {
+      setViewMode('card');
+    }
+  }, [isMobile, viewMode]);
 
   // Fetch data
   const { data: tasksData, isLoading: tasksLoading, refetch } = useTasks(
@@ -432,11 +442,18 @@ export default function AdminTasksPage() {
   if (tasksLoading || !isReady) {
     return (
       <PageShell 
+        pageTitle="Tasks"
         userRole={user?.role || 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
+        fabIcon={Plus}
+        fabLabel="Add Task"
+        onFabClick={() => setIsCreateOpen(true)}
       >
-        <div className="p-6 space-y-6">
+        <div className={cn(
+          "p-6 space-y-6",
+          isMobile && "p-3 space-y-4"
+        )}>
           {/* Header Skeleton */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
@@ -453,7 +470,10 @@ export default function AdminTasksPage() {
           </div>
           
           {/* Task Cards Skeleton */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className={cn(
+            "grid gap-4",
+            isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          )}>
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 animate-pulse">
                 <Skeleton className="h-6 w-3/4 mb-2" />
@@ -479,9 +499,13 @@ export default function AdminTasksPage() {
 
   return (
     <PageShell 
+      pageTitle="Tasks"
       userRole={user?.role || 'VIEWER'} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
+      fabIcon={Plus}
+      fabLabel="Add Task"
+      onFabClick={() => setIsCreateOpen(true)}
     >
       <div className="p-6 space-y-6">
         {/* Header */}
@@ -589,7 +613,10 @@ export default function AdminTasksPage() {
 
         {/* Create Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="sm:max-w-[525px] bg-graphite-800 border-white/10">
+          <DialogContent className={cn(
+            "sm:max-w-[525px] bg-graphite-800 border-white/10",
+            isMobile && "fixed inset-4 max-w-none h-[calc(100vh-2rem)] flex flex-col"
+          )}>
             <DialogHeader>
               <DialogTitle className="text-white">Create New Task</DialogTitle>
               <DialogDescription className="text-white/60">
@@ -728,7 +755,10 @@ export default function AdminTasksPage() {
 
         {/* Edit Dialog */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-[525px] bg-graphite-800 border-white/10">
+          <DialogContent className={cn(
+            "sm:max-w-[525px] bg-graphite-800 border-white/10",
+            isMobile && "fixed inset-4 max-w-none h-[calc(100vh-2rem)] flex flex-col"
+          )}>
             <DialogHeader>
               <DialogTitle className="text-white">Edit Task</DialogTitle>
               <DialogDescription className="text-white/60">

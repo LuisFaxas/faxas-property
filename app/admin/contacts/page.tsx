@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ContactCard } from '@/components/contacts/contact-card';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { AssignTaskDialog } from '@/components/contacts/assign-task-dialog';
 import { PageShell } from '@/components/blocks/page-shell';
 import { DataTable } from '@/components/ui/data-table';
@@ -137,6 +138,8 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function AdminContactsPage() {
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   const [isReady, setIsReady] = useState(false);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -157,6 +160,13 @@ export default function AdminContactsPage() {
       setTimeout(() => setIsReady(true), 500);
     }
   }, [authLoading, user]);
+
+  // Auto-switch to card view on mobile
+  useEffect(() => {
+    if (isMobile && viewMode === 'list') {
+      setViewMode('card');
+    }
+  }, [isMobile, viewMode]);
 
   // Form
   const form = useForm<ContactFormValues>({
@@ -749,7 +759,7 @@ export default function AdminContactsPage() {
               >
                 Clear Filters
               </Button>
-            ) : (
+            ) : !isMobile ? (
               <Button
                 className="bg-accent-500 hover:bg-accent-600"
                 onClick={() => setIsCreateOpen(true)}
@@ -757,10 +767,14 @@ export default function AdminContactsPage() {
                 <Plus className="h-4 w-4 mr-2" />
                 Add Your First Contact
               </Button>
-            )}
+            ) : null}
           </div>
         ) : viewMode === 'card' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className={cn(
+            "grid gap-4",
+            isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+            isLandscape && "grid-cols-2"
+          )}>
             {filteredContacts.map((contact: any) => (
               <ContactCard
                 key={contact.id}
@@ -785,7 +799,10 @@ export default function AdminContactsPage() {
 
         {/* Create Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="sm:max-w-[525px] bg-graphite-800 border-white/10">
+          <DialogContent className={cn(
+            "sm:max-w-[525px] bg-graphite-800 border-white/10",
+            isMobile && "fixed inset-4 max-w-none h-[calc(100vh-2rem)] flex flex-col overflow-hidden"
+          )}>
             <DialogHeader>
               <DialogTitle className="text-white">Create New Contact</DialogTitle>
               <DialogDescription className="text-white/60">
@@ -971,7 +988,10 @@ export default function AdminContactsPage() {
 
         {/* Edit Dialog - Similar to Create */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-[525px] bg-graphite-800 border-white/10">
+          <DialogContent className={cn(
+            "sm:max-w-[525px] bg-graphite-800 border-white/10",
+            isMobile && "fixed inset-4 max-w-none h-[calc(100vh-2rem)] flex flex-col overflow-hidden"
+          )}>
             <DialogHeader>
               <DialogTitle className="text-white">Edit Contact</DialogTitle>
               <DialogDescription className="text-white/60">
