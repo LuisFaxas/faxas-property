@@ -75,7 +75,7 @@ export function useSwipeGestures({
     swipeDuration: 500,
   });
 
-  return enabled ? swipeHandlers : {};
+  return enabled ? swipeHandlers : { ref: null };
 }
 
 /**

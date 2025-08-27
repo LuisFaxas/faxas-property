@@ -371,6 +371,267 @@ export function useMobileDetect() {
 }
 ```
 
+## Standardized Mobile Components (v2.0)
+
+### Universal Mobile Dialog
+Use `MobileDialog` for all modals across the app:
+
+```tsx
+import { MobileDialog } from '@/components/ui/mobile';
+
+<MobileDialog
+  open={open}
+  onOpenChange={setOpen}
+  title="Dialog Title"
+  description="Optional description"
+  size="md" // sm | md | lg | full
+  footer={
+    <>
+      <Button variant="outline">Cancel</Button>
+      <Button>Save</Button>
+    </>
+  }
+>
+  {/* Content */}
+</MobileDialog>
+```
+
+**Standards:**
+- Automatically switches between Dialog (desktop) and Sheet (mobile)
+- Bottom sheet on mobile with 90vh height
+- Consistent dark theme styling
+- Built-in close button
+- Footer for action buttons
+
+### Mobile Card with Swipe Actions
+Use `MobileCard` for all swipeable list items:
+
+```tsx
+import { MobileCard } from '@/components/ui/mobile';
+
+<MobileCard
+  leftSwipeAction={{
+    id: 'delete',
+    label: 'Delete',
+    icon: Trash2,
+    color: 'red',
+    action: handleDelete
+  }}
+  rightSwipeAction={{
+    id: 'complete',
+    label: 'Complete',
+    icon: Check,
+    color: 'green',
+    action: handleComplete
+  }}
+  onTap={handleTap}
+  isDimmed={isCompleted}
+>
+  {/* Card content */}
+</MobileCard>
+```
+
+**Standards:**
+- Right swipe = Primary positive action (Complete, Approve, etc.)
+- Left swipe = Destructive action (Delete, Reject, etc.)
+- Gradient backgrounds: green (positive), red (destructive), blue (edit), yellow (warning)
+- 100px swipe threshold for action trigger
+- Scale animation on execution
+
+### Mobile Detail Sheet
+Use `MobileDetailSheet` for full item details:
+
+```tsx
+import { MobileDetailSheet } from '@/components/ui/mobile';
+
+<MobileDetailSheet
+  isOpen={open}
+  onClose={handleClose}
+  title="Item Title"
+  subtitle="Optional subtitle"
+  statusBadge={{
+    label: 'Active',
+    className: 'bg-green-500/20 text-green-400'
+  }}
+  sections={[
+    {
+      id: 'description',
+      label: 'Description',
+      icon: FileText,
+      value: item.description
+    }
+  ]}
+  actions={[
+    {
+      id: 'edit',
+      label: 'Edit',
+      icon: Edit,
+      onClick: handleEdit
+    }
+  ]}
+/>
+```
+
+**Standards:**
+- 85vh height for comfortable viewing
+- Sticky header with status badge
+- Scrollable content area
+- Fixed action buttons at bottom
+- Consistent section layout with icons
+
+### Mobile List with Sections
+Use `MobileList` for organized list displays:
+
+```tsx
+import { MobileList } from '@/components/ui/mobile';
+
+<MobileList
+  sections={[
+    {
+      id: 'active',
+      title: 'Active Items',
+      items: activeItems,
+      renderItem: (item) => <ItemCard item={item} />
+    },
+    {
+      id: 'completed',
+      title: 'Completed',
+      items: completedItems,
+      renderItem: (item) => <ItemCard item={item} />
+    }
+  ]}
+  showProgress={true}
+  progressConfig={{
+    completed: completedCount,
+    total: totalCount,
+    label: 'tasks completed'
+  }}
+  showCompletedToggle={true}
+  completedSectionId="completed"
+  storageKey="tasks"
+/>
+```
+
+**Standards:**
+- Progress indicator at top with green gradient
+- Collapsible sections with item counts
+- Completed items hidden by default
+- Preferences saved to localStorage
+- Empty state support
+
+## Swipe Gesture Standards
+
+### Swipe Actions Pattern
+```typescript
+// Standard swipe action colors
+const swipeColors = {
+  complete: 'green',   // Positive actions
+  delete: 'red',       // Destructive actions
+  edit: 'blue',        // Modify actions
+  archive: 'gray',     // Neutral actions
+  warning: 'yellow'    // Caution actions
+};
+
+// Standard swipe thresholds
+const SWIPE_THRESHOLD = 60;      // Minimum to show action
+const ACTION_THRESHOLD = 100;    // Distance to trigger
+const MAX_SWIPE = 150;           // Maximum swipe distance
+```
+
+### Gesture Feedback
+- Visual: Gradient background reveals during swipe
+- Haptic: Vibration on action trigger (if supported)
+- Animation: Scale down to 95% when executing
+- Resistance: 30% resistance past threshold
+
+## Toast Notifications
+
+### Swipe-to-Dismiss Toasts
+All toasts now support upward swipe to dismiss:
+
+```tsx
+import { toast } from '@/hooks/use-toast';
+
+toast({
+  title: 'Success',
+  description: 'Action completed successfully',
+  variant: 'default' // or 'destructive'
+});
+```
+
+**Standards:**
+- Swipe up to dismiss on mobile
+- 4 second auto-dismiss
+- Dark theme styling (graphite-800 background)
+- Visual swipe indicator bar
+- Appear from top on mobile
+
+## Progress Indicators
+
+### Standard Progress Bar
+```tsx
+<div className="bg-graphite-700 rounded-full h-2">
+  <div
+    className="bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full transition-all duration-300"
+    style={{ width: `${percentage}%` }}
+  />
+</div>
+```
+
+**Standards:**
+- Green gradient for positive progress
+- 2px height for subtle appearance
+- Smooth transitions (300ms)
+- Always show with completion stats
+
+## Completed/Archived Items
+
+### Handling Pattern
+```typescript
+// Standard approach for completed items
+const [showCompleted, setShowCompleted] = useState(() => {
+  const saved = localStorage.getItem('showCompleted');
+  return saved ? JSON.parse(saved) : false;
+});
+
+// Visual treatment
+className={cn(
+  isCompleted && 'opacity-60 line-through'
+)}
+```
+
+**Standards:**
+- Hidden by default
+- Toggle saved to localStorage
+- 60% opacity when shown
+- Strikethrough text
+- Grouped at bottom of list
+- Show count when hidden
+
+## Migration from Old Components
+
+### Component Mapping
+| Old Component | New Component | Migration Notes |
+|---|---|---|
+| `Dialog` + custom mobile | `MobileDialog` | Automatic mobile adaptation |
+| `MobileTaskDialog` | `MobileDialog` | Use universal component |
+| Custom swipe cards | `MobileCard` | Standardized swipe actions |
+| Custom detail views | `MobileDetailSheet` | Consistent detail pattern |
+| Custom list layouts | `MobileList` | Built-in section management |
+
+### Quick Migration Example
+```tsx
+// Old approach
+{isMobile ? (
+  <CustomBottomSheet>...</CustomBottomSheet>
+) : (
+  <Dialog>...</Dialog>
+)}
+
+// New approach
+<MobileDialog>...</MobileDialog>
+```
+
 ## Testing Checklist
 
 ### Device Testing
@@ -419,5 +680,6 @@ When implementing mobile features:
 
 ---
 
-*Last Updated: Based on Schedule page implementation*
-*Version: 1.0*
+*Last Updated: November 2024 - Standardized Mobile Components*
+*Version: 2.0*
+*Changes: Added universal mobile components (MobileDialog, MobileCard, MobileDetailSheet, MobileList), swipe gesture standards, toast notifications, progress indicators, and completed items handling patterns*

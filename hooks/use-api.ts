@@ -44,7 +44,7 @@ export function useCreateTask() {
       }
       toast({
         title: 'Success',
-        description: data.message || 'Task created successfully'
+        description: data.data?.message || 'Task created successfully'
       });
     },
     onError: (error: any) => {
@@ -259,7 +259,7 @@ export function useBulkDeleteTasks() {
           queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }] 
         });
       }
-      const count = response.deleted || variables.taskIds.length;
+      const count = response.data?.deleted || variables.taskIds.length;
       toast({
         title: 'Success',
         description: `${count} task${count !== 1 ? 's' : ''} deleted successfully`

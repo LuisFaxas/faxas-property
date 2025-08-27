@@ -57,7 +57,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     refetch: refetchProjects 
   } = useProjects(isReady);
   
-  const projects = projectsData || [];
+  const projects = projectsData?.data || projectsData || [];
   
   // Set default project when projects are loaded
   useEffect(() => {

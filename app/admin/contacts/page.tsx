@@ -137,7 +137,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AdminContactsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading } = useAuth();
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   const [isReady, setIsReady] = useState(false);
@@ -498,11 +498,11 @@ export default function AdminContactsPage() {
   };
   
   // Get contacts array
-  const contacts = Array.isArray(contactsData) ? contactsData : [];
+  const contacts = Array.isArray(contactsData?.data) ? contactsData.data : Array.isArray(contactsData) ? contactsData : [];
   
   // Filter contacts based on active filters
   const filteredContacts = useMemo(() => {
-    let filtered = contacts;
+    let filtered: any[] = contacts;
     
     if (activeFilters.includes('portal')) {
       filtered = filtered.filter((c: any) => c.portalStatus === 'ACTIVE');
@@ -565,7 +565,7 @@ export default function AdminContactsPage() {
   if (contactsLoading || !isReady) {
     return (
       <PageShell 
-        userRole={user?.role || 'VIEWER'} 
+        userRole={(userRole as "ADMIN" | "STAFF" | "CONTRACTOR" | "VIEWER") || 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
       >
@@ -579,7 +579,7 @@ export default function AdminContactsPage() {
 
   return (
     <PageShell 
-      userRole={user?.role || 'VIEWER'} 
+      userRole={(userRole as "ADMIN" | "STAFF" | "CONTRACTOR" | "VIEWER") || 'VIEWER'} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
     >

@@ -31,22 +31,22 @@ const eventSchema = z.object({
   startTime: z.string().min(1, 'Start time is required'),
   endDate: z.string().min(1, 'End date is required'),
   endTime: z.string().min(1, 'End time is required'),
-  isAllDay: z.boolean().default(false),
-  timezone: z.string().default('America/New_York'),
+  isAllDay: z.boolean(),
+  timezone: z.string(),
   status: z.enum(['PENDING', 'REQUESTED', 'PLANNED', 'DONE', 'CANCELED', 'RESCHEDULE_NEEDED']),
-  attendees: z.array(z.string()).default([]),
+  attendees: z.array(z.string()),
   notes: z.string().optional(),
   // Recurrence fields
-  isRecurring: z.boolean().default(false),
+  isRecurring: z.boolean(),
   recurrenceType: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM']).optional(),
-  recurrenceInterval: z.number().min(1).default(1),
+  recurrenceInterval: z.number().min(1),
   recurrenceDaysOfWeek: z.array(z.number()).optional(),
   recurrenceEndDate: z.string().optional(),
   recurrenceOccurrences: z.number().optional(),
   // Notification fields
-  sendReminders: z.boolean().default(true),
-  reminderMinutes: z.number().default(15),
-  sendInvites: z.boolean().default(false),
+  sendReminders: z.boolean(),
+  reminderMinutes: z.number(),
+  sendInvites: z.boolean(),
 });
 
 export type EventFormData = z.infer<typeof eventSchema>;

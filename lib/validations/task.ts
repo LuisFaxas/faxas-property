@@ -41,7 +41,7 @@ export const createTaskSchema = z.object({
   
   // Metadata
   tags: z.array(z.string()).optional(),
-  customFields: z.record(z.unknown()).optional(),
+  customFields: z.record(z.string(), z.unknown()).optional(),
   isRecurring: z.boolean().default(false),
   recurringPattern: z.string().optional(),
   
@@ -51,7 +51,7 @@ export const createTaskSchema = z.object({
   thumbnailUrl: z.string().url().optional(),
   voiceNoteUrl: z.string().url().optional(),
   quickTemplate: z.string().optional(),
-  mobileMetadata: z.record(z.unknown()).optional(),
+  mobileMetadata: z.record(z.string(), z.unknown()).optional(),
   
   // Hierarchy
   parentTaskId: z.string().optional(),

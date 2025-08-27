@@ -65,19 +65,19 @@ import {
 } from '@/components/ui/form';
 import type { ColumnDef } from '@tanstack/react-table';
 
-// Form schema
+// Form schema - matching the validation schema
 const budgetItemSchema = z.object({
   discipline: z.string().min(1, 'Discipline is required'),
   category: z.string().min(1, 'Category is required'),
   item: z.string().min(1, 'Item name is required'),
   unit: z.string().optional(),
-  qty: z.number().min(0).default(1),
-  estUnitCost: z.number().min(0).default(0),
-  estTotal: z.number().min(0).default(0),
-  committedTotal: z.number().min(0).default(0),
-  paidToDate: z.number().min(0).default(0),
+  qty: z.number().min(0, 'Quantity must be positive'),
+  estUnitCost: z.number().min(0, 'Unit cost must be positive'),
+  estTotal: z.number().min(0, 'Total must be positive'),
+  committedTotal: z.number().min(0, 'Committed total must be positive'),
+  paidToDate: z.number().min(0, 'Paid amount must be positive'),
   vendorContactId: z.string().optional(),
-  status: z.enum(['BUDGETED', 'COMMITTED', 'PAID']).default('BUDGETED'),
+  status: z.enum(['BUDGETED', 'COMMITTED', 'PAID']),
   projectId: z.string()
 });
 
@@ -115,7 +115,7 @@ const CATEGORIES = [
 
 export default function AdminBudgetPage() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const isReady = !!user;
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
@@ -195,14 +195,15 @@ export default function AdminBudgetPage() {
       };
     }
     
+    const data = summary?.data || summary;
     return {
-      totalBudget: summary.totalBudget || 0,
-      totalCommitted: summary.totalCommitted || 0,
-      totalPaid: summary.totalPaid || 0,
-      remaining: summary.remainingBudget || 0,
-      variance: summary.totalVariance || 0,
-      percentSpent: summary.spendRate || 0,
-      overBudgetCount: summary.overBudgetCount || 0
+      totalBudget: data?.totalBudget || 0,
+      totalCommitted: data?.totalCommitted || 0,
+      totalPaid: data?.totalPaid || 0,
+      remaining: data?.remainingBudget || 0,
+      variance: data?.totalVariance || 0,
+      percentSpent: data?.spendRate || 0,
+      overBudgetCount: data?.overBudgetCount || 0
     };
   }, [summary]);
   
@@ -502,7 +503,7 @@ export default function AdminBudgetPage() {
   if (isLoading) {
     return (
       <PageShell 
-        userRole={user?.role || 'VIEWER'} 
+        userRole={(userRole as "ADMIN" | "STAFF" | "CONTRACTOR" | "VIEWER") || 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
       >
@@ -565,7 +566,7 @@ export default function AdminBudgetPage() {
   
   return (
     <PageShell 
-      userRole={user?.role || 'VIEWER'} 
+      userRole={(userRole as "ADMIN" | "STAFF" | "CONTRACTOR" | "VIEWER") || 'VIEWER'} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
     >
@@ -894,7 +895,7 @@ export default function AdminBudgetPage() {
           </div>
           
           <TabsContent value="overview" className="space-y-4">
-            {summary?.disciplineBreakdown && (
+            {summary?.data?.disciplineBreakdown && (
               <Card>
                 <CardHeader>
                   <CardTitle>Budget by Discipline</CardTitle>
@@ -904,7 +905,7 @@ export default function AdminBudgetPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {Object.entries(summary.disciplineBreakdown).map(([discipline, data]: [string, any]) => (
+                    {Object.entries(summary.data.disciplineBreakdown).map(([discipline, data]: [string, any]) => (
                       <div key={discipline} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">{discipline}</span>
@@ -966,9 +967,9 @@ export default function AdminBudgetPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {summary?.topOverBudgetItems && summary.topOverBudgetItems.length > 0 ? (
+                {summary?.data?.topOverBudgetItems && summary.data.topOverBudgetItems.length > 0 ? (
                   <div className="space-y-4">
-                    {summary.topOverBudgetItems.map((item: any) => (
+                    {summary.data.topOverBudgetItems.map((item: any) => (
                       <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
                           <p className="font-medium">{item.item}</p>
