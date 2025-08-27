@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { MobileTaskDetailSheet } from './mobile-task-detail-sheet';
 import {
   Clock,
   AlertCircle,
@@ -12,8 +13,8 @@ import {
   XCircle,
   Check,
   Trash2,
-  Edit,
   MoreVertical,
+  Edit,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -40,9 +41,9 @@ const priorityConfig = {
 };
 
 // Swipe configuration
-const SWIPE_THRESHOLD = 80; // Minimum distance to reveal action buttons
-const SWIPE_CONFIRM_THRESHOLD = 200; // Distance for auto-confirm (optional feature)
-const ACTION_BUTTON_WIDTH = 80; // Width of revealed action button
+const SWIPE_THRESHOLD = 60; // Minimum distance to trigger action
+const DELETE_BUTTON_WIDTH = 80; // Width of delete button
+const COMPLETE_THRESHOLD = 100; // Distance to trigger complete
 
 export function MobileTaskCard({
   task,
@@ -55,7 +56,8 @@ export function MobileTaskCard({
   const [startX, setStartX] = useState(0);
   const [currentX, setCurrentX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [swipeState, setSwipeState] = useState<'idle' | 'swiping' | 'revealed-left' | 'revealed-right'>('idle');
+  const [swipeState, setSwipeState] = useState<'idle' | 'swiping' | 'completing' | 'uncompleting' | 'deleting'>('idle');
+  const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -82,17 +84,22 @@ export function MobileTaskCard({
     const touch = e.touches[0];
     const deltaX = touch.clientX - startX;
     
-    // Add resistance at the edges
-    let adjustedDelta = deltaX;
-    if (Math.abs(deltaX) > ACTION_BUTTON_WIDTH) {
-      const excess = Math.abs(deltaX) - ACTION_BUTTON_WIDTH;
-      const resistance = 0.3; // 30% of excess movement
-      adjustedDelta = deltaX > 0 
-        ? ACTION_BUTTON_WIDTH + (excess * resistance)
-        : -(ACTION_BUTTON_WIDTH + (excess * resistance));
+    // Right swipe (complete) - allow more distance with resistance
+    if (deltaX > 0) {
+      const resistance = deltaX > COMPLETE_THRESHOLD ? 0.3 : 1;
+      const adjustedDelta = deltaX > COMPLETE_THRESHOLD 
+        ? COMPLETE_THRESHOLD + (deltaX - COMPLETE_THRESHOLD) * resistance
+        : deltaX;
+      setCurrentX(Math.min(adjustedDelta, COMPLETE_THRESHOLD * 1.5));
     }
-    
-    setCurrentX(adjustedDelta);
+    // Left swipe (delete) - limit to button width
+    else if (deltaX < 0) {
+      const resistance = Math.abs(deltaX) > DELETE_BUTTON_WIDTH ? 0.3 : 1;
+      const adjustedDelta = Math.abs(deltaX) > DELETE_BUTTON_WIDTH
+        ? -(DELETE_BUTTON_WIDTH + (Math.abs(deltaX) - DELETE_BUTTON_WIDTH) * resistance)
+        : deltaX;
+      setCurrentX(Math.max(adjustedDelta, -DELETE_BUTTON_WIDTH * 1.5));
+    }
   };
 
   const handleTouchEnd = () => {
@@ -100,19 +107,44 @@ export function MobileTaskCard({
     
     setIsDragging(false);
     
-    // Determine final position based on swipe distance
-    if (currentX > SWIPE_THRESHOLD) {
-      // Swipe right - reveal complete button
-      setCurrentX(ACTION_BUTTON_WIDTH);
-      setSwipeState('revealed-right');
-    } else if (currentX < -SWIPE_THRESHOLD) {
-      // Swipe left - reveal delete button
-      setCurrentX(-ACTION_BUTTON_WIDTH);
-      setSwipeState('revealed-left');
-    } else {
-      // Snap back to center
-      setCurrentX(0);
-      setSwipeState('idle');
+    // Right swipe - complete/uncomplete based on current status
+    if (currentX > COMPLETE_THRESHOLD) {
+      if (isCompleted) {
+        // Uncomplete task
+        setSwipeState('uncompleting');
+        setCurrentX(COMPLETE_THRESHOLD);
+        setTimeout(() => {
+          if (onStatusChange) {
+            onStatusChange(task.id, 'TODO');
+          }
+          resetSwipe();
+        }, 200);
+      } else {
+        // Complete task
+        setSwipeState('completing');
+        setCurrentX(COMPLETE_THRESHOLD);
+        setTimeout(() => {
+          if (onStatusChange) {
+            onStatusChange(task.id, 'COMPLETED');
+          }
+          resetSwipe();
+        }, 200);
+      }
+    }
+    // Left swipe - delete immediately
+    else if (currentX < -COMPLETE_THRESHOLD) {
+      setSwipeState('deleting');
+      setCurrentX(-COMPLETE_THRESHOLD);
+      setTimeout(() => {
+        if (onDelete) {
+          onDelete(task);
+        }
+        resetSwipe();
+      }, 200);
+    }
+    // Snap back to center if swipe was too small
+    else {
+      resetSwipe();
     }
   };
 
@@ -122,205 +154,195 @@ export function MobileTaskCard({
     setSwipeState('idle');
   };
 
-  // Handle action button clicks
-  const handleComplete = () => {
-    if (onStatusChange) {
-      onStatusChange(task.id, 'COMPLETED');
-    }
-    resetSwipe();
+
+  // Handle card tap
+  const handleCardTap = (e: React.MouseEvent) => {
+    // Don't open if clicking on buttons or swiping
+    if ((e.target as HTMLElement).closest('button') || swipeState !== 'idle') return;
+    setShowDetailSheet(true);
   };
 
-  const handleDelete = () => {
-    if (onDelete) {
-      onDelete(task);
-    }
-    resetSwipe();
-  };
-
-  const handleEdit = () => {
-    if (onEdit) {
-      onEdit(task);
-    }
-    setShowMoreMenu(false);
-  };
-
-  // More menu for desktop or as fallback
+  // More menu for desktop
   const handleMoreClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMoreMenu(!showMoreMenu);
   };
 
   return (
-    <div
-      ref={cardRef}
-      className={cn(
-        'relative overflow-hidden',
-        className
-      )}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Background action buttons */}
-      <div className="absolute inset-0 flex items-center justify-between px-4">
-        {/* Complete button (right swipe reveals) */}
-        <Button
-          onClick={handleComplete}
-          disabled={isCompleted}
-          className={cn(
-            'h-full w-20 rounded-none bg-green-600 hover:bg-green-700 text-white',
-            'transition-opacity duration-200',
-            swipeState === 'revealed-right' ? 'opacity-100' : 'opacity-0'
-          )}
-        >
-          <Check className="h-5 w-5" />
-        </Button>
-        
-        {/* Delete button (left swipe reveals) */}
-        <Button
-          onClick={handleDelete}
-          className={cn(
-            'h-full w-20 rounded-none bg-red-600 hover:bg-red-700 text-white ml-auto',
-            'transition-opacity duration-200',
-            swipeState === 'revealed-left' ? 'opacity-100' : 'opacity-0'
-          )}
-        >
-          <Trash2 className="h-5 w-5" />
-        </Button>
-      </div>
-
-      {/* Main card content */}
+    <>
       <div
+        ref={cardRef}
         className={cn(
-          'relative bg-graphite-800 backdrop-blur-sm rounded-lg',
-          'border border-white/10',
-          'min-h-[80px]', // Ensure minimum touch target height
-          'transition-transform duration-200 ease-out',
-          isDragging && 'transition-none', // Disable transition while dragging
-          isCompleted && 'opacity-75'
+          'relative overflow-hidden',
+          className
         )}
-        style={{
-          transform: `translateX(${currentX}px)`,
-        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
-        <div className="p-4">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-start gap-3 flex-1">
-              <StatusIcon className={cn('h-5 w-5 mt-0.5 flex-shrink-0', statusStyle.color)} />
-              <div className="flex-1 min-w-0">
-                <h3 className={cn(
-                  'font-medium text-white text-base leading-tight',
-                  isCompleted && 'line-through text-white/60'
-                )}>
-                  {task.title}
-                </h3>
-                {task.description && (
-                  <p className="text-sm text-white/60 line-clamp-2 mt-1">{task.description}</p>
-                )}
-              </div>
+        {/* Background layers */}
+        <div className="absolute inset-0">
+          {/* Right swipe - Complete/Uncomplete action background */}
+          {currentX > 20 && (
+            <div className={cn(
+              "absolute inset-0 flex items-center justify-start px-4",
+              isCompleted 
+                ? "bg-gradient-to-r from-yellow-600 to-yellow-500" 
+                : "bg-gradient-to-r from-green-600 to-green-500"
+            )}>
+              {isCompleted ? (
+                <>
+                  <XCircle className="h-6 w-6 text-white" />
+                  <span className="ml-3 text-white font-medium">Uncomplete</span>
+                </>
+              ) : (
+                <>
+                  <Check className="h-6 w-6 text-white" />
+                  <span className="ml-3 text-white font-medium">Complete</span>
+                </>
+              )}
             </div>
-            
-            {/* More menu button (desktop or fallback) */}
-            {!isMobile && (
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={handleMoreClick}
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-                
-                {/* Dropdown menu */}
-                {showMoreMenu && (
-                  <div className="absolute right-0 top-8 z-10 w-48 rounded-md bg-graphite-800 border border-white/10 shadow-lg">
-                    <button
-                      onClick={handleEdit}
-                      className="flex w-full items-center px-4 py-2 text-sm text-white hover:bg-white/10"
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </button>
-                    {!isCompleted && (
+          )}
+          
+          {/* Left swipe - Delete action background */}
+          {currentX < -20 && (
+            <div className="absolute inset-0 bg-gradient-to-l from-red-600 to-red-500 flex items-center justify-end px-4">
+              <span className="mr-3 text-white font-medium">Delete</span>
+              <Trash2 className="h-6 w-6 text-white" />
+            </div>
+          )}
+        </div>
+
+        {/* Main card content */}
+        <div
+          className={cn(
+            'relative bg-graphite-800 backdrop-blur-sm rounded-lg',
+            'border border-white/10',
+            'min-h-[80px]',
+            'transition-all duration-200 ease-out',
+            isDragging && 'transition-none',
+            isCompleted && !isDragging && !swipeState.includes('ing') && 'opacity-75',
+            swipeState === 'completing' && 'scale-95',
+            swipeState === 'uncompleting' && 'scale-95',
+            swipeState === 'deleting' && 'scale-95',
+            isMobile && 'cursor-pointer'
+          )}
+          style={{
+            transform: `translateX(${currentX}px)`,
+          }}
+          onClick={handleCardTap}
+        >
+          <div className="p-4">
+            {/* Header */}
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-start gap-3 flex-1">
+                <StatusIcon className={cn('h-5 w-5 mt-0.5 flex-shrink-0', statusStyle.color)} />
+                <div className="flex-1 min-w-0">
+                  <h3 className={cn(
+                    'font-medium text-white text-base leading-tight',
+                    isCompleted && 'line-through text-white/60'
+                  )}>
+                    {task.title}
+                  </h3>
+                  {task.description && !isMobile && (
+                    <p className="text-sm text-white/60 line-clamp-2 mt-1">{task.description}</p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Desktop more menu */}
+              {!isMobile && (
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={handleMoreClick}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                  
+                  {showMoreMenu && (
+                    <div className="absolute right-0 top-8 z-10 w-48 rounded-md bg-graphite-800 border border-white/10 shadow-lg">
                       <button
-                        onClick={handleComplete}
+                        onClick={() => {
+                          if (onEdit) onEdit(task);
+                          setShowMoreMenu(false);
+                        }}
+                        className="flex w-full items-center px-4 py-2 text-sm text-white hover:bg-white/10"
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (onStatusChange) {
+                            onStatusChange(task.id, isCompleted ? 'TODO' : 'COMPLETED');
+                          }
+                          setShowMoreMenu(false);
+                        }}
                         className="flex w-full items-center px-4 py-2 text-sm text-white hover:bg-white/10"
                       >
                         <Check className="mr-2 h-4 w-4" />
-                        Complete
+                        {isCompleted ? 'Mark Incomplete' : 'Complete'}
                       </button>
-                    )}
-                    <button
-                      onClick={handleDelete}
-                      className="flex w-full items-center px-4 py-2 text-sm text-red-400 hover:bg-white/10"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                      <button
+                        onClick={() => {
+                          if (onDelete) onDelete(task);
+                          setShowMoreMenu(false);
+                        }}
+                        className="flex w-full items-center px-4 py-2 text-sm text-red-400 hover:bg-white/10"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
-          {/* Badges */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            <Badge className={cn('text-xs', statusStyle.bg, statusStyle.color)}>
-              {statusStyle.label}
-            </Badge>
-            <Badge className={cn('text-xs', priorityStyle.bg, priorityStyle.color)}>
-              {task.priority}
-            </Badge>
-            {isOverdue && (
-              <Badge className="text-xs bg-red-500/20 text-red-400">
-                Overdue
+            {/* Badges */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              <Badge className={cn('text-xs', statusStyle.bg, statusStyle.color)}>
+                {statusStyle.label}
               </Badge>
-            )}
-          </div>
+              <Badge className={cn('text-xs', priorityStyle.bg, priorityStyle.color)}>
+                {task.priority}
+              </Badge>
+              {isOverdue && (
+                <Badge className="text-xs bg-red-500/20 text-red-400">
+                  Overdue
+                </Badge>
+              )}
+            </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between text-xs text-white/60">
-            {task.assignedTo && (
-              <span>Assigned to: {task.assignedTo.displayName || task.assignedTo.email?.split('@')[0]}</span>
-            )}
-            {task.dueDate && (
-              <span className={cn(isOverdue && 'text-red-400')}>
-                Due: {format(new Date(task.dueDate), 'MMM d')}
-              </span>
-            )}
+            {/* Footer */}
+            <div className="flex items-center justify-between text-xs text-white/60">
+              {task.assignedTo && (
+                <span>Assigned: {task.assignedTo.displayName || task.assignedTo.email?.split('@')[0]}</span>
+              )}
+              {task.dueDate && (
+                <span className={cn(isOverdue && 'text-red-400')}>
+                  Due: {format(new Date(task.dueDate), 'MMM d')}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
-      
-      {/* Visual swipe indicators during drag */}
-      {isDragging && (
-        <>
-          {currentX > 20 && !isCompleted && (
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-              <div className={cn(
-                'flex items-center gap-2 text-green-500 transition-opacity',
-                currentX > SWIPE_THRESHOLD ? 'opacity-100' : 'opacity-50'
-              )}>
-                <Check className="h-5 w-5" />
-                <span className="text-sm font-medium">Complete</span>
-              </div>
-            </div>
-          )}
-          {currentX < -20 && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-              <div className={cn(
-                'flex items-center gap-2 text-red-500 transition-opacity',
-                currentX < -SWIPE_THRESHOLD ? 'opacity-100' : 'opacity-50'
-              )}>
-                <span className="text-sm font-medium">Delete</span>
-                <Trash2 className="h-5 w-5" />
-              </div>
-            </div>
-          )}
-        </>
+
+      {/* Mobile Task Detail Sheet */}
+      {isMobile && (
+        <MobileTaskDetailSheet
+          task={task}
+          isOpen={showDetailSheet}
+          onClose={() => setShowDetailSheet(false)}
+          onEdit={onEdit || (() => {})}
+          onDelete={onDelete || (() => {})}
+          onStatusChange={onStatusChange || (() => {})}
+        />
       )}
-    </div>
+    </>
   );
 }

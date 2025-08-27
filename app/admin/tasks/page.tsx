@@ -139,6 +139,13 @@ export default function AdminTasksPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [showCompleted, setShowCompleted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('showCompletedTasks');
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -185,6 +192,13 @@ export default function AdminTasksPage() {
       form.setValue('projectId', projectId);
     }
   }, [projectId, form]);
+
+  // Save showCompleted preference
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('showCompletedTasks', JSON.stringify(showCompleted));
+    }
+  }, [showCompleted]);
   
   // Extract tasks from response
   const tasks = tasksData || [];
@@ -709,40 +723,129 @@ export default function AdminTasksPage() {
               )}
             </div>
           ) : viewMode === 'card' ? (
-            <div className={cn(
-              "grid gap-4",
-              isMobile
-                ? "grid-cols-1 pb-4"
-                : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-            )}>
-              {filteredTasks.map((task: Task) => (
-                isMobile ? (
-                  <MobileTaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={() => handleEdit(task)}
-                    onDelete={handleDelete}
-                    onStatusChange={handleStatusUpdate}
-                  />
-                ) : (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={() => handleEdit(task)}
-                    onDelete={handleDelete}
-                    onStatusChange={(taskId: string, status: string) => {
-                      updateMutation.mutate(
-                        { id: taskId, status },
-                        { 
-                          onSuccess: () => {
-                            queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-                          }
-                        }
-                      );
-                    }}
-                  />
-                )
-              ))}
+            <div>
+              {/* Progress and Toggle */}
+              {filteredTasks.length > 0 && (
+                <div className="bg-graphite-800/30 backdrop-blur-sm rounded-lg p-3 mb-4 border border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="text-sm text-white/80">
+                        <span className="font-medium text-green-400">
+                          {filteredTasks.filter((t: Task) => t.status === 'COMPLETED').length}
+                        </span>
+                        <span className="text-white/60"> of </span>
+                        <span className="font-medium">{filteredTasks.length}</span>
+                        <span className="text-white/60"> tasks completed</span>
+                      </div>
+                    </div>
+                    {filteredTasks.filter((t: Task) => t.status === 'COMPLETED').length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCompleted(!showCompleted)}
+                        className="border-white/20 text-white/60 hover:text-white hover:bg-white/10"
+                      >
+                        {showCompleted ? 'Hide' : 'Show'} Completed
+                      </Button>
+                    )}
+                  </div>
+                  {/* Progress bar */}
+                  {filteredTasks.length > 0 && (
+                    <div className="mt-3 w-full bg-graphite-700 rounded-full h-2">
+                      <div
+                        className="bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${(filteredTasks.filter((t: Task) => t.status === 'COMPLETED').length / filteredTasks.length) * 100}%` 
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Active Tasks */}
+              {filteredTasks.filter((t: Task) => t.status !== 'COMPLETED').length > 0 && (
+                <div className={cn(
+                  "grid gap-4",
+                  isMobile
+                    ? "grid-cols-1 pb-4"
+                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                )}>
+                  {filteredTasks.filter((t: Task) => t.status !== 'COMPLETED').map((task: Task) => (
+                    isMobile ? (
+                      <MobileTaskCard
+                        key={task.id}
+                        task={task}
+                        onEdit={() => handleEdit(task)}
+                        onDelete={handleDelete}
+                        onStatusChange={handleStatusUpdate}
+                      />
+                    ) : (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onEdit={() => handleEdit(task)}
+                        onDelete={handleDelete}
+                        onStatusChange={(taskId: string, status: string) => {
+                          updateMutation.mutate(
+                            { id: taskId, status },
+                            { 
+                              onSuccess: () => {
+                                queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+                              }
+                            }
+                          );
+                        }}
+                      />
+                    )
+                  ))}
+                </div>
+              )}
+              
+              {/* Completed Tasks Section */}
+              {showCompleted && filteredTasks.filter((t: Task) => t.status === 'COMPLETED').length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-sm font-medium text-white/60 mb-4 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Completed Tasks
+                  </h3>
+                  <div className={cn(
+                    "grid gap-4",
+                    isMobile
+                      ? "grid-cols-1 pb-4"
+                      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                  )}>
+                    {filteredTasks.filter((t: Task) => t.status === 'COMPLETED').map((task: Task) => (
+                      isMobile ? (
+                        <MobileTaskCard
+                          key={task.id}
+                          task={task}
+                          onEdit={() => handleEdit(task)}
+                          onDelete={handleDelete}
+                          onStatusChange={handleStatusUpdate}
+                        />
+                      ) : (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onEdit={() => handleEdit(task)}
+                          onDelete={handleDelete}
+                          onStatusChange={(taskId: string, status: string) => {
+                            updateMutation.mutate(
+                              { id: taskId, status },
+                              { 
+                                onSuccess: () => {
+                                  queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+                                }
+                              }
+                            );
+                          }}
+                        />
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             isMobile ? (
@@ -870,7 +973,7 @@ export default function AdminTasksPage() {
                             <SelectItem value="TODO">To Do</SelectItem>
                             <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
                             <SelectItem value="BLOCKED">Blocked</SelectItem>
-                            <SelectItem value="DONE">Done</SelectItem>
+                            <SelectItem value="COMPLETED">Completed</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -1018,7 +1121,7 @@ export default function AdminTasksPage() {
                             <SelectItem value="TODO">To Do</SelectItem>
                             <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
                             <SelectItem value="BLOCKED">Blocked</SelectItem>
-                            <SelectItem value="DONE">Done</SelectItem>
+                            <SelectItem value="COMPLETED">Completed</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
