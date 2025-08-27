@@ -26,10 +26,10 @@ interface MobileListViewProps {
 }
 
 const statusConfig = {
-  TODO: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/20' },
-  IN_PROGRESS: { icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-500/20' },
-  BLOCKED: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/20' },
-  DONE: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/20' },
+  TODO: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/20', label: 'To Do' },
+  IN_PROGRESS: { icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-500/20', label: 'In Progress' },
+  BLOCKED: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/20', label: 'Blocked' },
+  COMPLETED: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/20', label: 'Completed' },
 };
 
 const priorityConfig = {
@@ -67,7 +67,7 @@ export function MobileListView({
   const handleTouchEnd = (task: any) => {
     if (currentX > 100) {
       // Swipe right - Mark as done
-      onStatusChange?.(task.id, 'DONE');
+      onStatusChange?.(task.id, 'COMPLETED');
     } else if (currentX < -100) {
       // Swipe left - Show delete
       onDelete?.(task);
@@ -101,7 +101,7 @@ export function MobileListView({
         const priorityStyle = priorityConfig[task.priority as keyof typeof priorityConfig] || priorityConfig.MEDIUM;
         const isExpanded = expandedTask === task.id;
         const isSwiped = swipedTask === task.id;
-        const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
+        const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'COMPLETED';
 
         return (
           <div
@@ -213,14 +213,14 @@ export function MobileListView({
 
                     {/* Quick actions */}
                     <div className="flex gap-2">
-                      {task.status !== 'DONE' && (
+                      {task.status !== 'COMPLETED' && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="flex-1 h-9 bg-green-600/20 border-green-600/30 text-green-400 hover:bg-green-600/30"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onStatusChange?.(task.id, 'DONE');
+                            onStatusChange?.(task.id, 'COMPLETED');
                           }}
                         >
                           <Check className="h-4 w-4 mr-1" />
