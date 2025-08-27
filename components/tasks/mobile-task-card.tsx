@@ -30,7 +30,7 @@ const statusConfig = {
   TODO: { icon: Clock, color: 'text-yellow-500', bg: 'bg-yellow-500/20', label: 'To Do' },
   IN_PROGRESS: { icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-500/20', label: 'In Progress' },
   BLOCKED: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/20', label: 'Blocked' },
-  DONE: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/20', label: 'Done' },
+  COMPLETED: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/20', label: 'Completed' },
 };
 
 const priorityConfig = {
@@ -57,7 +57,7 @@ export function MobileTaskCard({
   const statusStyle = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.TODO;
   const priorityStyle = priorityConfig[task.priority as keyof typeof priorityConfig] || priorityConfig.MEDIUM;
 
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
+  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'COMPLETED';
 
   // Touch handlers for swipe
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -77,7 +77,7 @@ export function MobileTaskCard({
     
     if (currentX > 100) {
       // Swipe right - Mark as done
-      onStatusChange?.(task.id, 'DONE');
+      onStatusChange?.(task.id, 'COMPLETED');
     } else if (currentX < -100) {
       // Swipe left - Show actions
       setShowActions(true);
@@ -219,7 +219,7 @@ export function MobileTaskCard({
               variant="ghost"
               className="h-12 w-12 rounded-full bg-green-600/20 hover:bg-green-600/30"
               onClick={() => {
-                onStatusChange?.(task.id, 'DONE');
+                onStatusChange?.(task.id, 'COMPLETED');
                 setShowActions(false);
               }}
             >

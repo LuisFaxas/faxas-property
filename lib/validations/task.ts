@@ -169,6 +169,10 @@ export const bulkUpdateTasksSchema = z.object({
   }),
 });
 
+export const bulkDeleteTasksSchema = z.object({
+  taskIds: z.array(z.string()).min(1, 'At least one task ID is required'),
+});
+
 // Export types
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
@@ -181,3 +185,4 @@ export type CreateAttachmentInput = z.infer<typeof createAttachmentSchema>;
 export type CreateChecklistItemInput = z.infer<typeof createChecklistItemSchema>;
 export type UpdateChecklistItemInput = z.infer<typeof updateChecklistItemSchema>;
 export type BulkUpdateTasksInput = z.infer<typeof bulkUpdateTasksSchema>;
+export type BulkDeleteTasksInput = z.infer<typeof bulkDeleteTasksSchema>;

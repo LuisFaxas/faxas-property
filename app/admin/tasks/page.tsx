@@ -69,6 +69,7 @@ import {
   useUpdateTask, 
   useUpdateTaskStatus,
   useDeleteTask,
+  useBulkDeleteTasks,
   useContacts 
 } from '@/hooks/use-api';
 import { useForm } from 'react-hook-form';
@@ -126,7 +127,7 @@ type TaskFormValues = z.infer<typeof taskFormSchema>;
 // Component starts here
 export default function AdminTasksPage() {
   const { user, loading: authLoading } = useAuth();
-  const { currentProject } = useProjectContext();
+  const { currentProject, projects } = useProjectContext();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
@@ -138,6 +139,7 @@ export default function AdminTasksPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -168,6 +170,7 @@ export default function AdminTasksPage() {
   const updateMutation = useUpdateTask();
   const updateStatusMutation = useUpdateTaskStatus();
   const deleteMutation = useDeleteTask();
+  const bulkDeleteMutation = useBulkDeleteTasks();
   
   // Wait for auth
   useEffect(() => {
@@ -183,7 +186,8 @@ export default function AdminTasksPage() {
     }
   }, [projectId, form]);
   
-  const tasks = tasksData?.data || [];
+  // Extract tasks from response
+  const tasks = tasksData || [];
   
   // Filter tasks
   const filteredTasks = useMemo(() => {
@@ -225,7 +229,7 @@ export default function AdminTasksPage() {
       });
       setIsCreateOpen(false);
       form.reset();
-      refetch();
+      await refetch();
     } catch (error) {
       console.error('Error creating task:', error);
       toast({
@@ -315,11 +319,35 @@ export default function AdminTasksPage() {
     }
   };
   
-  const handleBulkDelete = async () => {
-    toast({
-      title: 'Info',
-      description: `${selectedRows.length} tasks selected for deletion`,
-    });
+  const handleBulkDelete = () => {
+    if (selectedRows.length === 0) {
+      toast({
+        title: 'No tasks selected',
+        description: 'Please select tasks to delete',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsBulkDeleteOpen(true);
+  };
+  
+  const handleConfirmBulkDelete = async () => {
+    if (selectedRows.length === 0) return;
+    
+    setIsSubmitting(true);
+    try {
+      await bulkDeleteMutation.mutateAsync({
+        taskIds: selectedRows,
+        projectId
+      });
+      setSelectedRows([]);
+      setIsBulkDeleteOpen(false);
+      refetch();
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   // Status badge component
@@ -328,7 +356,7 @@ export default function AdminTasksPage() {
       TODO: { variant: 'secondary', icon: Clock },
       IN_PROGRESS: { variant: 'default', icon: AlertCircle },
       BLOCKED: { variant: 'destructive', icon: XCircle },
-      DONE: { variant: 'outline', icon: CheckCircle },
+      COMPLETED: { variant: 'outline', icon: CheckCircle },
     };
     const { variant, icon: Icon } = variants[status] || variants.TODO;
     return (
@@ -412,7 +440,7 @@ export default function AdminTasksPage() {
         const date = row.getValue('dueDate');
         if (!date) return <span className="text-white/40">No due date</span>;
         const dueDate = new Date(date as string);
-        const isOverdue = dueDate < new Date() && row.original.status !== 'DONE';
+        const isOverdue = dueDate < new Date() && row.original.status !== 'COMPLETED';
         return (
           <span className={isOverdue ? 'text-red-500' : ''}>
             {format(dueDate, 'MMM dd, yyyy')}
@@ -447,8 +475,8 @@ export default function AdminTasksPage() {
                 Start Task
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => handleStatusUpdate(task.id, 'DONE')}
-                disabled={task.status === 'DONE'}
+                onClick={() => handleStatusUpdate(task.id, 'COMPLETED')}
+                disabled={task.status === 'COMPLETED'}
               >
                 Mark as Done
               </DropdownMenuItem>
@@ -1079,6 +1107,38 @@ export default function AdminTasksPage() {
                   </>
                 ) : (
                   'Delete'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Bulk Delete Confirmation Dialog */}
+        <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+          <AlertDialogContent className="bg-graphite-800 border-white/10 text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Multiple Tasks</AlertDialogTitle>
+              <AlertDialogDescription className="text-white/60">
+                Are you sure you want to delete {selectedRows.length} selected task{selectedRows.length !== 1 ? 's' : ''}? 
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-white/10" disabled={isSubmitting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmBulkDelete}
+                className="bg-red-500 hover:bg-red-600"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Deleting...
+                  </>
+                ) : (
+                  `Delete ${selectedRows.length} Task${selectedRows.length !== 1 ? 's' : ''}`
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

@@ -52,7 +52,8 @@ apiClient.interceptors.response.use(
   (response) => {
     // If the response has a standard API structure with data property, extract it
     if (response.data && typeof response.data === 'object' && 'success' in response.data) {
-      return response.data.data || response.data;
+      // Return just the data array, not the wrapper
+      return response.data.data;
     }
     return response.data;
   },

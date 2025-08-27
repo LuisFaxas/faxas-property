@@ -245,6 +245,36 @@ export function useDeleteTask() {
   });
 }
 
+export function useBulkDeleteTasks() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: { taskIds: string[]; projectId?: string }) => 
+      apiClient.delete('/tasks/bulk-delete', { data: { taskIds: data.taskIds } }),
+    onSuccess: (response, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      // Also invalidate specific project tasks if projectId is available
+      if (variables.projectId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }] 
+        });
+      }
+      const count = response.deleted || variables.taskIds.length;
+      toast({
+        title: 'Success',
+        description: `${count} task${count !== 1 ? 's' : ''} deleted successfully`
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to delete tasks',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
 // Budget API hooks
 export function useBudget(query?: any, enabled: boolean = true) {
   return useQuery({

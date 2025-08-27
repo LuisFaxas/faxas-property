@@ -71,7 +71,7 @@ export function TaskFilterBar({
 
   return (
     <div className={cn(
-      "sticky top-0 z-30 bg-graphite-900/95 backdrop-blur-sm border-b border-white/10",
+      "sticky top-0 z-50 bg-graphite-900/95 backdrop-blur-sm border-b border-white/10",
       className
     )}>
       <div className="px-3 py-2">
