@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const query = taskQuerySchema.parse(searchParams);
     
     const where: Prisma.TaskWhereInput = {
-      projectId: query.projectId,
+      ...(query.projectId && { projectId: query.projectId }),
       ...(query.status && { status: query.status }),
       ...(query.priority && { priority: query.priority }),
       ...(query.assignedToId && { assignedToId: query.assignedToId }),

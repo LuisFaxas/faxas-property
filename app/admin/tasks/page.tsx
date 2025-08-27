@@ -144,7 +144,7 @@ export default function AdminTasksPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   
-  const projectId = currentProject?.id || 'default';
+  const projectId = currentProject?.id || '';
   
   // Form setup
   const form = useForm<TaskFormValues>({
@@ -154,14 +154,14 @@ export default function AdminTasksPage() {
       description: '',
       priority: 'MEDIUM',
       status: 'TODO',
-      projectId: projectId || 'default',
+      projectId: projectId || '',
     },
   });
   
-  // API hooks
-  const { data: tasksData, isLoading: tasksLoading, refetch } = useTasks(
+  // API hooks - only fetch tasks if we have a projectId
+  const { data: tasksData, isLoading: tasksLoading, refetch, error: tasksError } = useTasks(
     { projectId, limit: 100 },
-    isReady
+    isReady && !!projectId  // Only fetch when ready AND we have a project
   );
   const { data: contactsData } = useContacts({ projectId }, isReady);
   const createMutation = useCreateTask();
@@ -213,11 +213,12 @@ export default function AdminTasksPage() {
   // Handlers
   const handleCreate = async (values: TaskFormValues) => {
     setIsSubmitting(true);
+    const taskData = {
+      ...values,
+      projectId: projectId || values.projectId,
+    };
     try {
-      await createMutation.mutateAsync({
-        ...values,
-        projectId: projectId || 'default',
-      });
+      await createMutation.mutateAsync(taskData);
       toast({
         title: 'Success',
         description: 'Task created successfully',
@@ -465,6 +466,25 @@ export default function AdminTasksPage() {
       },
     },
   ];
+  
+  // No project selected state
+  if (!projectId) {
+    return (
+      <PageShell 
+        pageTitle="Tasks"
+        userRole={user?.role || 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+      >
+        <div className="p-6">
+          <div className="glass-card p-8 text-center">
+            <h2 className="text-xl font-semibold text-white mb-2">No Project Selected</h2>
+            <p className="text-white/60">Please select a project from the project selector to view tasks.</p>
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
   
   // Loading state
   if (tasksLoading || !isReady) {
