@@ -33,8 +33,15 @@ export function useCreateTask() {
   
   return useMutation({
     mutationFn: (data: any) => apiClient.post('/tasks', data),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      // Invalidate all tasks queries (this will catch queries with different params)
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      // Also invalidate specific project tasks if projectId is available
+      if (variables.projectId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }] 
+        });
+      }
       toast({
         title: 'Success',
         description: data.message || 'Task created successfully'
@@ -55,9 +62,15 @@ export function useUpdateTask() {
   
   return useMutation({
     mutationFn: ({ id, ...data }: any) => apiClient.put(`/tasks/${id}`, data),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task'] });
+      // Also invalidate specific project tasks if projectId is available
+      if (variables.projectId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }] 
+        });
+      }
       toast({
         title: 'Success',
         description: data.message || 'Task updated successfully'
@@ -207,9 +220,16 @@ export function useDeleteTask() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/tasks/${id}`),
-    onSuccess: () => {
+    mutationFn: ({ id, projectId }: { id: string; projectId?: string }) => 
+      apiClient.delete(`/tasks/${id}`),
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      // Also invalidate specific project tasks if projectId is available
+      if (variables.projectId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }] 
+        });
+      }
       toast({
         title: 'Success',
         description: 'Task deleted successfully'

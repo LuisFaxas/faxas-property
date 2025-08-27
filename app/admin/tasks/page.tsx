@@ -7,6 +7,8 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { DataTable } from '@/components/ui/data-table';
 import { TaskCard } from '@/components/tasks/task-card';
 import { MobileTaskCard } from '@/components/tasks/mobile-task-card';
+import { MobileListView } from '@/components/tasks/mobile-list-view';
+import { MobileDateTimePicker } from '@/components/tasks/mobile-date-time-picker';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { MobileTaskDialog } from '@/components/tasks/mobile-task-dialog';
 import { TaskFilterBar } from '@/components/tasks/task-filter-bar';
@@ -66,6 +68,7 @@ import {
   useCreateTask, 
   useUpdateTask, 
   useUpdateTaskStatus,
+  useDeleteTask,
   useContacts 
 } from '@/hooks/use-api';
 import { useForm } from 'react-hook-form';
@@ -90,7 +93,6 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import apiClient from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
 // Types
@@ -142,7 +144,7 @@ export default function AdminTasksPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   
-  const projectId = currentProject?.id || '';
+  const projectId = currentProject?.id || 'default';
   
   // Form setup
   const form = useForm<TaskFormValues>({
@@ -165,6 +167,7 @@ export default function AdminTasksPage() {
   const createMutation = useCreateTask();
   const updateMutation = useUpdateTask();
   const updateStatusMutation = useUpdateTaskStatus();
+  const deleteMutation = useDeleteTask();
   
   // Wait for auth
   useEffect(() => {
@@ -172,13 +175,13 @@ export default function AdminTasksPage() {
       setTimeout(() => setIsReady(true), 500);
     }
   }, [authLoading, user]);
-  
-  // Auto-switch to card view on mobile
+
+  // Update form projectId when project changes
   useEffect(() => {
-    if (isMobile && viewMode === 'list') {
-      setViewMode('card');
+    if (projectId) {
+      form.setValue('projectId', projectId);
     }
-  }, [isMobile, viewMode]);
+  }, [projectId, form]);
   
   const tasks = tasksData?.data || [];
   
@@ -243,24 +246,20 @@ export default function AdminTasksPage() {
     if (!selectedTask) return;
     
     setIsSubmitting(true);
-    try {
-      await apiClient.delete(`/tasks/${selectedTask.id}`);
-      toast({
-        title: 'Success',
-        description: 'Task deleted successfully',
-      });
-      setIsDeleteOpen(false);
-      setSelectedTask(null);
-      refetch();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete task',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    deleteMutation.mutate(
+      { id: selectedTask.id, projectId },
+      {
+        onSuccess: () => {
+          setIsDeleteOpen(false);
+          setSelectedTask(null);
+          refetch();
+          setIsSubmitting(false);
+        },
+        onError: () => {
+          setIsSubmitting(false);
+        }
+      }
+    );
   };
   
   const handleEdit = (task: Task) => {
@@ -698,18 +697,27 @@ export default function AdminTasksPage() {
               ))}
             </div>
           ) : (
-            <div className="glass-card p-6">
-              <DataTable
-                columns={columns}
-                data={filteredTasks}
-                searchKey="title"
-                searchPlaceholder="Search tasks..."
-                onRowSelectionChange={(rows) => {
-                  const selectedIds = rows.map((row: any) => row.id);
-                  setSelectedRows(selectedIds);
-                }}
+            isMobile ? (
+              <MobileListView
+                tasks={filteredTasks}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onStatusChange={handleStatusUpdate}
               />
-            </div>
+            ) : (
+              <div className="glass-card p-6">
+                <DataTable
+                  columns={columns}
+                  data={filteredTasks}
+                  searchKey="title"
+                  searchPlaceholder="Search tasks..."
+                  onRowSelectionChange={(rows) => {
+                    const selectedIds = rows.map((row: any) => row.id);
+                    setSelectedRows(selectedIds);
+                  }}
+                />
+              </div>
+            )
           )}
         </div>
 
@@ -731,42 +739,6 @@ export default function AdminTasksPage() {
           onOpenChange={setIsCreateOpen}
           title="Create New Task"
           description={!isMobile ? "Add a new task to the project. Click save when you're done." : undefined}
-          footer={
-            <div className={cn(
-              "flex gap-3",
-              isMobile && "flex-row"
-            )}>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setIsCreateOpen(false)}
-                disabled={isSubmitting}
-                className={cn(
-                  "border-white/20 text-white hover:bg-white/10",
-                  isMobile && "flex-1 h-12 text-base"
-                )}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                className={cn(
-                  "bg-blue-600 hover:bg-blue-700",
-                  isMobile && "flex-1 h-12 text-base"
-                )}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create Task'
-                )}
-              </Button>
-            </div>
-          }
         >
           <Form {...form}>
             <form 
@@ -865,19 +837,52 @@ export default function AdminTasksPage() {
                     <FormItem>
                       <FormLabel className="text-white">Due Date</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="datetime-local"
-                          className={cn(
-                            "bg-white/5 border-white/10 text-white",
-                            isMobile && "min-h-[48px] text-base"
-                          )}
-                          {...field}
+                        <MobileDateTimePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select date and time"
+                          className="w-full"
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                {/* Form Actions - Inside the form */}
+                <div className={cn(
+                  "flex gap-3 pt-4",
+                  isMobile && "flex-row border-t border-white/10 mt-4"
+                )}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsCreateOpen(false)}
+                    disabled={isSubmitting}
+                    className={cn(
+                      "border-white/20 text-white hover:bg-white/10",
+                      isMobile && "flex-1 h-12 text-base"
+                    )}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className={cn(
+                      "bg-blue-600 hover:bg-blue-700",
+                      isMobile && "flex-1 h-12 text-base"
+                    )}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Task'
+                    )}
+                  </Button>
+                </div>
             </form>
           </Form>
         </MobileTaskDialog>
@@ -888,42 +893,6 @@ export default function AdminTasksPage() {
           onOpenChange={setIsEditOpen}
           title="Edit Task"
           description={!isMobile ? "Make changes to the task. Click save when you're done." : undefined}
-          footer={
-            <div className={cn(
-              "flex gap-3",
-              isMobile && "flex-row"
-            )}>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setIsEditOpen(false)}
-                disabled={isSubmitting}
-                className={cn(
-                  "border-white/20 text-white hover:bg-white/10",
-                  isMobile && "flex-1 h-12 text-base"
-                )}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                className={cn(
-                  "bg-blue-600 hover:bg-blue-700",
-                  isMobile && "flex-1 h-12 text-base"
-                )}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </Button>
-            </div>
-          }
         >
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
@@ -1016,16 +985,52 @@ export default function AdminTasksPage() {
                     <FormItem>
                       <FormLabel className="text-white">Due Date</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="datetime-local"
-                          className="bg-white/5 border-white/10 text-white"
-                          {...field}
+                        <MobileDateTimePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select date and time"
+                          className="w-full"
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                {/* Form Actions - Inside the form */}
+                <div className={cn(
+                  "flex gap-3 pt-4",
+                  isMobile && "flex-row border-t border-white/10 mt-4"
+                )}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsEditOpen(false)}
+                    disabled={isSubmitting}
+                    className={cn(
+                      "border-white/20 text-white hover:bg-white/10",
+                      isMobile && "flex-1 h-12 text-base"
+                    )}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className={cn(
+                      "bg-blue-600 hover:bg-blue-700",
+                      isMobile && "flex-1 h-12 text-base"
+                    )}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
+                  </Button>
+                </div>
             </form>
           </Form>
         </MobileTaskDialog>
