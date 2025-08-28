@@ -246,7 +246,12 @@ export default function AdminDecisionsPage() {
       dateRaised: new Date(),
       dateDecided: null,
       relatedRisks: formData.relatedRisks.split(',').map(r => r.trim()).filter(Boolean),
-      alternatives: formData.alternatives.filter(a => a.option),
+      alternatives: formData.alternatives
+        .filter(a => a.option)
+        .map(a => ({
+          ...a,
+          cost: parseFloat(a.cost) || 0
+        })),
       notes: formData.notes
     };
 
@@ -274,7 +279,12 @@ export default function AdminDecisionsPage() {
           impactTime: parseFloat(formData.impactTime) || 0,
           stakeholders: formData.stakeholders.split(',').map(s => s.trim()).filter(Boolean),
           relatedRisks: formData.relatedRisks.split(',').map(r => r.trim()).filter(Boolean),
-          alternatives: formData.alternatives.filter(a => a.option),
+          alternatives: formData.alternatives
+            .filter(a => a.option)
+            .map(a => ({
+              ...a,
+              cost: parseFloat(a.cost) || 0
+            })),
           notes: formData.notes
         };
       }

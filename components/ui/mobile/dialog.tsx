@@ -109,13 +109,20 @@ export function MobileDialog({
 
   // Desktop: Use dialog
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
       <DialogContent 
         className={cn(
           "bg-graphite-800 border-white/10 text-white",
           sizeClasses[size],
           className
         )}
+        onPointerDownOutside={(e) => {
+          // Prevent closing when clicking outside if dialog contains forms
+          const target = e.target as HTMLElement;
+          if (target.closest('form')) {
+            e.preventDefault();
+          }
+        }}
       >
         <DialogHeader>
           <DialogTitle className="text-white">

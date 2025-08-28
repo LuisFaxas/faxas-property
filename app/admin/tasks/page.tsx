@@ -17,17 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -69,8 +60,7 @@ import {
   useUpdateTask, 
   useUpdateTaskStatus,
   useDeleteTask,
-  useBulkDeleteTasks,
-  useContacts 
+  useBulkDeleteTasks 
 } from '@/hooks/use-api';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -87,10 +77,7 @@ import {
   XCircle,
   LayoutGrid,
   List,
-  ClipboardList,
-  Search,
-  Filter,
-  Loader2
+  ClipboardList
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -101,11 +88,15 @@ interface Task {
   id: string;
   title: string;
   description?: string;
-  status: 'TODO' | 'IN_PROGRESS' | 'BLOCKED' | 'DONE';
+  status: 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'BLOCKED' | 'COMPLETED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   dueDate?: string;
   assignedToId?: string;
-  assignedTo?: any;
+  assignedTo?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
   projectId: string;
   createdAt: string;
   updatedAt: string;
@@ -117,7 +108,7 @@ const taskFormSchema = z.object({
   description: z.string().optional(),
   dueDate: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
-  status: z.enum(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'COMPLETED']),
   assignedToId: z.string().optional(),
   projectId: z.string(),
 });
@@ -126,11 +117,10 @@ type TaskFormValues = z.infer<typeof taskFormSchema>;
 
 // Component starts here
 export default function AdminTasksPage() {
-  const { user, loading: authLoading } = useAuth();
-  const { currentProject, projects } = useProjectContext();
+  const { user, userRole, loading: authLoading } = useAuth();
+  const { currentProject } = useProjectContext();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   
   const [isReady, setIsReady] = useState(false);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
@@ -168,11 +158,10 @@ export default function AdminTasksPage() {
   });
   
   // API hooks - only fetch tasks if we have a projectId
-  const { data: tasksData, isLoading: tasksLoading, refetch, error: tasksError } = useTasks(
+  const { data: tasksData, isLoading: tasksLoading, refetch } = useTasks(
     { projectId, limit: 100 },
     isReady && !!projectId  // Only fetch when ready AND we have a project
   );
-  const { data: contactsData } = useContacts({ projectId }, isReady);
   const createMutation = useCreateTask();
   const updateMutation = useUpdateTask();
   const updateStatusMutation = useUpdateTaskStatus();
@@ -200,11 +189,10 @@ export default function AdminTasksPage() {
     }
   }, [showCompleted]);
   
-  // Extract tasks from response
-  const tasks = tasksData || [];
-  
-  // Filter tasks
+  // Extract and filter tasks
   const filteredTasks = useMemo(() => {
+    // Extract tasks from response
+    const tasks = Array.isArray(tasksData) ? tasksData : tasksData?.data || [];
     let filtered = [...tasks];
     
     // Search filter
@@ -226,7 +214,7 @@ export default function AdminTasksPage() {
     }
     
     return filtered;
-  }, [tasks, searchQuery, statusFilter, priorityFilter]);
+  }, [tasksData, searchQuery, statusFilter, priorityFilter]);
   
   // Handlers
   const handleCreate = async (values: TaskFormValues) => {
@@ -366,9 +354,10 @@ export default function AdminTasksPage() {
   
   // Status badge component
   const StatusBadge = ({ status }: { status: string }) => {
-    const variants: Record<string, { variant: any; icon: any }> = {
+    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof Clock }> = {
       TODO: { variant: 'secondary', icon: Clock },
       IN_PROGRESS: { variant: 'default', icon: AlertCircle },
+      IN_REVIEW: { variant: 'default', icon: AlertCircle },
       BLOCKED: { variant: 'destructive', icon: XCircle },
       COMPLETED: { variant: 'outline', icon: CheckCircle },
     };
@@ -489,6 +478,12 @@ export default function AdminTasksPage() {
                 Start Task
               </DropdownMenuItem>
               <DropdownMenuItem 
+                onClick={() => handleStatusUpdate(task.id, 'IN_REVIEW')}
+                disabled={task.status === 'IN_REVIEW'}
+              >
+                Mark for Review
+              </DropdownMenuItem>
+              <DropdownMenuItem 
                 onClick={() => handleStatusUpdate(task.id, 'COMPLETED')}
                 disabled={task.status === 'COMPLETED'}
               >
@@ -514,7 +509,7 @@ export default function AdminTasksPage() {
     return (
       <PageShell 
         pageTitle="Tasks"
-        userRole={user?.role || 'VIEWER'} 
+        userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
       >
@@ -533,7 +528,7 @@ export default function AdminTasksPage() {
     return (
       <PageShell 
         pageTitle="Tasks"
-        userRole={user?.role || 'VIEWER'} 
+        userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
         fabIcon={Plus}
@@ -584,7 +579,7 @@ export default function AdminTasksPage() {
   return (
     <PageShell 
       pageTitle="Tasks"
-      userRole={user?.role || 'VIEWER'} 
+      userRole={userRole as 'VIEWER' | 'ADMIN' | 'STAFF' | 'CONTRACTOR' | undefined} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
       fabIcon={Plus}
@@ -862,10 +857,6 @@ export default function AdminTasksPage() {
                   data={filteredTasks}
                   searchKey="title"
                   searchPlaceholder="Search tasks..."
-                  onRowSelectionChange={(rows) => {
-                    const selectedIds = rows.map((row: any) => row.id);
-                    setSelectedRows(selectedIds);
-                  }}
                 />
               </div>
             )
@@ -972,6 +963,7 @@ export default function AdminTasksPage() {
                           <SelectContent>
                             <SelectItem value="TODO">To Do</SelectItem>
                             <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                            <SelectItem value="IN_REVIEW">In Review</SelectItem>
                             <SelectItem value="BLOCKED">Blocked</SelectItem>
                             <SelectItem value="COMPLETED">Completed</SelectItem>
                           </SelectContent>
@@ -1120,6 +1112,7 @@ export default function AdminTasksPage() {
                           <SelectContent>
                             <SelectItem value="TODO">To Do</SelectItem>
                             <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                            <SelectItem value="IN_REVIEW">In Review</SelectItem>
                             <SelectItem value="BLOCKED">Blocked</SelectItem>
                             <SelectItem value="COMPLETED">Completed</SelectItem>
                           </SelectContent>

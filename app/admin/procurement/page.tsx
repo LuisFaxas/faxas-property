@@ -184,7 +184,7 @@ const PRIORITY_CONFIG = {
 };
 
 export default function ProcurementPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isAuthenticated = !!user;
   const { toast } = useToast();
   
@@ -240,8 +240,8 @@ export default function ProcurementPage() {
   });
   
   // Watch form fields for calculations
-  const watchQuantity = form.watch('quantity');
-  const watchUnitPrice = form.watch('unitPrice');
+  const watchQuantity = form?.watch('quantity');
+  const watchUnitPrice = form?.watch('unitPrice');
   
   useEffect(() => {
     if (watchQuantity && watchUnitPrice) {
@@ -1047,12 +1047,12 @@ export default function ProcurementPage() {
                             />
                           </div>
                           
-                          {form.watch('totalCost') > 0 && (
+                          {(form?.watch('totalCost') || 0) > 0 && (
                             <div className="p-4 bg-muted rounded-lg">
                               <div className="flex justify-between items-center">
                                 <span className="text-sm font-medium">Total Cost:</span>
                                 <span className="text-2xl font-bold">
-                                  ${form.watch('totalCost').toFixed(2)}
+                                  ${(form?.watch('totalCost') || 0).toFixed(2)}
                                 </span>
                               </div>
                             </div>
@@ -1176,7 +1176,14 @@ export default function ProcurementPage() {
                                 <FormItem>
                                   <FormLabel>Required By Date *</FormLabel>
                                   <FormControl>
-                                    <Input type="date" {...field} />
+                                    <Input 
+                                      type="date" 
+                                      {...field}
+                                      value={field.value instanceof Date 
+                                        ? format(field.value, 'yyyy-MM-dd')
+                                        : field.value || ''
+                                      }
+                                    />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1221,7 +1228,7 @@ export default function ProcurementPage() {
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {Array.isArray(budgetData) && budgetData.map((item: any) => (
+                                    {(Array.isArray(budgetData) ? budgetData : budgetData?.data || []).map((item: any) => (
                                       <SelectItem key={item.id} value={item.id}>
                                         {item.item} - {item.discipline} 
                                         (${Number(item.estTotal).toFixed(2)})
@@ -1237,16 +1244,16 @@ export default function ProcurementPage() {
                             )}
                           />
                           
-                          {form.watch('budgetItemId') && budgetData && (
+                          {form?.watch('budgetItemId') && budgetData && (
                             <div className="p-4 bg-muted rounded-lg space-y-2">
                               {(() => {
-                                const budgetItem = budgetData.find(
-                                  (b: any) => b.id === form.watch('budgetItemId')
+                                const budgetItem = (Array.isArray(budgetData) ? budgetData : budgetData?.data || []).find(
+                                  (b: any) => b.id === form?.watch('budgetItemId')
                                 );
                                 if (!budgetItem) return null;
                                 
                                 const remaining = Number(budgetItem.estTotal) - Number(budgetItem.committedTotal);
-                                const willExceed = form.watch('totalCost') > remaining;
+                                const willExceed = (form?.watch('totalCost') || 0) > remaining;
                                 
                                 return (
                                   <>
@@ -1269,7 +1276,7 @@ export default function ProcurementPage() {
                                       <div className="text-sm text-red-600 flex items-center gap-2">
                                         <AlertCircle className="h-4 w-4" />
                                         This order will exceed the budget by $
-                                        {(form.watch('totalCost') - remaining).toFixed(2)}
+                                        {((form?.watch('totalCost') || 0) - remaining).toFixed(2)}
                                       </div>
                                     )}
                                   </>
@@ -1316,7 +1323,14 @@ export default function ProcurementPage() {
                                 <FormItem>
                                   <FormLabel>Estimated Arrival</FormLabel>
                                   <FormControl>
-                                    <Input type="date" {...field} />
+                                    <Input 
+                                      type="date" 
+                                      {...field}
+                                      value={field.value instanceof Date 
+                                        ? format(field.value, 'yyyy-MM-dd')
+                                        : field.value || ''
+                                      }
+                                    />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>

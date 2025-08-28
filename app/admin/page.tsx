@@ -48,7 +48,7 @@ function LoadingCard() {
 }
 
 export default function AdminDashboard() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading } = useAuth();
   const [projectId, setProjectId] = useState<string>('');
   const [isReady, setIsReady] = useState(false);
 
@@ -123,7 +123,7 @@ export default function AdminDashboard() {
   };
   return (
     <PageShell 
-      userRole={user?.role || 'VIEWER'} 
+      userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}>
       <div className="p-6 space-y-6">
@@ -180,7 +180,7 @@ export default function AdminDashboard() {
                   <Skeleton className="h-16 w-full" />
                   <Skeleton className="h-16 w-full" />
                 </>
-              ) : todaySchedule?.data?.length > 0 ? (
+              ) : todaySchedule?.data && todaySchedule.data.length > 0 ? (
                 todaySchedule.data.map((event: any) => (
                   <div key={event.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
                     <div className="flex items-center gap-3">
@@ -220,7 +220,7 @@ export default function AdminDashboard() {
                     <Skeleton className="h-16 w-full" />
                     <Skeleton className="h-16 w-full" />
                   </>
-                ) : budgetExceptions?.data?.length > 0 ? (
+                ) : budgetExceptions?.data && budgetExceptions.data.length > 0 ? (
                   budgetExceptions.data.slice(0, 3).map((item: any) => (
                     <div key={item.id} className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                       <div className="flex items-center justify-between">

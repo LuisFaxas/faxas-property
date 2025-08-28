@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import apiClient from '@/lib/api-client';
 import { Plus, Calendar, CalendarDays, List, CheckCircle, XCircle, Clock, AlertCircle, Users } from 'lucide-react';
-import { View as CalendarViewType } from 'react-big-calendar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -13,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MobileDialog } from '@/components/ui/mobile';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -40,7 +39,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageShell } from '@/components/blocks/page-shell';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useSchedule, useTodaysSchedule, useProjects } from '@/hooks/use-api';
@@ -51,7 +50,30 @@ import { FullCalendarView } from '@/components/schedule/fullcalendar-view';
 import { cn } from '@/lib/utils';
 import { KPICarousel } from '@/components/schedule/kpi-carousel';
 import { Loader2 } from 'lucide-react';
+import { EventForm } from '@/components/schedule/mobile/event-form';
 import { useMediaQuery } from '@/hooks/use-media-query';
+
+// Type definitions - matches FullCalendarView's expectations
+interface ScheduleEvent {
+  id: string;
+  title: string;
+  description?: string;
+  type: string; // Changed to string for compatibility with FullCalendarView
+  start?: string;
+  end?: string;
+  startTime?: string; // Alternative field name used in API
+  endTime?: string; // Alternative field name used in API
+  eventType?: 'WORK' | 'MEETING' | 'SITE_VISIT' | 'CALL' | 'EMAIL_FOLLOWUP'; // Strict type for validation
+  location?: string;
+  attendees?: string[];
+  relatedContactIds?: string[]; // Alternative field for attendees
+  status: string; // Changed to string for compatibility with FullCalendarView
+  statusType?: 'PENDING' | 'REQUESTED' | 'PLANNED' | 'DONE' | 'CANCELED' | 'RESCHEDULE_NEEDED'; // Strict type for validation
+  requestedBy?: string;
+  approvedBy?: string;
+  notes?: string;
+  projectId?: string; // Made optional to match FullCalendarView
+}
 
 // Helper functions for date and time handling
 const getDefaultDate = () => {
@@ -93,17 +115,16 @@ export default function AdminSchedulePage() {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const isReady = !!user;
   // No need for extra state - media queries handle this
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [typeFilters, setTypeFilters] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
-  const [filters, setFilters] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state with separate date and time fields
@@ -143,33 +164,25 @@ export default function AdminSchedulePage() {
 
   // Filter events based on active tab and type filters
   const filteredEvents = useMemo(() => {
-    let events = [];
+    let events: ScheduleEvent[] = [];
     
     // Get events based on active tab
     if (activeTab === 'today') {
-      events = todaysEvents || [];
+      events = Array.isArray(todaysEvents) ? todaysEvents : todaysEvents?.data || [];
     } else {
-      events = scheduleEvents || [];
+      events = Array.isArray(scheduleEvents) ? scheduleEvents : scheduleEvents?.data || [];
     }
     
     if (!Array.isArray(events)) return [];
     
     // Apply type filters
     if (typeFilters.length > 0) {
-      events = events.filter((event: any) => typeFilters.includes(event.type));
+      events = events.filter((event: ScheduleEvent) => typeFilters.includes(event.type));
     }
     
     return events;
   }, [scheduleEvents, todaysEvents, activeTab, typeFilters]);
 
-  // Toggle type filter
-  const toggleTypeFilter = (type: string) => {
-    setTypeFilters(prev => 
-      prev.includes(type) 
-        ? prev.filter(t => t !== type)
-        : [...prev, type]
-    );
-  };
 
   // Calculate metrics
   const metrics = useMemo(() => {
@@ -189,10 +202,12 @@ export default function AdminSchedulePage() {
 
     return {
       totalEvents: scheduleEvents.length,
-      todayEvents: todaysEvents?.length || 0,
-      pendingApprovals: scheduleEvents.filter((e: any) => e.status === 'REQUESTED').length,
-      upcomingWork: scheduleEvents.filter((e: any) => {
-        const eventDate = new Date(e.start || e.startTime);
+      todayEvents: Array.isArray(todaysEvents) ? todaysEvents.length : 0,
+      pendingApprovals: scheduleEvents.filter((e: ScheduleEvent) => e.status === 'REQUESTED').length,
+      upcomingWork: scheduleEvents.filter((e: ScheduleEvent) => {
+        const dateString = e.start || e.startTime;
+        if (!dateString) return false;
+        const eventDate = new Date(dateString);
         return e.type === 'WORK' && eventDate >= today && e.status === 'PLANNED';
       }).length
     };
@@ -210,7 +225,7 @@ export default function AdminSchedulePage() {
         location: formData.location,
         attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
         status: formData.status,
-        projectId: formData.projectId
+        projectId: formData.projectId || undefined
       });
 
       toast({
@@ -221,7 +236,7 @@ export default function AdminSchedulePage() {
       setIsCreateOpen(false);
       resetForm();
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to create event',
@@ -246,7 +261,7 @@ export default function AdminSchedulePage() {
         location: formData.location,
         attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
         status: formData.status,
-        projectId: formData.projectId
+        projectId: formData.projectId || undefined
       });
 
       toast({
@@ -258,7 +273,7 @@ export default function AdminSchedulePage() {
       setSelectedEvent(null);
       resetForm();
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to update event',
@@ -284,7 +299,7 @@ export default function AdminSchedulePage() {
       setIsDeleteOpen(false);
       setSelectedEvent(null);
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to delete event',
@@ -309,7 +324,7 @@ export default function AdminSchedulePage() {
       });
 
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to approve event',
@@ -332,10 +347,30 @@ export default function AdminSchedulePage() {
       });
 
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to reject event',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle updating event status and other fields
+  const handleUpdateEvent = async (eventId: string, updates: Partial<ScheduleEvent>) => {
+    try {
+      await apiClient.put(`/api/v1/schedule/${eventId}`, updates);
+      
+      toast({
+        title: 'Success',
+        description: 'Event updated successfully',
+      });
+      
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to update event',
         variant: 'destructive',
       });
     }
@@ -360,10 +395,10 @@ export default function AdminSchedulePage() {
     });
   };
 
-  const openEditDialog = (event: any) => {
+  const openEditDialog = (event: ScheduleEvent) => {
     setSelectedEvent(event);
-    const startDateTime = event.start || event.startTime ? splitDateTime((event.start || event.startTime)) : { date: getDefaultDate(), time: getDefaultTime(1) };
-    const endDateTime = event.end || event.endTime ? splitDateTime((event.end || event.endTime)) : { date: getDefaultDate(), time: getDefaultTime(2) };
+    const startDateTime = event.start || event.startTime ? splitDateTime((event.start || event.startTime) as string) : { date: getDefaultDate(), time: getDefaultTime(1) };
+    const endDateTime = event.end || event.endTime ? splitDateTime((event.end || event.endTime) as string) : { date: getDefaultDate(), time: getDefaultTime(2) };
     
     setFormData({
       title: event.title,
@@ -385,7 +420,7 @@ export default function AdminSchedulePage() {
   };
 
   // Handle calendar drag and drop
-  const handleEventDrop = async ({ event, start, end }: { event: any; start: Date; end: Date }) => {
+  const handleEventDrop = async ({ event, start, end }: { event: ScheduleEvent; start: Date; end: Date }) => {
     try {
       await apiClient.put(`/schedule/${event.id}`, {
         title: event.title,
@@ -405,7 +440,7 @@ export default function AdminSchedulePage() {
       });
 
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to reschedule event',
@@ -414,22 +449,8 @@ export default function AdminSchedulePage() {
     }
   };
 
-  // Handle calendar slot selection for quick event creation
-  const handleSelectSlot = (slotInfo: any) => {
-    const startDate = new Date(slotInfo.start);
-    const endDate = new Date(slotInfo.end);
-    
-    setFormData({
-      ...formData,
-      startDate: startDate.toISOString().split('T')[0],
-      startTime: startDate.toTimeString().substring(0, 5),
-      endDate: endDate.toISOString().split('T')[0],
-      endTime: endDate.toTimeString().substring(0, 5),
-    });
-    setIsCreateOpen(true);
-  };
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<ScheduleEvent>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -478,7 +499,7 @@ export default function AdminSchedulePage() {
               type === 'SITE_VISIT' ? 'outline' :
               type === 'CALL' ? 'secondary' :
               type === 'EMAIL_FOLLOWUP' ? 'outline' :
-              'destructive'
+              'default'
             }
           >
             {type.replace('_', ' ')}
@@ -500,8 +521,8 @@ export default function AdminSchedulePage() {
         }
         
         try {
-          const start = new Date(startValue);
-          const end = endValue ? new Date(endValue) : null;
+          const start = startValue ? new Date(startValue as string) : new Date();
+          const end = endValue ? new Date(endValue as string) : null;
           
           // Check if dates are valid
           if (isNaN(start.getTime())) {
@@ -517,7 +538,7 @@ export default function AdminSchedulePage() {
               </div>
             </div>
           );
-        } catch (error) {
+        } catch {
           return <div className="text-white/40">Invalid date</div>;
         }
       },
@@ -622,7 +643,7 @@ export default function AdminSchedulePage() {
     return (
       <PageShell 
         pageTitle="Schedule"
-        userRole={user?.role || 'VIEWER'} 
+        userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
         fabIcon={Plus}
@@ -674,7 +695,7 @@ export default function AdminSchedulePage() {
     return (
       <PageShell 
         pageTitle="Schedule"
-        userRole={user?.role || 'VIEWER'} 
+        userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
         fabIcon={Plus}
@@ -732,59 +753,72 @@ export default function AdminSchedulePage() {
                 }}
               />
             ) : (
-              <div className="h-full overflow-auto">
+              <div className="h-full overflow-auto text-xs">
                 <DataTable 
                   columns={columns} 
-                  data={filteredEvents} 
-                  className="text-xs"
+                  data={filteredEvents}
                 />
               </div>
             )}
           </div>
           
-          {/* Compact FAB */}
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button
-                className="fixed bottom-2 right-2 z-50 rounded-full h-10 w-10 shadow-lg bg-blue-600 hover:bg-blue-700"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-full h-full bg-gray-900 text-white border-0 rounded-none">
-              <DialogHeader className="flex-shrink-0">
-                <DialogTitle>Create Schedule Event</DialogTitle>
-                <DialogDescription className="text-white/60">
-                  Add a new event to the project calendar
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto px-1">
-                {/* Form content - same as mobile form */}
-                <div className="grid gap-4 py-4 pr-2">
-                  {/* ... existing form fields ... */}
-                </div>
-              </div>
-              <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
+          {/* Create Event Dialog for Landscape */}
+          <MobileDialog
+            open={isCreateOpen}
+            onOpenChange={setIsCreateOpen}
+            title="Create Schedule Event"
+            description="Add a new event to the project calendar"
+            footer={
+              <div className="flex gap-2 w-full">
                 <Button 
                   variant="outline" 
                   onClick={() => setIsCreateOpen(false)}
                   disabled={isSubmitting}
+                  className="flex-1"
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} disabled={isSubmitting}>
+                <Button 
+                  onClick={handleCreate} 
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
                   {isSubmitting ? (
                     <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Creating...
                     </>
                   ) : (
                     'Create Event'
                   )}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </div>
+            }
+          >
+            <EventForm 
+              formData={{
+                title: formData.title,
+                type: formData.type,
+                description: formData.description,
+                location: formData.location,
+                startDate: formData.startDate,
+                startTime: formData.startTime,
+                endDate: formData.endDate,
+                endTime: formData.endTime,
+                status: formData.status,
+                attendees: formData.attendees,
+                requestedBy: formData.requestedBy,
+                approvedBy: formData.approvedBy
+              }} 
+              onChange={(data) => {
+                setFormData({
+                  ...data,
+                  notes: formData.notes,
+                  projectId: formData.projectId || ''
+                });
+              }} 
+            />
+          </MobileDialog>
           
           {/* FAB also in landscape mode for consistency */}
           <Button
@@ -804,7 +838,7 @@ export default function AdminSchedulePage() {
   return (
     <PageShell 
       pageTitle="Schedule"
-      userRole={user?.role || 'VIEWER'} 
+      userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
       fabIcon={Plus}
@@ -822,194 +856,76 @@ export default function AdminSchedulePage() {
               <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-white">Schedule Management</h1>
               <p className="text-white/60 text-xs sm:text-sm lg:text-base">Manage project calendar and events</p>
             </div>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="sm:size-default w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Event
-                </Button>
-              </DialogTrigger>
-            <DialogContent className="w-full h-full sm:max-w-[500px] sm:max-h-[85vh] sm:h-auto overflow-hidden flex flex-col bg-gray-900 text-white border-0 sm:border sm:border-white/10 rounded-none sm:rounded-lg">
-              <DialogHeader className="flex-shrink-0">
-                <DialogTitle>Create Schedule Event</DialogTitle>
-                <DialogDescription className="text-white/60">
-                  Add a new event to the project calendar
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto px-1">
-                <div className="grid gap-4 py-4 pr-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Event Title</Label>
-                    <Input
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="bg-white/5 border-white/10 text-white"
-                      placeholder="e.g., Site Inspection"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Event Type</Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value) => setFormData({ ...formData, type: value })}
-                    >
-                      <SelectTrigger className="bg-white/5 border-white/10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CALL">Call</SelectItem>
-                        <SelectItem value="MEETING">Meeting</SelectItem>
-                        <SelectItem value="SITE_VISIT">Site Visit</SelectItem>
-                        <SelectItem value="WORK">Work</SelectItem>
-                        <SelectItem value="EMAIL_FOLLOWUP">Email Followup</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                    placeholder="Event details..."
-                  />
-                </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Start Date</Label>
-                      <Input
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Start Time</Label>
-                      <Input
-                        type="time"
-                        value={formData.startTime}
-                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>End Date</Label>
-                      <Input
-                        type="date"
-                        value={formData.endDate}
-                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>End Time</Label>
-                      <Input
-                        type="time"
-                        value={formData.endTime}
-                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Location</Label>
-                    <Input
-                      value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                      placeholder="e.g., Main Site"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value) => setFormData({ ...formData, status: value })}
-                    >
-                      <SelectTrigger className="bg-white/5 border-white/10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PENDING">Pending Approval</SelectItem>
-                        <SelectItem value="REQUESTED">Requested</SelectItem>
-                        <SelectItem value="PLANNED">Planned</SelectItem>
-                        <SelectItem value="DONE">Done</SelectItem>
-                        <SelectItem value="CANCELED">Canceled</SelectItem>
-                        <SelectItem value="RESCHEDULE_NEEDED">Reschedule Needed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Attendees (comma-separated)</Label>
-                  <Input
-                    value={formData.attendees}
-                    onChange={(e) => setFormData({ ...formData, attendees: e.target.value })}
-                    className="bg-white/5 border-white/10 text-white"
-                    placeholder="John Doe, Jane Smith"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Requested By</Label>
-                    <Input
-                      value={formData.requestedBy}
-                      onChange={(e) => setFormData({ ...formData, requestedBy: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                      placeholder="Name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Approved By</Label>
-                    <Input
-                      value={formData.approvedBy}
-                      onChange={(e) => setFormData({ ...formData, approvedBy: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                      placeholder="Name"
-                    />
-                  </div>
-                </div>
-                </div>
-              </div>
-              <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsCreateOpen(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleCreate} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Event'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            <Button 
+              size="sm" 
+              className="sm:size-default w-full sm:w-auto"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Event
+            </Button>
         </div>
         )}
 
-        
-        {/* Mobile Dialog for creating events */}
+        {/* Universal Create Event Dialog - Works for both mobile and desktop */}
+        <MobileDialog
+          open={isCreateOpen}
+          onOpenChange={setIsCreateOpen}
+          title="Create Schedule Event"
+          description="Add a new event to the project calendar"
+          footer={
+            <div className="flex gap-2 w-full">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsCreateOpen(false)}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreate} 
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Event'
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <EventForm 
+            formData={{
+              title: formData.title,
+              type: formData.type,
+              description: formData.description,
+              location: formData.location,
+              startDate: formData.startDate,
+              startTime: formData.startTime,
+              endDate: formData.endDate,
+              endTime: formData.endTime,
+              status: formData.status,
+              attendees: formData.attendees,
+              requestedBy: formData.requestedBy,
+              approvedBy: formData.approvedBy
+            }} 
+            onChange={(data) => {
+              setFormData({
+                ...data,
+                notes: formData.notes,
+                projectId: formData.projectId || ''
+              });
+            }} 
+          />
+        </MobileDialog>
+
+        {/* KPI Carousel */}
         {isMobile && !isLandscape && (
           <>
             
@@ -1509,7 +1425,7 @@ export default function AdminSchedulePage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Event</AlertDialogTitle>
               <AlertDialogDescription className="text-white/60">
-                Are you sure you want to delete "{selectedEvent?.title}"? This action cannot be undone.
+                Are you sure you want to delete &quot;{selectedEvent?.title}&quot;? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState, useEffect } from 'react';
 import { AuthProvider } from '@/app/contexts/AuthContext';
 import { ProjectProvider } from '@/app/contexts/ProjectContext';
+import { ToastListener } from '@/components/providers/toast-listener';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -36,6 +37,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         <ProjectProvider>
           {children}
+          <ToastListener />
         </ProjectProvider>
       </AuthProvider>
       <ReactQueryDevtools initialIsOpen={false} />
