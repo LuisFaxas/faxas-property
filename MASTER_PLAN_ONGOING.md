@@ -1,291 +1,572 @@
 # FAXAS PROPERTY - Construction Management Control Center
-## MASTER IMPLEMENTATION PLAN
-**Last Updated**: August 23, 2025
+## COMPREHENSIVE ARCHITECTURE DOCUMENTATION & MASTER PLAN
+**Last Updated**: August 28, 2025
+**Version**: 2.0
 
 **Project**: Miami Duplex Remodel Management System  
 **Repository**: https://github.com/LuisFaxas/faxas-property  
 **Local Path**: `C:\1) FAXAS\CODING PROJECTS\CONSTRUCTION_MANAGEMENT\FAXAS_PROPERTY\control-center`  
-**Development URL**: http://localhost:3000 or 3001  
+**Development URL**: http://localhost:3000 or 3001 (currently 3009)
 
 ---
 
-## 🎯 PROJECT OVERVIEW
+# 📐 SYSTEM ARCHITECTURE - CURRENT STATE
 
-A comprehensive construction management system featuring:
-- **Dual dashboards** (Admin & Contractor views)
-- **Real-time data management** for tasks, budgets, procurement, and scheduling
-- **Firebase authentication** with role-based access control
-- **PostgreSQL database** via Supabase
-- **Glass-morphism UI** with dark theme
-- **Document management** and approval workflows
-- **Mobile-first responsive design**
+## 🏗️ TECHNOLOGY STACK
 
-### Overall Completion: ~75% (Admin Portal), 0% (Contractor Portal)
+### **Frontend**
+- **Framework**: Next.js 15.5.0 (App Router)
+- **Language**: TypeScript 5.x
+- **Styling**: 
+  - Tailwind CSS 3.4.17
+  - shadcn/ui components
+  - Glass morphism design system
+  - Dark theme only
+- **State Management**: 
+  - TanStack Query v5 (server state)
+  - React Context (auth, projects)
+  - React Hook Form + Zod (forms)
+- **UI Libraries**:
+  - Lucide React (icons)
+  - React Big Calendar (schedule)
+  - Recharts (analytics)
+  - Framer Motion (animations)
+  - Embla Carousel (mobile)
 
----
+### **Backend**
+- **Runtime**: Node.js with Next.js API Routes
+- **Database**: PostgreSQL (Supabase hosted)
+- **ORM**: Prisma 6.14.0
+- **Authentication**: 
+  - Firebase Auth (client)
+  - Firebase Admin SDK (server)
+- **Validation**: Zod schemas
+- **File Storage**: Firebase Storage (configured, partial implementation)
 
-## 📊 CURRENT STATUS - DETAILED ASSESSMENT
-
-### ✅ PRODUCTION READY (6 Pages - Fully Functional with Real APIs)
-
-| Page | Production Readiness | Backend API | Key Features | Minor Issues |
-|------|---------------------|-------------|--------------|--------------|
-| **Tasks** | 95% ✅ | Complete | • Full CRUD operations<br>• Dual assignment (User OR Contact)<br>• Status tracking<br>• Filtering & search | Better loading states needed |
-| **Schedule** | 98% ✅ | Complete | • Calendar view (month/week/day/agenda)<br>• Drag & drop events<br>• Approval workflow<br>• Event color coding | Polish calendar colors |
-| **Budget** | 95% ✅ | Complete | • Line items CRUD<br>• Variance tracking<br>• KPI dashboard<br>• Commitment tracking | Better error handling |
-| **Procurement** | 98% ✅ | Complete | • Full PO lifecycle<br>• Bulk operations<br>• Analytics dashboard<br>• Export (CSV/Excel/PDF) | Production ready |
-| **Settings/Projects** | 90% ✅ | Complete | • Project CRUD<br>• Archive/Favorite<br>• Color coding<br>• Global context | More settings tabs needed |
-| **Contacts** | 85% ⚠️ | Complete | • Portal invitation system<br>• Task assignment<br>• Card/List views<br>• Export CSV | **Critical Issues:**<br>• Card overflow<br>• Mobile layout broken<br>• Filter chips wrap |
-
-### ⚠️ UI-ONLY FEATURES (3 Pages - Frontend Complete, No Backend)
-
-| Page | UI Status | Missing Backend | Required Work |
-|------|-----------|-----------------|---------------|
-| **Plans** | ✅ UI Complete | ❌ No API | • Create Plans API<br>• Firebase Storage integration<br>• Version control<br>• Upload/download |
-| **Risks** | ✅ UI Complete | ❌ No API | • Create Risks API<br>• Risk scoring algorithm<br>• Mitigation tracking<br>• Impact/probability matrix |
-| **Users** | ✅ UI Complete | ❌ Uses Mock Data | • Create Users API<br>• Firebase Admin integration<br>• Module permissions<br>• Activity tracking |
-
-### 📝 SPECIAL CASES
-
-| Page | Status | Notes |
-|------|--------|-------|
-| **Decisions** | UI exists, not linked | • Has page file but not in navigation<br>• Needs API<br>• Should be added to nav or removed |
-| **Invoices** | Missing for admin | • Only in contractor nav<br>• No admin version exists<br>• Critical for payments |
+### **Infrastructure**
+- **Development**: localhost:3000/3001/3009
+- **Database GUI**: Prisma Studio (port 5555)
+- **Environment**: .env.local configuration
 
 ---
 
-## 🚨 RECENT ACCOMPLISHMENTS (Not Previously Documented)
+## 🗄️ DATABASE ARCHITECTURE
 
-### 1. **Schedule Page V2 with Calendar Integration** ✅
-- Full react-big-calendar implementation
+### **Active Models (In Production)**
+1. **User** - Authentication and roles
+2. **Project** - Central entity for all data
+3. **Contact** - Vendors, contractors, team members
+4. **Task** - Work items with dual assignment
+5. **ScheduleEvent** - Calendar events
+6. **BudgetItem** - Financial line items
+7. **Procurement** - Purchase orders
+8. **UserModuleAccess** - Granular permissions
+9. **AuditLog** - Activity tracking
+
+### **Extended Task Models (Active)**
+- TaskDependency - Task relationships
+- TaskAttachment - File attachments
+- TaskComment - Discussion threads
+- TaskWatcher - Notification subscriptions
+- TaskPhoto - Site photos
+- TaskActivity - History log
+- TaskChecklistItem - Subtasks
+
+### **Unused Models (Schema exists, no implementation)**
+- PlanFile - Document management
+- Decision - Decision tracking
+- Risk - Risk assessment
+- Meeting - Meeting notes
+- Invoice - Billing
+- RFI, Submittal, ChangeOrder - Construction docs
+
+### **Role System**
+```typescript
+enum Role {
+  ADMIN      // Full system access
+  STAFF      // Operational access
+  CONTRACTOR // Limited project access
+  VIEWER     // Read-only access
+}
+```
+
+### **Module Permissions**
+```typescript
+enum Module {
+  TASKS
+  SCHEDULE
+  PLANS
+  UPLOADS
+  INVOICES
+  PROCUREMENT_READ
+  DOCS_READ
+}
+```
+
+---
+
+## 🎯 FRONTEND ARCHITECTURE
+
+### **Application Routes**
+
+#### **Public Routes**
+- `/` - Landing page
+- `/login` - Authentication
+- `/accept-invite` - Contractor invitation acceptance
+
+#### **Admin Portal Routes** (`/admin/*`)
+| Route | Status | API Integration | Description |
+|-------|--------|-----------------|-------------|
+| `/admin` | ✅ Production | Full | Dashboard with KPIs |
+| `/admin/tasks` | ✅ Production | Full | Task management with mobile UI |
+| `/admin/schedule` | ✅ Production | Full | Calendar with drag-drop |
+| `/admin/budget` | ✅ Production | Full | Budget line items |
+| `/admin/procurement` | ✅ Production | Full | Purchase orders with export |
+| `/admin/contacts` | ✅ Production | Full | Contact & portal management |
+| `/admin/settings` | ✅ Production | Full | Project configuration |
+| `/admin/plans` | ⚠️ UI Only | None | Document management (no API) |
+| `/admin/risks` | ⚠️ UI Only | None | Risk assessment (no API) |
+| `/admin/users` | ⚠️ UI Only | Mock Data | User management (no API) |
+| `/admin/decisions` | ⚠️ UI Only | None | Decision log (not in nav) |
+
+#### **Contractor Portal Routes** (`/contractor/*`)
+- `/contractor` - Single page dashboard (minimal implementation)
+
+### **Component Architecture**
+
+#### **UI Component Library** (`components/ui/`)
+- **Base Components**: 40+ shadcn/ui components
+- **Mobile Components** (`components/ui/mobile/`):
+  - MobileDialog - Unified bottom sheet/modal
+  - MobileCard - Touch-optimized cards
+  - MobileList - Swipeable lists
+  - DetailSheet - Mobile detail views
+
+#### **Feature Components**
+- `components/blocks/` - Layout components
+  - PageShell - Page wrapper
+  - Navigation - App navigation
+- `components/contacts/` - Contact management
+- `components/schedule/` - Calendar components
+- `components/tasks/` - Task components
+
+#### **Providers & Context**
+- AuthContext - User authentication state
+- ProjectContext - Active project state
+- QueryClient - React Query provider
+
+### **Responsive Design System**
+- **Breakpoints**: Mobile-first approach
+  - Mobile: < 768px
+  - Tablet: 768px - 1024px
+  - Desktop: > 1024px
+- **Mobile Optimizations**:
+  - Bottom sheets for dialogs
+  - Touch targets min 48px
+  - Swipe gestures
+  - Responsive skeletons
+
+---
+
+## 🔌 BACKEND ARCHITECTURE
+
+### **API Routes Structure** (`/api/v1/*`)
+
+#### **Implemented Endpoints**
+
+**Tasks** ✅
+- GET/POST `/api/v1/tasks`
+- PUT/DELETE `/api/v1/tasks/[id]`
+- PATCH `/api/v1/tasks/[id]/status`
+- DELETE `/api/v1/tasks/bulk-delete`
+
+**Schedule** ✅
+- GET/POST `/api/v1/schedule`
+- PUT/DELETE `/api/v1/schedule/[id]`
+- PUT `/api/v1/schedule/[id]/approve`
+- GET `/api/v1/schedule/today`
+
+**Budget** ✅
+- GET/POST `/api/v1/budget`
+- PUT/DELETE `/api/v1/budget/[id]`
+- GET `/api/v1/budget/summary`
+- GET `/api/v1/budget/exceptions`
+
+**Procurement** ✅
+- GET/POST `/api/v1/procurement`
+- PUT/DELETE `/api/v1/procurement/[id]`
+- PUT `/api/v1/procurement/[id]/approve`
+- POST `/api/v1/procurement/bulk`
+- GET `/api/v1/procurement/export`
+- GET `/api/v1/procurement/analytics`
+
+**Contacts** ✅
+- GET/POST `/api/v1/contacts`
+- PUT/DELETE `/api/v1/contacts/[id]`
+- POST `/api/v1/contacts/[id]/invite`
+- POST `/api/v1/contacts/accept-invite`
+
+**Projects** ✅
+- GET/POST `/api/v1/projects`
+- PUT/DELETE `/api/v1/projects/[id]`
+- PUT `/api/v1/projects/[id]/archive`
+- PUT `/api/v1/projects/[id]/favorite`
+
+#### **Missing APIs** (UI exists, no backend)
+- `/api/v1/users` - User management
+- `/api/v1/plans` - Document management
+- `/api/v1/risks` - Risk assessment
+- `/api/v1/decisions` - Decision tracking
+
+### **Authentication & Authorization**
+```typescript
+// Server-side auth check
+requireAuth() // Basic authentication
+requireRole(['ADMIN', 'STAFF']) // Role-based access
+
+// Client-side auth
+useAuth() // Hook for user state
+```
+
+### **Response Format**
+```typescript
+// Success
+{
+  success: true,
+  data: {...},
+  message?: string,
+  meta?: { pagination, total }
+}
+
+// Error
+{
+  success: false,
+  error: string,
+  code?: string
+}
+```
+
+---
+
+## 🔐 AUTHENTICATION FLOW
+
+1. **Client Authentication**:
+   - Firebase Auth (Google OAuth + Email/Password)
+   - JWT tokens with 1-hour expiry
+   - Auto-refresh every 50 minutes
+
+2. **Server Verification**:
+   - Firebase Admin SDK validates tokens
+   - User lookup in PostgreSQL
+   - Role verification
+
+3. **Portal Invitation Flow**:
+   - Admin creates Contact
+   - Sends invitation email with token
+   - Contact accepts at `/accept-invite`
+   - Creates User account linked to Contact
+   - Assigns CONTRACTOR role
+
+---
+
+# ✅ COMPLETED FEATURES
+
+## **Production-Ready Systems**
+
+### **1. Task Management System**
+- Full CRUD operations
+- Dual assignment (Users OR Contacts)
+- Priority levels (LOW to CRITICAL)
+- Status workflow (TODO → IN_PROGRESS → COMPLETED)
+- Subtasks and checklists
+- File attachments
+- Comments and activity log
+- Mobile-optimized UI with unified dialogs
+- Responsive skeleton loading
+
+### **2. Schedule Management**
+- React Big Calendar integration
 - Multiple views (month, week, day, agenda)
 - Drag-and-drop event management
-- Event color coding by status
-- Quick event creation from calendar clicks
+- Event types (CALL, MEETING, SITE_VISIT, WORK)
+- Approval workflow
 - Mobile-responsive calendar
+- Event color coding by status
 
-### 2. **Contacts Page V2 - Portal System** ✅
-- **Portal Invitation System**:
-  - Secure token generation
-  - Accept-invite page (`/accept-invite`)
-  - Portal status tracking (NONE, INVITED, ACTIVE, BLOCKED)
-  - Firebase Auth integration for contractors
-- **Task Assignment to Contacts**:
-  - Dual assignment system in database
-  - `assignedContactId` field in Task model
-  - AssignTaskDialog component
-  - Updated API endpoints
-- **Mobile-First Design**:
-  - Card/List view toggle
-  - Touch-friendly cards (48px min targets)
-  - Bottom sheets for mobile details
-  - Quick filter chips
-- **Known Issues**: Card overflow, mobile responsiveness problems
+### **3. Budget Management**
+- Line item CRUD
+- Variance tracking
+- Commitment tracking
+- Discipline categorization
+- KPI dashboard
+- Real-time calculations
 
-### 3. **CLAUDE.md Documentation** ✅
-- Comprehensive guide for future Claude instances
-- Critical commands and workflows
-- High-level architecture documentation
-- Common patterns and best practices
+### **4. Procurement System**
+- Full PO lifecycle
+- Bulk operations
+- Approval workflow
+- Export (CSV, Excel, PDF)
+- Analytics dashboard
+- Supplier management
+
+### **5. Contact & Portal System**
+- Contact CRUD with categories
+- Portal invitation system
+- Token-based registration
+- Task assignment to contacts
+- Portal status tracking
+- Mobile-optimized cards
+
+### **6. Project Management**
+- Multi-project support
+- Archive/Favorite functionality
+- Project-specific settings
+- Color coding
+- Global project context
+
+### **7. Mobile UI/UX System**
+- Unified MobileDialog component
+- Bottom sheet pattern
+- Touch-optimized interfaces
+- Responsive skeletons
+- Swipe gestures
+- Mobile-first layouts
 
 ---
 
-## 🏗️ TECHNICAL ARCHITECTURE
+# 🚧 ONGOING DEVELOPMENT
 
-### Frontend Stack
-- **Framework**: Next.js 15.5.0 with App Router
-- **Language**: TypeScript 5
-- **Styling**: Tailwind CSS 3.4 + shadcn/ui
-- **State**: React Query (TanStack Query) + Context API
-- **Forms**: React Hook Form + Zod validation
-- **Tables**: TanStack Table
-- **Calendar**: react-big-calendar
+## **Next Implementation Phases**
 
-### Backend Stack
-- **Database**: PostgreSQL (Supabase)
-- **ORM**: Prisma 6.14.0
-- **Auth**: Firebase Auth with custom claims
-- **Storage**: Firebase Storage (configured, not fully integrated)
-- **API**: REST with Zod validation
+### **Phase 1: User Management & RBAC System**
 
-### Database Schema Updates
+#### **Database Enhancements**
 ```prisma
-✅ Extended Models:
-- Contact: Added portal fields (portalStatus, inviteToken, userId, etc.)
-- Task: Added assignedContactId for dual assignment
-- User: Linked to Contact for portal access
+// Add to Contact model
+tradeType        String?   // PLUMBER, ELECTRICIAN, etc
+licenseNumber    String?
+insuranceExpiry  DateTime?
+rating           Float?
+preferredVendor  Boolean
 
-✅ In Use (9): User, Project, Contact, Task, ScheduleEvent, BudgetItem, Procurement, AuditLog, UserModuleAccess
-❌ Unused (4): PlanFile, Decision, Risk, Invoice
+// New models needed
+model BidRequest {
+  id          String
+  projectId   String
+  tradeType   String
+  scope       String
+  deadline    DateTime
+  status      String
+}
+
+model BidResponse {
+  id           String
+  bidRequestId String
+  contactId    String
+  amount       Decimal
+  status       String
+}
 ```
 
----
-
-## 🎯 IMMEDIATE ACTION PLAN (5-7 Days to Production)
-
-### **Phase 1: Fix Critical Issues** (Day 1)
-**Goal**: Stabilize existing features
-
-1. **Fix Contacts Page** (2-3 hours) ⚡
-   - Fix card text overflow with truncation
-   - Fix mobile responsive layout
-   - Fix filter chips wrapping
-   - Add proper loading skeletons
-   - Test on multiple devices
-
-2. **General Polish** (2-3 hours)
-   - Fix console errors across all pages
-   - Ensure all CRUD operations work
-   - Test mobile responsiveness globally
-   - Verify authentication flow
-
-### **Phase 2: Complete Missing APIs** (Days 2-4)
-**Goal**: Fill critical backend gaps
-
-**Day 2 - Plans API** (Full Day)
-- Create `/api/v1/plans` endpoints
-- Firebase Storage integration
-- Version control system
-- Upload/download functionality
-- Connect to existing UI
-
-**Day 3 - Users API** (Full Day)
+#### **API Implementation**
 - Create `/api/v1/users` endpoints
-- Firebase Admin SDK integration
-- Role management system
-- Module permissions
-- Replace mock data
+- Implement role templates
+- Build permission matrix
+- Add team management
 
-**Day 4 - Risks API** (Half Day)
-- Create `/api/v1/risks` endpoints
+#### **UI Components**
+- User management dashboard
+- Permission matrix interface
+- Role assignment workflow
+- Team builder
+
+### **Phase 2: Revolutionary Bid Management System**
+
+#### **Core Features**
+1. **Bid Request Creation**
+   - Select trade type
+   - Define scope
+   - Attach documents
+   - Set deadline
+
+2. **Contractor Bid Submission**
+   - View requests by trade
+   - Submit detailed bids
+   - Track bid status
+   - Receive notifications
+
+3. **Bid Comparison & Approval**
+   - Side-by-side comparison
+   - Automatic budget integration
+   - Approval workflow
+   - Historical tracking
+
+#### **Implementation**
+- Extend Budget page with bid section
+- Create contractor "My Bids" view
+- Notification system
+- Email integration
+
+### **Phase 3: Complete Missing APIs**
+
+#### **Plans API**
+- Firebase Storage integration
+- Version control
+- Document categorization
+- Sharing permissions
+
+#### **Risks API**
 - Risk scoring algorithm
+- Impact assessment
 - Mitigation tracking
-- Dashboard integration
+- Risk matrix visualization
 
-**Day 4 - Decisions Integration** (Half Day)
-- Add to navigation OR remove page
-- Create API if keeping
-- Connect to UI
+#### **Users API**
+- Replace mock data
+- Firebase Admin integration
+- Module permissions
+- Activity tracking
 
-### **Phase 3: Final Polish** (Day 5)
-**Goal**: Production readiness
+### **Phase 4: Advanced Features**
 
-1. **UX Improvements**
-   - Add loading skeletons everywhere
-   - Implement error boundaries
-   - Create empty states with CTAs
-   - Add success notifications
-   - Consistent form validation messages
+#### **Contractor Portal Enhancement**
+- Dedicated contractor dashboard
+- Task calendar view
+- Document access
+- Invoice submission
+- Progress reporting
 
-2. **Performance**
-   - Optimize bundle size
-   - Implement lazy loading
-   - Add image optimization
-   - Cache API responses
+#### **Workflow Automation**
+- Automated approvals
+- Email notifications
+- Task dependencies
+- Scheduled reports
 
-### **Phase 4: Testing & Documentation** (Days 6-7)
-1. **Testing**
-   - End-to-end workflow testing
-   - Mobile device testing
-   - Cross-browser testing
-   - Load testing
-
-2. **Documentation**
-   - API documentation
-   - User guide
-   - Admin guide
-   - Deployment guide
-   - Update CLAUDE.md
+#### **Analytics & Reporting**
+- Project dashboards
+- Performance metrics
+- Cost analysis
+- Timeline tracking
 
 ---
 
-## 📈 PROJECT METRICS - UPDATED
+# 🎯 STRATEGIC ROADMAP
 
-### Completion Status by Area
-```
-Admin Portal:       75% Complete
-├── Working Pages:  6/10 (60%)
-├── APIs:          6/10 (60%)
-├── UI Complete:   10/10 (100%)
-└── Production Ready: 5/10 (50%)
+## **Immediate Priorities**
 
-Contractor Portal:  0% Complete
-├── Pages:         0/5 (0%)
-├── APIs:          0/5 (0%)
-└── UI:            0/5 (0%)
+### **1. Activate Existing Infrastructure**
+- Enable UserModuleAccess permissions
+- Implement role-based UI filtering
+- Create permission templates
+- Add role selection to invitation flow
 
-Overall Project:    ~40% Complete
-```
+### **2. Build Bid Management MVP**
+- Add trade types to Contacts
+- Create bid request/response tables
+- Build submission interface
+- Implement comparison view
 
-### Lines of Code Distribution
-```
-Total: ~12,000+ lines across admin pages
+### **3. Complete Core APIs**
+- Users API with real data
+- Plans API with storage
+- Risks API with scoring
+- Decisions API or remove
 
-1. Procurement:     1,893 lines
-2. Contacts:        1,500+ lines (with new v2)
-3. Schedule:        1,200+ lines (with calendar)
-4. Budget:          1,138 lines
-5. Decisions:       1,114 lines
-6. Risks:           1,068 lines
-7. User Management: 1,028 lines
-8. Settings:        1,008 lines
-9. Plans:             947 lines
-10. Tasks:            769 lines
-```
+## **Medium-Term Goals**
 
----
+### **1. Enterprise Features**
+- Multi-tenant architecture
+- Subscription management
+- Usage tracking
+- API rate limiting
 
-## ✅ SUCCESS CRITERIA - UPDATED
+### **2. Integration Capabilities**
+- Email integration
+- Calendar sync
+- Accounting software
+- Document signing
 
-### ✅ Achieved (Recent Additions)
-- [x] Schedule V2 with full calendar integration
-- [x] Contacts V2 with portal invitation system
-- [x] Task assignment to contacts (dual assignment)
-- [x] Accept-invite flow for contractors
-- [x] Mobile-first card/list views
-- [x] CLAUDE.md documentation
-- [x] Calendar drag-and-drop functionality
-- [x] Portal status tracking
+### **3. Mobile Application**
+- React Native app
+- Offline support
+- Push notifications
+- Camera integration
 
-### 🔄 In Progress
-- [ ] Fix Contacts page overflow issues
-- [ ] Complete Plans API with Firebase Storage
-- [ ] Complete Users API with real data
-- [ ] Complete Risks API with scoring
+## **Long-Term Vision**
 
-### ❌ Not Started
-- [ ] Decisions API (or remove page)
-- [ ] Admin Invoices page
-- [ ] Contractor portal (all features)
-- [ ] Email integration
-- [ ] Automated workflows
-- [ ] Production deployment
+### **1. AI/ML Features**
+- Predictive scheduling
+- Cost estimation
+- Risk prediction
+- Automated task assignment
 
----
+### **2. Marketplace**
+- Contractor discovery
+- Material sourcing
+- Equipment rental
+- Insurance providers
 
-## 🚀 ROADMAP TO PRODUCTION
-
-### Week 1 (Current Week)
-- ✅ Complete Schedule V2 (DONE)
-- ✅ Complete Contacts V2 (DONE - needs polish)
-- 🔄 Fix critical issues
-- 🔄 Create missing APIs
-
-### Week 2
-- Complete admin portal
-- Begin contractor portal
-- Firebase Storage full integration
-- Testing & QA
-
-### Week 3
-- Complete contractor portal
-- Email/Calendar integration
-- Final testing
-- Production deployment
+### **3. Compliance & Standards**
+- SOC 2 certification
+- Industry standards
+- Regulatory compliance
+- Data privacy
 
 ---
 
-## 🛠️ CRITICAL COMMANDS
+# 📊 TECHNICAL DEBT & IMPROVEMENTS
+
+## **Code Quality**
+- Add unit tests
+- Implement E2E testing
+- Error boundary implementation
+- Performance optimization
+
+## **Infrastructure**
+- Production deployment setup
+- CI/CD pipeline
+- Monitoring & logging
+- Backup strategy
+
+## **Security**
+- Two-factor authentication
+- API rate limiting
+- Data encryption
+- Security audit
+
+## **Documentation**
+- API documentation
+- User guides
+- Developer docs
+- Video tutorials
+
+---
+
+# 🚀 DEPLOYMENT READINESS
+
+## **Current State**
+- **Admin Portal**: 85% complete, production-ready
+- **Contractor Portal**: 5% complete, minimal MVP
+- **Mobile Experience**: 100% responsive, optimized
+- **API Coverage**: 60% of planned endpoints
+
+## **Required for Production**
+1. Complete Users API
+2. Implement basic contractor portal
+3. Set up production database
+4. Configure production environment
+5. Implement monitoring
+
+## **Scaling Considerations**
+- Database indexing optimized
+- API pagination implemented
+- Caching strategy needed
+- CDN for static assets
+- Load balancing setup
+
+---
+
+# 🛠️ CRITICAL COMMANDS
 
 ### Development
 ```bash
@@ -312,40 +593,17 @@ curl http://localhost:3000/api/v1/schedule
 
 ---
 
-## 🐛 KNOWN ISSUES
-
-### High Priority
-1. **Contacts Page**: Card overflow, mobile layout broken
-2. **Missing APIs**: Plans, Risks, Users (using mock)
-3. **Navigation**: Decisions page exists but not linked
-
-### Medium Priority
-4. Loading states inconsistent
-5. Error handling needs improvement
-6. Empty states missing in some pages
-
-### Low Priority
-7. Calendar event colors need polish
-8. Settings page needs more tabs
-9. Bulk selection UX improvements
-
----
-
-## 📝 NOTES
+# 📝 NOTES
 
 - Admin credentials: `admin@example.com / admin123`
-- Development runs on port 3000 (sometimes 3001)
-- Decisions page exists but not in navigation - needs resolution
-- Users page uses mock data - needs real API
+- Development runs on port 3000 (sometimes 3001 or 3009)
 - Firebase Storage configured but not fully integrated
 - Portal invitation system works end-to-end
 - Contact-Task dual assignment implemented
+- UserModuleAccess table exists but not utilized
 
 ---
 
-**END OF MASTER PLAN - Updated August 23, 2025**
+**This document represents the single source of truth for the FAXAS Property Control Center architecture and development roadmap.**
 
-
-
-
-
+**END OF MASTER PLAN - Version 2.0 - August 28, 2025**
