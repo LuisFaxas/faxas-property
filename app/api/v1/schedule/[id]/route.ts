@@ -247,3 +247,5 @@ export const PATCH = withAuth(
     resolveProjectId: resolveScheduleProject
   }
 );
+// Export runtime for Firebase Admin
+export const runtime = 'nodejs';

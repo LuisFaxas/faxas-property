@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/api/auth-check';
 import { successResponse, errorResponse } from '@/lib/api/response';
 import { z } from 'zod';
+import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
+import { getUserProjects } from '@/lib/api/auth-check';
 
 // Validation schema for project creation
 const createProjectSchema = z.object({
@@ -24,17 +25,22 @@ const createProjectSchema = z.object({
   color: z.string().optional(),
 });
 
-// GET /api/v1/projects - List all projects
-export async function GET(request: NextRequest) {
-  try {
-    await requireAuth();
+// GET /api/v1/projects - List all projects user has access to
+export const GET = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth } = security;
     
     const url = new URL(request.url);
     const includeArchived = url.searchParams.get('includeArchived') === 'true';
     const favoritesOnly = url.searchParams.get('favoritesOnly') === 'true';
     
+    // Get user's accessible projects
+    const userProjectIds = await getUserProjects(auth.uid);
+    
     // Build where clause
-    const where: any = {};
+    const where: any = {
+      id: { in: userProjectIds }  // Only show projects user has access to
+    };
     if (!includeArchived) {
       where.isArchived = false;
     }
@@ -78,15 +84,16 @@ export async function GET(request: NextRequest) {
     }
     
     return successResponse(projects);
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    // No module or project requirement for listing projects
   }
-}
+);
 
 // POST /api/v1/projects - Create new project
-export async function POST(request: NextRequest) {
-  try {
-    const authUser = await requireAuth();
+export const POST = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth } = security;
     const body = await request.json();
     
     // Validate request body
@@ -118,10 +125,19 @@ export async function POST(request: NextRequest) {
       data: createData
     });
     
+    // Add creator as project member with ADMIN role
+    await prisma.projectMember.create({
+      data: {
+        projectId: project.id,
+        userId: auth.uid,
+        role: auth.role  // Preserve user's system role in project
+      }
+    });
+    
     // Log activity
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'CREATE',
         entity: 'PROJECT',
         entityId: project.id,
@@ -133,10 +149,11 @@ export async function POST(request: NextRequest) {
     });
     
     return successResponse(project, 'Project created successfully');
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return errorResponse(error.errors[0].message, 400);
-    }
-    return errorResponse(error);
+  },
+  {
+    roles: ['ADMIN', 'STAFF']  // Only admins and staff can create projects
   }
-}
+);
+
+// Export runtime for Firebase Admin
+export const runtime = 'nodejs';

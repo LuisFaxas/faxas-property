@@ -1,19 +1,35 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth, requireRole } from '@/lib/api/auth-check';
 import { successResponse, errorResponse, paginationMetadata } from '@/lib/api/response';
 import { createBudgetItemSchema, budgetQuerySchema } from '@/lib/validations/budget';
-import { Prisma } from '@prisma/client';
+import { Prisma, Module } from '@prisma/client';
+import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
+
+// Helper to redact cost fields for contractors
+function redactCostsForContractor<T extends any>(item: T, role: string): T {
+  if (role !== 'CONTRACTOR') return item;
+  
+  // Redact sensitive cost information for contractors
+  const redacted = { ...item };
+  delete redacted.estUnitCost;
+  delete redacted.estTotal;
+  delete redacted.committedTotal;
+  delete redacted.paidToDate;
+  delete redacted.variance;
+  delete redacted.varianceAmount;
+  delete redacted.variancePercent;
+  return redacted;
+}
 
 // GET /api/v1/budget - List budget items with filters
-export async function GET(request: NextRequest) {
-  try {
-    await requireAuth();
+export const GET = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const searchParams = Object.fromEntries(request.nextUrl.searchParams);
     const query = budgetQuerySchema.parse(searchParams);
     
     const where: Prisma.BudgetItemWhereInput = {
-      ...(query.projectId && { projectId: query.projectId }),
+      projectId: projectId!,  // Use projectId from security context
       ...(query.discipline && { discipline: query.discipline }),
       ...(query.category && { category: query.category }),
       ...(query.status && { status: query.status })
@@ -41,7 +57,7 @@ export async function GET(request: NextRequest) {
       prisma.budgetItem.count({ where })
     ]);
     
-    // Calculate variance for each item
+    // Calculate variance for each item (only for non-contractors)
     const itemsWithVariance = items.map(item => ({
       ...item,
       variance: Number(item.variance),
@@ -51,20 +67,28 @@ export async function GET(request: NextRequest) {
         : 0
     }));
     
+    // Redact cost information for contractors
+    const finalItems = auth.role === 'CONTRACTOR' 
+      ? itemsWithVariance.map(item => redactCostsForContractor(item, auth.role))
+      : itemsWithVariance;
+    
     return successResponse(
-      itemsWithVariance,
+      finalItems,
       undefined,
       paginationMetadata(query.page, query.limit, total)
     );
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.BUDGET,
+    action: 'view',
+    requireProject: true
   }
-}
+);
 
 // POST /api/v1/budget - Create new budget item
-export async function POST(request: NextRequest) {
-  try {
-    const authUser = await requireRole(['ADMIN', 'STAFF']);
+export const POST = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const body = await request.json();
     const data = createBudgetItemSchema.parse(body);
     
@@ -87,7 +111,7 @@ export async function POST(request: NextRequest) {
         vendorContactId: data.vendorContactId,
         status: data.status,
         variance: variance,
-        projectId: data.projectId
+        projectId: projectId!  // Use projectId from security context
       },
       include: {
         project: {
@@ -102,7 +126,7 @@ export async function POST(request: NextRequest) {
     // Log activity
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'CREATE',
         entity: 'BUDGET_ITEM',
         entityId: budgetItem.id,
@@ -115,7 +139,14 @@ export async function POST(request: NextRequest) {
     });
     
     return successResponse(budgetItem, 'Budget item created successfully');
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.BUDGET,
+    action: 'edit',
+    requireProject: true,
+    roles: ['ADMIN', 'STAFF']
   }
-}
+);
+
+// Export runtime for Firebase Admin
+export const runtime = 'nodejs';

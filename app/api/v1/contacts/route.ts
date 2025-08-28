@@ -1,19 +1,19 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth, requireRole } from '@/lib/api/auth-check';
 import { successResponse, errorResponse, paginationMetadata } from '@/lib/api/response';
 import { createContactSchema, contactQuerySchema } from '@/lib/validations/contact';
-import { Prisma } from '@prisma/client';
+import { Prisma, Module } from '@prisma/client';
+import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
 
 // GET /api/v1/contacts - List contacts with filters
-export async function GET(request: NextRequest) {
-  try {
-    const authUser = await requireAuth();
+export const GET = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const searchParams = Object.fromEntries(request.nextUrl.searchParams);
     const query = contactQuerySchema.parse(searchParams);
     
     const where: Prisma.ContactWhereInput = {
-      projectId: query.projectId,
+      projectId: projectId!,  // Use projectId from security context
       ...(query.category && { category: query.category }),
       ...(query.status && { status: query.status }),
       ...(query.search && {
@@ -50,15 +50,18 @@ export async function GET(request: NextRequest) {
       undefined,
       paginationMetadata(query.page, query.limit, total)
     );
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.CONTACTS,
+    action: 'view',
+    requireProject: true
   }
-}
+);
 
 // POST /api/v1/contacts - Create new contact
-export async function POST(request: NextRequest) {
-  try {
-    const authUser = await requireRole(['ADMIN', 'STAFF']);
+export const POST = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const body = await request.json();
     const data = createContactSchema.parse(body);
     
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
         specialty: data.specialty,
         status: data.status || 'ACTIVE',
         notes: data.notes,
-        projectId: data.projectId
+        projectId: projectId!  // Use projectId from security context
       },
       include: {
         project: {
@@ -87,7 +90,7 @@ export async function POST(request: NextRequest) {
     // Log activity
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'CREATE',
         entity: 'CONTACT',
         entityId: contact.id,
@@ -99,7 +102,14 @@ export async function POST(request: NextRequest) {
     });
     
     return successResponse(contact, 'Contact created successfully');
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.CONTACTS,
+    action: 'edit',
+    requireProject: true,
+    roles: ['ADMIN', 'STAFF']
   }
-}
+);
+
+// Export runtime for Firebase Admin
+export const runtime = 'nodejs';

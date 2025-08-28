@@ -137,3 +137,5 @@ export const POST = withAuth(
     requireProject: true
   }
 );
+// Export runtime for Firebase Admin
+export const runtime = 'nodejs';

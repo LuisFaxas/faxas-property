@@ -359,3 +359,5 @@ export const PATCH = withAuth(
     requireProject: true
   }
 );
+// Export runtime for Firebase Admin
+export const runtime = 'nodejs';

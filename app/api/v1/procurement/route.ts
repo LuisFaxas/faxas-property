@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth, requireRole } from '@/lib/api/auth-check';
 import { successResponse, errorResponse, paginationMetadata } from '@/lib/api/response';
 import { procurementQuerySchema, createProcurementSchema } from '@/lib/validations/procurement';
-import { Prisma } from '@prisma/client';
+import { Prisma, Module } from '@prisma/client';
+import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
 
 // Helper to generate PO number
 async function generatePONumber(): Promise<string> {
@@ -39,15 +39,15 @@ function calculateTotalCost(quantity: number, unitPrice?: number): number {
 }
 
 // GET /api/v1/procurement - List procurement items with advanced filtering
-export async function GET(request: NextRequest) {
-  try {
-    await requireAuth();
+export const GET = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const searchParams = Object.fromEntries(request.nextUrl.searchParams);
     const query = procurementQuerySchema.parse(searchParams);
     
     // Build where clause with advanced filters
     const where: Prisma.ProcurementWhereInput = {
-      ...(query.projectId && { projectId: query.projectId }),
+      projectId: projectId!,  // Use projectId from security context
       ...(query.supplierId && { supplierId: query.supplierId }),
       ...(query.orderStatus && { orderStatus: query.orderStatus }),
       ...(query.priority && { priority: query.priority }),
@@ -165,15 +165,18 @@ export async function GET(request: NextRequest) {
       undefined,
       paginationMetadata(query.page, query.limit, total)
     );
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.PROCUREMENT,
+    action: 'view',
+    requireProject: true
   }
-}
+);
 
 // POST /api/v1/procurement - Create new procurement item with auto PO generation
-export async function POST(request: NextRequest) {
-  try {
-    const authUser = await requireRole(['ADMIN', 'STAFF']);
+export const POST = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const body = await request.json();
     const data = createProcurementSchema.parse(body);
     
@@ -189,7 +192,7 @@ export async function POST(request: NextRequest) {
     // Create procurement item
     const procurement = await prisma.procurement.create({
       data: {
-        projectId: data.projectId,
+        projectId: projectId!,  // Use projectId from security context
         poNumber,
         materialItem: data.materialItem,
         description: data.description,
@@ -210,10 +213,10 @@ export async function POST(request: NextRequest) {
         budgetItemId: data.budgetItemId,
         attachments: data.attachments || [],
         tags: data.tags || [],
-        requestedBy: authUser.uid,
+        requestedBy: auth.uid,
         requestedAt: new Date(),
-        createdBy: authUser.uid,
-        updatedBy: authUser.uid
+        createdBy: auth.uid,
+        updatedBy: auth.uid
       },
       include: {
         project: true,
@@ -238,7 +241,7 @@ export async function POST(request: NextRequest) {
     // Log activity
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'CREATE',
         entity: 'PROCUREMENT',
         entityId: procurement.id,
@@ -253,7 +256,14 @@ export async function POST(request: NextRequest) {
     });
     
     return successResponse(procurement, 'Procurement item created successfully');
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.PROCUREMENT,
+    action: 'edit',
+    requireProject: true,
+    roles: ['ADMIN', 'STAFF']
   }
-}
+);
+
+// Export runtime for Firebase Admin
+export const runtime = 'nodejs';
