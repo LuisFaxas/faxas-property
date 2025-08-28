@@ -1,164 +1,149 @@
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { successResponse, paginationMetadata } from '@/lib/api/response';
+import { successResponse, paginationMetadata, errorResponse } from '@/lib/api/response';
 import { createTaskSchema, taskQuerySchema, bulkUpdateTasksSchema } from '@/lib/validations/task';
 import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
-import { Prisma, Module } from '@prisma/client';
+import { Module } from '@prisma/client';
+import { Policy } from '@/lib/policy';
+import { createSecurityContext, createRepositories } from '@/lib/data';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/v1/tasks - List tasks with advanced filters
 export const GET = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth, projectId } = security;
-    const searchParams = Object.fromEntries(request.nextUrl.searchParams);
-    const query = taskQuerySchema.parse(searchParams);
-    
-    // Enforce project scope from security context
-    const where: Prisma.TaskWhereInput = {
-      projectId: projectId!, // Required by wrapper
-      ...(query.status && { status: query.status }),
-      ...(query.priority && { priority: query.priority }),
-      ...(query.assignedToId && { assignedToId: query.assignedToId }),
-      ...(query.isOnCriticalPath !== undefined && { isOnCriticalPath: query.isOnCriticalPath }),
-      ...(query.isMilestone !== undefined && { isMilestone: query.isMilestone }),
-      ...(query.weatherDependent !== undefined && { weatherDependent: query.weatherDependent }),
-      ...(query.requiresInspection !== undefined && { requiresInspection: query.requiresInspection }),
-      ...(query.trade && { trade: query.trade }),
-      ...(query.location && { location: query.location }),
-      ...(query.tags && { tags: { hasSome: query.tags } }),
-      ...(query.parentTaskId && { parentTaskId: query.parentTaskId }),
-      ...(query.search && {
-        OR: [
-          { title: { contains: query.search, mode: 'insensitive' } },
-          { description: { contains: query.search, mode: 'insensitive' } }
-        ]
-      }),
-      ...(query.dueDateFrom && query.dueDateTo && {
-        dueDate: {
-          gte: new Date(query.dueDateFrom),
-          lte: new Date(query.dueDateTo)
-        }
-      }),
-      ...(query.startDateFrom && query.startDateTo && {
-        startDate: {
-          gte: new Date(query.startDateFrom),
-          lte: new Date(query.startDateTo)
-        }
-      })
-    };
-    
-    // Contractors can only see their assigned tasks
-    if (auth.role === 'CONTRACTOR') {
-      where.OR = [
-        { assignedToId: auth.uid },
-        { assignedContactId: auth.user.contact?.id }
-      ];
-    }
-    
-    // Build orderBy clause
-    const orderBy: Prisma.TaskOrderByWithRelationInput[] = [];
-    if (query.sortBy) {
-      orderBy.push({ [query.sortBy]: query.sortOrder || 'asc' });
-    } else {
-      orderBy.push({ dueDate: 'asc' }, { priority: 'desc' }, { createdAt: 'desc' });
-    }
-    
-    const [tasks, total] = await Promise.all([
-      prisma.task.findMany({
-        where,
-        include: {
-          assignedTo: {
-            select: {
-              id: true,
-              email: true
-            }
-          },
-          assignedContact: {
-            select: {
-              id: true,
-              name: true,
-              company: true,
-              emails: true,
-              phones: true
-            }
-          },
-          project: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          subtasks: query.includeSubtasks ? {
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              priority: true,
-              progressPercentage: true
-            }
-          } : false,
-          dependencies: {
-            include: {
-              predecessorTask: {
-                select: {
-                  id: true,
-                  title: true,
-                  status: true
-                }
-              }
-            }
-          },
-          dependents: {
-            include: {
-              dependentTask: {
-                select: {
-                  id: true,
-                  title: true,
-                  status: true
-                }
-              }
-            }
-          },
-          _count: {
-            select: {
-              attachments: true,
-              comments: true,
-              watchers: true,
-              photos: true,
-              checklistItems: true,
-              subtasks: true
-            }
+    try {
+      const { auth, projectId } = security;
+      
+      // Use policy engine to verify access
+      await Policy.assertModuleAccess(auth.user.id, projectId!, Module.TASKS, 'read');
+      
+      // Create scoped context and repositories
+      const scopedContext = await createSecurityContext(auth.user.id, projectId!);
+      const repos = createRepositories(scopedContext);
+      
+      // Parse query parameters
+      const searchParams = Object.fromEntries(request.nextUrl.searchParams);
+      const query = taskQuerySchema.parse(searchParams);
+      
+      // Build where clause - projectId is automatically enforced by repository
+      const where: any = {
+        ...(query.status && { status: query.status }),
+        ...(query.priority && { priority: query.priority }),
+        ...(query.assignedToId && { assignedToId: query.assignedToId }),
+        ...(query.isOnCriticalPath !== undefined && { isOnCriticalPath: query.isOnCriticalPath }),
+        ...(query.isMilestone !== undefined && { isMilestone: query.isMilestone }),
+        ...(query.weatherDependent !== undefined && { weatherDependent: query.weatherDependent }),
+        ...(query.requiresInspection !== undefined && { requiresInspection: query.requiresInspection }),
+        ...(query.trade && { trade: query.trade }),
+        ...(query.location && { location: query.location }),
+        ...(query.tags && { tags: { hasSome: query.tags } }),
+        ...(query.parentTaskId && { parentTaskId: query.parentTaskId }),
+        ...(query.search && {
+          OR: [
+            { title: { contains: query.search, mode: 'insensitive' } },
+            { description: { contains: query.search, mode: 'insensitive' } }
+          ]
+        }),
+        ...(query.dueDateFrom && query.dueDateTo && {
+          dueDate: {
+            gte: new Date(query.dueDateFrom),
+            lte: new Date(query.dueDateTo)
           }
-        },
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-        orderBy
-      }),
-      prisma.task.count({ where })
-    ]);
-    
-    // Calculate completion stats for tasks with subtasks
-    const tasksWithStats = tasks.map(task => {
-      if (task.subtasks && task.subtasks.length > 0) {
-        const completedSubtasks = task.subtasks.filter(st => st.status === 'COMPLETED').length;
-        const subtaskProgress = Math.round((completedSubtasks / task.subtasks.length) * 100);
-        return {
-          ...task,
-          subtaskProgress,
-          completedSubtasks,
-          totalSubtasks: task.subtasks.length
-        };
+        }),
+        ...(query.startDateFrom && query.startDateTo && {
+          startDate: {
+            gte: new Date(query.startDateFrom),
+            lte: new Date(query.startDateTo)
+          }
+        })
+      };
+      
+      // Contractors can only see their assigned tasks
+      const role = await Policy.getUserProjectRole(auth.user.id, projectId!);
+      if (role === 'CONTRACTOR') {
+        // Get the contact ID associated with this user
+        const contact = await prisma.contact.findFirst({
+          where: {
+            projectId: projectId!,
+            userId: auth.user.id
+          }
+        });
+        
+        if (contact) {
+          where.OR = [
+            { assignedToId: auth.user.id },
+            { assignedContactId: contact.id }
+          ];
+        } else {
+          where.assignedToId = auth.user.id;
+        }
       }
-      return task;
-    });
-    
-    return successResponse(
-      tasksWithStats,
-      undefined,
-      {
-        ...paginationMetadata(query.page, query.limit, total),
-        view: query.view || 'list'
+      
+      // Determine the order
+      const orderBy: any = {};
+      if (query.sortBy) {
+        orderBy[query.sortBy] = query.sortOrder || 'asc';
+      } else {
+        orderBy.createdAt = 'desc';
       }
-    );
+      
+      // Use scoped repository for data access
+      const [tasks, totalCount] = await Promise.all([
+        repos.tasks.findMany({
+          where,
+          include: {
+            assignedTo: {
+              select: {
+                id: true,
+                email: true,
+                role: true
+              }
+            },
+            assignedContact: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+                company: true
+              }
+            },
+            subtasks: query.includeSubtasks ? {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                completedAt: true
+              }
+            } : false,
+            attachments: true,
+            dependencies: query.includeDependencies ? {
+              include: {
+                dependsOn: true
+              }
+            } : false,
+            dependents: query.includeDependencies ? {
+              include: {
+                task: true
+              }
+            } : false
+          },
+          orderBy,
+          skip: query.offset,
+          take: query.limit
+        }),
+        repos.tasks.count({ where })
+      ]);
+      
+      // Apply rate limiting based on role
+      const rateLimitTier = await Policy.getRateLimitTier(auth.user.id);
+      
+      return successResponse(
+        tasks,
+        paginationMetadata(totalCount, query.limit, query.offset)
+      );
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     module: Module.TASKS,
@@ -167,197 +152,170 @@ export const GET = withAuth(
   }
 );
 
-// POST /api/v1/tasks - Create new task with all features
+// POST /api/v1/tasks - Create a new task
 export const POST = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth, projectId } = security;
-    const body = await request.json();
-    const data = createTaskSchema.parse(body);
-    
-    const task = await prisma.task.create({
-      data: {
-        // Basic fields
-        title: data.title,
-        description: data.description,
-        status: data.status || 'TODO',
-        priority: data.priority || 'MEDIUM',
-        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        
-        // Assignment
-        assignedToId: data.assignedToId && data.assignedToId !== '' ? data.assignedToId : undefined,
-        assignedContactId: data.assignedContactId && data.assignedContactId !== '' ? data.assignedContactId : undefined,
-        projectId: projectId!,  // Use projectId from security context
-        relatedContactIds: data.relatedContactIds || [],
-        
-        // Progress tracking
-        progressPercentage: data.progressPercentage || 0,
-        estimatedHours: data.estimatedHours,
-        actualHours: data.actualHours,
-        
-        // Construction-specific
-        isOnCriticalPath: data.isOnCriticalPath || false,
-        isMilestone: data.isMilestone || false,
-        location: data.location,
-        trade: data.trade,
-        weatherDependent: data.weatherDependent || false,
-        requiresInspection: data.requiresInspection || false,
-        inspectionStatus: data.inspectionStatus,
-        
-        // Location data
-        latitude: data.latitude,
-        longitude: data.longitude,
-        locationName: data.locationName,
-        
-        // Metadata
-        tags: data.tags || [],
-        customFields: data.customFields,
-        isRecurring: data.isRecurring || false,
-        recurringPattern: data.recurringPattern,
-        
-        // Mobile fields
-        offlineCreated: data.offlineCreated || false,
-        localId: data.localId,
-        thumbnailUrl: data.thumbnailUrl,
-        voiceNoteUrl: data.voiceNoteUrl,
-        quickTemplate: data.quickTemplate,
-        mobileMetadata: data.mobileMetadata,
-        
-        // Hierarchy
-        parentTaskId: data.parentTaskId
-      },
-      include: {
-        assignedTo: {
-          select: {
-            id: true,
-            email: true
-          }
-        },
-        assignedContact: {
-          select: {
-            id: true,
-            name: true,
-            company: true,
-            emails: true,
-            phones: true
-          }
-        },
-        project: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        parentTask: {
-          select: {
-            id: true,
-            title: true
-          }
-        }
+    try {
+      const { auth, projectId } = security;
+      
+      // Use policy engine to verify write access
+      await Policy.assertModuleAccess(auth.user.id, projectId!, Module.TASKS, 'write');
+      
+      // Create scoped context and repositories
+      const scopedContext = await createSecurityContext(auth.user.id, projectId!);
+      const repos = createRepositories(scopedContext);
+      
+      const body = await request.json();
+      const validatedData = createTaskSchema.parse(body);
+      
+      // Handle assignee - can be either a user or contact
+      let assigneeData: any = {};
+      if (validatedData.assigneeType === 'USER' && validatedData.assignedToId) {
+        assigneeData.assignedToId = validatedData.assignedToId;
+      } else if (validatedData.assigneeType === 'CONTACT' && validatedData.assignedContactId) {
+        assigneeData.assignedContactId = validatedData.assignedContactId;
       }
-    });
-    
-    // Log activity
-    await prisma.auditLog.create({
-      data: {
-        userId: auth.uid,
-        action: 'CREATE',
-        entity: 'TASK',
-        entityId: task.id,
-        meta: {
-          title: task.title,
-          assignedTo: task.assignedToId,
-          priority: task.priority,
-          isMilestone: task.isMilestone,
-          isOnCriticalPath: task.isOnCriticalPath
+      
+      // Create task using scoped repository
+      const task = await repos.tasks.create({
+        data: {
+          ...validatedData,
+          ...assigneeData,
+          projectId: projectId!, // Enforced by repository
+          createdBy: auth.user.id,
+          customFields: validatedData.customFields || {},
+          subtasks: validatedData.subtasks ? {
+            create: validatedData.subtasks
+          } : undefined
+        },
+        include: {
+          assignedTo: true,
+          assignedContact: true,
+          subtasks: true,
+          attachments: true
         }
-      }
-    });
-    
-    // Create activity record
-    await prisma.taskActivity.create({
-      data: {
-        taskId: task.id,
-        userId: auth.uid,
-        action: 'CREATED',
-        details: {
-          title: task.title,
-          priority: task.priority,
-          assignedTo: task.assignedToId
+      });
+      
+      // Create activity log
+      await prisma.taskActivity.create({
+        data: {
+          taskId: task.id,
+          userId: auth.user.id,
+          action: 'CREATED',
+          description: `Task "${task.title}" created`
         }
-      }
-    });
-    
-    return successResponse(task, 'Task created successfully');
+      });
+      
+      // Log policy decision for audit
+      await Policy.logPolicyDecision(
+        auth.user.id,
+        projectId!,
+        Module.TASKS,
+        'write',
+        true,
+        'Task created successfully'
+      );
+      
+      return successResponse(task, 'Task created successfully');
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     module: Module.TASKS,
     action: 'edit',
-    requireProject: true
+    requireProject: true,
+    roles: ['ADMIN', 'STAFF']
   }
 );
 
-// PATCH /api/v1/tasks - Bulk update tasks
+// PATCH /api/v1/tasks/bulk - Bulk update tasks
 export const PATCH = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth, projectId } = security;
-    const body = await request.json();
-    const data = bulkUpdateTasksSchema.parse(body);
-    
-    const updateData: any = {};
-    if (data.updates.status) updateData.status = data.updates.status;
-    if (data.updates.priority) updateData.priority = data.updates.priority;
-    if (data.updates.assignedToId !== undefined) updateData.assignedToId = data.updates.assignedToId;
-    if (data.updates.dueDate) updateData.dueDate = new Date(data.updates.dueDate);
-    if (data.updates.tags) updateData.tags = data.updates.tags;
-    if (data.updates.trade) updateData.trade = data.updates.trade;
-    if (data.updates.location) updateData.location = data.updates.location;
-    
-    // Update all tasks - ensure they belong to the project
-    const result = await prisma.task.updateMany({
-      where: {
-        id: { in: data.taskIds },
-        projectId: projectId!  // Ensure tasks belong to current project
-      },
-      data: updateData
-    });
-    
-    // Log bulk activity
-    await prisma.auditLog.create({
-      data: {
-        userId: auth.uid,
-        action: 'BULK_UPDATE',
-        entity: 'TASK',
-        entityId: data.taskIds.join(','),
-        meta: {
-          count: result.count,
-          updates: data.updates
+    try {
+      const { auth, projectId } = security;
+      
+      // Use policy engine to verify write access
+      await Policy.assertModuleAccess(auth.user.id, projectId!, Module.TASKS, 'write');
+      
+      // Create scoped context and repositories
+      const scopedContext = await createSecurityContext(auth.user.id, projectId!);
+      const repos = createRepositories(scopedContext);
+      
+      const body = await request.json();
+      const validatedData = bulkUpdateTasksSchema.parse(body);
+      
+      const results = [];
+      
+      for (const update of validatedData.updates) {
+        // Verify each task belongs to the project (repository will enforce this)
+        const task = await repos.tasks.findUnique({
+          where: { id: update.id }
+        });
+        
+        if (!task) {
+          results.push({
+            id: update.id,
+            success: false,
+            error: 'Task not found or access denied'
+          });
+          continue;
+        }
+        
+        try {
+          const updated = await repos.tasks.update({
+            where: { id: update.id },
+            data: update.data
+          });
+          
+          // Log status changes
+          if (update.data.status && update.data.status !== task.status) {
+            await prisma.taskActivity.create({
+              data: {
+                taskId: task.id,
+                userId: auth.user.id,
+                action: 'STATUS_CHANGE',
+                description: `Status changed from ${task.status} to ${update.data.status}`,
+                metadata: {
+                  oldStatus: task.status,
+                  newStatus: update.data.status
+                }
+              }
+            });
+          }
+          
+          results.push({
+            id: update.id,
+            success: true,
+            data: updated
+          });
+        } catch (error: any) {
+          results.push({
+            id: update.id,
+            success: false,
+            error: error.message
+          });
         }
       }
-    });
-    
-    // Create activity records for each task
-    const activities = data.taskIds.map(taskId => ({
-      taskId,
-      userId: auth.uid,
-      action: 'BULK_UPDATED',
-      details: data.updates
-    }));
-    
-    await prisma.taskActivity.createMany({
-      data: activities
-    });
-    
-    return successResponse(
-      { updated: result.count },
-      `Successfully updated ${result.count} tasks`
-    );
+      
+      const successCount = results.filter(r => r.success).length;
+      const failureCount = results.filter(r => !r.success).length;
+      
+      return successResponse(
+        results,
+        `Bulk update completed: ${successCount} succeeded, ${failureCount} failed`
+      );
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     module: Module.TASKS,
     action: 'edit',
-    requireProject: true
+    requireProject: true,
+    roles: ['ADMIN', 'STAFF']
   }
 );
+
 // Export runtime for Firebase Admin
 export const runtime = 'nodejs';

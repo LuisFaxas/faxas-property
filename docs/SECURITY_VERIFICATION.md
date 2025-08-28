@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the comprehensive security test suite for the Construction Management System, verifying that all Stage 1 security hardening measures are properly implemented and functioning correctly.
+This document describes the comprehensive security test suite for the Construction Management System, verifying that all security hardening measures are properly implemented and functioning correctly. This includes Stage 1 (RBAC), Stage 2 (Test Suite), and Stage 3 (Policy Engine & CSP) implementations.
 
 ## Test Coverage Matrix
 
@@ -232,6 +232,140 @@ NODE_ENV=test npm run test:security:ci
    # Clear any cached rate limit data
    ```
 
+## Stage 3: Policy Engine Architecture
+
+### Centralized Authorization
+All authorization decisions now flow through the **Policy Engine** (`lib/policy/`):
+
+```typescript
+// Policy Engine Functions
+Policy.assertMember(userId, projectId)           // Verify project membership
+Policy.assertModuleAccess(userId, projectId, module, permission)  // Check module permissions
+Policy.getUserProjectRole(userId, projectId)     // Get user's role in project
+Policy.getRateLimitTier(userId)                 // Get rate limit based on role
+Policy.applyDataRedaction(data, role, module)   // Redact sensitive data
+```
+
+### Scoped Data Layer
+All data access uses **Scoped Repositories** (`lib/data/`) that enforce tenant isolation:
+
+```typescript
+// Repository automatically adds projectId to all queries
+const repos = createRepositories(securityContext);
+const tasks = await repos.tasks.findMany({ where: { status: 'TODO' } });
+// Becomes: WHERE status = 'TODO' AND projectId = 'user-project-id'
+```
+
+Key features:
+- Automatic project scoping in WHERE clauses
+- Ownership validation of returned data
+- Audit logging for all mutations
+- Transaction support with scoping
+
+### Security Headers Profile
+
+#### Content Security Policy (CSP)
+Dynamic nonce-based CSP with strict directives:
+```
+default-src 'self'
+script-src 'self' 'strict-dynamic' 'nonce-{random}'
+object-src 'none'
+base-uri 'self'
+frame-ancestors 'none'
+upgrade-insecure-requests
+```
+
+#### HSTS (HTTP Strict Transport Security)
+```
+max-age=31536000; includeSubDomains; preload
+```
+
+#### Other Headers
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `X-Frame-Options: DENY`
+- Removed: `X-XSS-Protection` (deprecated)
+
+### CSP Nonce Implementation
+1. Middleware generates unique nonce per request
+2. Nonce stored in response header `x-nonce`
+3. Application extracts nonce for inline scripts:
+```jsx
+// In your React component
+const nonce = headers().get('x-nonce');
+<script nonce={nonce}>
+  // Inline script
+</script>
+```
+
+### Rate Limiting Tiers
+Role-based rate limiting with configurable tiers:
+- **ADMIN**: 200 requests/minute
+- **STAFF**: 150 requests/minute
+- **CONTRACTOR**: 100 requests/minute
+- **VIEWER**: 50 requests/minute
+
+Both user-based and IP-based tracking implemented.
+
+## Testing the Policy Engine
+
+### Run Policy Tests
+```bash
+# Unit tests for policy functions
+npm test lib/policy/__tests__/policy.test.ts
+
+# Integration tests for policy enforcement
+npm test __tests__/security/policy-enforcement.test.ts
+```
+
+### Verify CSP Headers
+```bash
+# Start the development server
+npm run dev
+
+# Check headers with curl
+curl -I http://localhost:3000/api/v1/tasks
+```
+
+### Test Query Scoping
+```sql
+-- All queries should include projectId
+SELECT * FROM tasks WHERE status = 'TODO' AND project_id = 'scoped-id';
+
+-- Never allow unscoped queries
+SELECT * FROM tasks WHERE status = 'TODO'; -- This should be prevented
+```
+
+## Migration Guide for New Endpoints
+
+When creating new API endpoints:
+
+1. **Always use withAuth wrapper**:
+```typescript
+export const GET = withAuth(
+  async (request, ctx, security) => {
+    // Your handler
+  },
+  { module: Module.YOUR_MODULE, action: 'read', requireProject: true }
+);
+```
+
+2. **Use Policy Engine for authorization**:
+```typescript
+await Policy.assertModuleAccess(userId, projectId, module, permission);
+```
+
+3. **Use Scoped Repositories for data access**:
+```typescript
+const context = await createSecurityContext(userId, projectId);
+const repos = createRepositories(context);
+const data = await repos.yourModel.findMany();
+```
+
+4. **Never access Prisma directly** for project-scoped data
+5. **Log policy decisions** for audit trails
+
 ## Maintenance
 
 ### Adding New Tests
@@ -241,10 +375,28 @@ NODE_ENV=test npm run test:security:ci
 4. Ensure CI passes before merging
 
 ### Updating Security Policies
-1. Modify security implementation
-2. Update corresponding tests
+1. Modify policy engine (`lib/policy/`)
+2. Update scoped repositories if needed
 3. Run full test suite
 4. Update documentation
+
+### Tuning CSP
+1. Edit `middleware.ts` to modify CSP directives
+2. Test with CSP validator tools
+3. Monitor console for CSP violations
+4. Adjust as needed for legitimate resources
+
+## Security Checklist for Code Review
+
+- [ ] All API routes use `withAuth` wrapper
+- [ ] Policy engine consulted for authorization
+- [ ] Data access through scoped repositories
+- [ ] No direct Prisma access for tenant data
+- [ ] Audit logs created for mutations
+- [ ] Rate limiting applied based on role
+- [ ] CSP nonce used for inline scripts
+- [ ] Security headers present in responses
+- [ ] Tests cover the new endpoints
 
 ## Contact
 
@@ -252,5 +404,5 @@ For security concerns or questions about these tests, please contact the securit
 
 ---
 
-*Last Updated: [Current Date]*
-*Version: Stage 2 Security Verification*
+*Last Updated: December 2024*
+*Version: Stage 3 - Policy Engine + CSP*

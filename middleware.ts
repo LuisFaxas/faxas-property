@@ -1,32 +1,121 @@
+/**
+ * Security Middleware
+ * Implements CSP, HSTS, and other security headers
+ */
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { randomBytes } from 'crypto';
 
-// Public routes that don't require authentication
-const publicRoutes = [
-  '/login',
-  '/test-auth', 
-  '/api/health', 
-  '/api/webhooks',
-  '/_next',
-  '/favicon.ico'
-];
-
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  
-  // Check if route is public or static asset
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
-  
-  if (isPublicRoute) {
-    return NextResponse.next();
-  }
-  
-  // For now, allow access without checking cookies since Firebase Auth
-  // handles authentication state client-side
-  // The AuthContext and ProtectedRoute components handle the actual protection
-  return NextResponse.next();
+/**
+ * Generate a nonce for CSP
+ */
+function generateNonce(): string {
+  return randomBytes(16).toString('base64');
 }
 
+/**
+ * Build Content Security Policy
+ */
+function buildCSP(nonce: string): string {
+  const directives = [
+    `default-src 'self'`,
+    `script-src 'self' 'strict-dynamic' 'nonce-${nonce}' https: 'unsafe-inline'`, // unsafe-inline is ignored when nonce is present
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`, // Allow inline styles for now
+    `font-src 'self' https://fonts.gstatic.com data:`,
+    `img-src 'self' data: blob: https:`,
+    `connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com wss://localhost:* ws://localhost:*`,
+    `object-src 'none'`,
+    `base-uri 'self'`,
+    `form-action 'self'`,
+    `frame-ancestors 'none'`,
+    `block-all-mixed-content`,
+    `upgrade-insecure-requests`
+  ];
+
+  return directives.join('; ');
+}
+
+export function middleware(request: NextRequest) {
+  const response = NextResponse.next();
+  
+  // Generate nonce for this request
+  const nonce = generateNonce();
+  
+  // Store nonce in request headers for use in the app
+  response.headers.set('x-nonce', nonce);
+  
+  // Security Headers
+  
+  // Content Security Policy with nonce
+  const csp = buildCSP(nonce);
+  response.headers.set('Content-Security-Policy', csp);
+  
+  // Strict Transport Security (HSTS) - 1 year
+  response.headers.set(
+    'Strict-Transport-Security',
+    'max-age=31536000; includeSubDomains; preload'
+  );
+  
+  // X-Content-Type-Options
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  
+  // Referrer Policy
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Permissions Policy (minimal permissions)
+  response.headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()'
+  );
+  
+  // X-Frame-Options (redundant with frame-ancestors in CSP but good for older browsers)
+  response.headers.set('X-Frame-Options', 'DENY');
+  
+  // Remove X-Powered-By header
+  response.headers.delete('X-Powered-By');
+  
+  // Remove legacy X-XSS-Protection (deprecated and can introduce vulnerabilities)
+  response.headers.delete('X-XSS-Protection');
+  
+  // Add security headers for API routes specifically
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    // No cookies in cross-site requests for APIs
+    response.headers.set('SameSite', 'Strict');
+    
+    // Additional CORS headers if needed
+    const origin = request.headers.get('origin');
+    if (origin && isAllowedOrigin(origin)) {
+      response.headers.set('Access-Control-Allow-Origin', origin);
+      response.headers.set('Access-Control-Allow-Credentials', 'true');
+      response.headers.set(
+        'Access-Control-Allow-Methods',
+        'GET, POST, PUT, DELETE, OPTIONS'
+      );
+      response.headers.set(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization'
+      );
+    }
+  }
+  
+  return response;
+}
+
+/**
+ * Check if origin is allowed for CORS
+ */
+function isAllowedOrigin(origin: string): boolean {
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    process.env.NEXT_PUBLIC_APP_URL
+  ].filter(Boolean);
+  
+  return allowedOrigins.includes(origin);
+}
+
+// Configure which paths the middleware should run on
 export const config = {
   matcher: [
     /*
