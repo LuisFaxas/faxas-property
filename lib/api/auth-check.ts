@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { auth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { ApiError } from './response';
+import { NextRequest } from 'next/server';
 import type { User, Role, Module, ProjectMember } from '@prisma/client';
 
 export type AuthenticatedUser = {
@@ -11,9 +12,22 @@ export type AuthenticatedUser = {
   user: User;
 };
 
-export async function requireAuth(): Promise<AuthenticatedUser> {
-  const headersList = await headers();
-  const authorization = headersList.get('authorization');
+export async function requireAuth(request?: NextRequest): Promise<AuthenticatedUser> {
+  let authorization: string | null = null;
+  
+  // Try to get authorization from request first (for testing)
+  if (request) {
+    authorization = request.headers.get('authorization');
+  } else {
+    // Fall back to Next.js headers() for production
+    try {
+      const headersList = await headers();
+      authorization = headersList.get('authorization');
+    } catch (error) {
+      // In test environment, headers() might not be available
+      throw new ApiError(401, 'No authorization header');
+    }
+  }
   
   if (!authorization?.startsWith('Bearer ')) {
     throw new ApiError(401, 'Missing or invalid authorization header');

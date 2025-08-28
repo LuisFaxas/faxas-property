@@ -1,38 +1,42 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/api/auth-check';
 import { successResponse, errorResponse } from '@/lib/api/response';
 import { exportSchema } from '@/lib/validations/procurement';
-import { Prisma } from '@prisma/client';
+import { withAuth, SecurityContext } from '@/lib/api/auth-wrapper';
+import { Prisma, Module } from '@prisma/client';
 
 // GET /api/v1/procurement/export - Export procurement data
-export async function GET(request: NextRequest) {
-  try {
-    await requireAuth();
-    const searchParams = Object.fromEntries(request.nextUrl.searchParams);
-    const query = exportSchema.parse(searchParams);
-    
-    // Build where clause from filters
-    const where: Prisma.ProcurementWhereInput = {};
-    if (query.filters) {
-      const filters = query.filters;
-      Object.assign(where, {
-        ...(filters.projectId && { projectId: filters.projectId }),
-        ...(filters.supplierId && { supplierId: filters.supplierId }),
-        ...(filters.orderStatus && { orderStatus: filters.orderStatus }),
-        ...(filters.priority && { priority: filters.priority }),
-        ...(filters.discipline && { discipline: filters.discipline }),
-        ...(filters.phase && { phase: filters.phase }),
-        ...(filters.category && { category: filters.category }),
-        ...(filters.search && {
-          OR: [
-            { materialItem: { contains: filters.search, mode: 'insensitive' } },
-            { description: { contains: filters.search, mode: 'insensitive' } },
-            { poNumber: { contains: filters.search, mode: 'insensitive' } }
-          ]
-        })
-      });
-    }
+export const GET = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    try {
+      const { auth, projectId } = security;
+      const searchParams = Object.fromEntries(request.nextUrl.searchParams);
+      const query = exportSchema.parse(searchParams);
+      
+      // Build where clause from filters - enforce project scope from security context
+      const where: Prisma.ProcurementWhereInput = {
+        projectId: projectId! // Always scope to authorized project
+      };
+      
+      if (query.filters) {
+        const filters = query.filters;
+        // Don't allow overriding projectId from filters
+        Object.assign(where, {
+          ...(filters.supplierId && { supplierId: filters.supplierId }),
+          ...(filters.orderStatus && { orderStatus: filters.orderStatus }),
+          ...(filters.priority && { priority: filters.priority }),
+          ...(filters.discipline && { discipline: filters.discipline }),
+          ...(filters.phase && { phase: filters.phase }),
+          ...(filters.category && { category: filters.category }),
+          ...(filters.search && {
+            OR: [
+              { materialItem: { contains: filters.search, mode: 'insensitive' } },
+              { description: { contains: filters.search, mode: 'insensitive' } },
+              { poNumber: { contains: filters.search, mode: 'insensitive' } }
+            ]
+          })
+        });
+      }
     
     // Fetch procurement data
     const procurements = await prisma.procurement.findMany({
@@ -181,8 +185,18 @@ export async function GET(request: NextRequest) {
       return successResponse(exportData);
     }
     
-    return errorResponse('Invalid export format', 400);
-  } catch (error) {
-    return errorResponse(error);
+      return errorResponse('Invalid export format', 400);
+    } catch (error) {
+      return errorResponse(error);
+    }
+  },
+  {
+    module: Module.PROCUREMENT,
+    action: 'view',
+    requireProject: true,
+    roles: ['ADMIN', 'STAFF', 'CONTRACTOR'] // Contractors can view but data may be limited
   }
-}
+);
+
+// Export runtime for Firebase Admin
+export const runtime = 'nodejs';

@@ -31,10 +31,10 @@ export function withAuth<T extends Function>(
   return async (req: NextRequest, ctx?: any) => {
     try {
       // 1. Authenticate user
-      const auth = await requireAuth();
+      const auth = await requireAuth(req);
       
-      // 2. Rate limiting (will implement with Redis/Upstash)
-      await rateLimit(auth.uid);
+      // 2. Rate limiting with both user and IP tracking
+      await rateLimit(auth.uid, 100, 60000, req);
       
       // 3. Check roles if specified
       if (options.roles && !options.roles.includes(auth.role)) {
@@ -59,6 +59,25 @@ export function withAuth<T extends Function>(
               console.warn(`No projectId provided, defaulting to first available project: ${projectId}`);
             } else {
               throw new ApiError(400, 'No projects available for user');
+            }
+          } else {
+            // Validate that the projectId exists
+            const prisma = (await import('@/lib/prisma')).default;
+            const projectExists = await prisma.project.findUnique({
+              where: { id: projectId }
+            });
+            
+            if (!projectExists) {
+              console.warn(`Invalid projectId: ${projectId}, falling back to first available project`);
+              // Try to get a valid project for the user
+              const { getUserProjects } = await import('./auth-check');
+              const userProjects = await getUserProjects(auth.uid);
+              if (userProjects.length > 0) {
+                projectId = userProjects[0];
+                console.warn(`Using fallback project: ${projectId}`);
+              } else {
+                throw new ApiError(404, 'Project not found and no fallback available');
+              }
             }
           }
         } else if (options.resolveProjectId) {
