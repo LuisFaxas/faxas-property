@@ -10,7 +10,7 @@ import { MobileTaskCard } from '@/components/tasks/mobile-task-card';
 import { MobileListView } from '@/components/tasks/mobile-list-view';
 import { MobileDateTimePicker } from '@/components/tasks/mobile-date-time-picker';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
-import { MobileTaskDialog } from '@/components/tasks/mobile-task-dialog';
+import { MobileDialog } from '@/components/ui/mobile/dialog';
 import { TaskFilterBar } from '@/components/tasks/task-filter-bar';
 import { FilterBottomSheet } from '@/components/tasks/filter-bottom-sheet';
 import { Button } from '@/components/ui/button';
@@ -77,7 +77,9 @@ import {
   XCircle,
   LayoutGrid,
   List,
-  ClipboardList
+  ClipboardList,
+  Search,
+  Filter
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -195,12 +197,53 @@ export default function AdminTasksPage() {
     const tasks = Array.isArray(tasksData) ? tasksData : tasksData?.data || [];
     let filtered = [...tasks];
     
-    // Search filter
+    // Enhanced search filter
     if (searchQuery) {
-      filtered = filtered.filter(task => 
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((task: Task) => {
+        // Search in title and description
+        if (task.title.toLowerCase().includes(query) ||
+            task.description?.toLowerCase().includes(query)) {
+          return true;
+        }
+        
+        // Search in assignee name
+        if (task.assignedTo?.name?.toLowerCase().includes(query)) {
+          return true;
+        }
+        
+        // Search in priority
+        if (task.priority.toLowerCase().includes(query)) {
+          return true;
+        }
+        
+        // Search in status
+        const statusText = task.status.replace(/_/g, ' ').toLowerCase();
+        if (statusText.includes(query)) {
+          return true;
+        }
+        
+        // Search for date-related terms
+        if (task.dueDate) {
+          const dueDate = new Date(task.dueDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          
+          if (query === 'today' && dueDate.toDateString() === today.toDateString()) {
+            return true;
+          }
+          if (query === 'tomorrow' && dueDate.toDateString() === tomorrow.toDateString()) {
+            return true;
+          }
+          if (query === 'overdue' && dueDate < today) {
+            return true;
+          }
+        }
+        
+        return false;
+      });
     }
     
     // Status filter
@@ -222,6 +265,8 @@ export default function AdminTasksPage() {
     const taskData = {
       ...values,
       projectId: projectId || values.projectId,
+      // Clean up empty date string - API expects undefined or valid ISO datetime
+      dueDate: values.dueDate || undefined,
     };
     try {
       await createMutation.mutateAsync(taskData);
@@ -291,6 +336,8 @@ export default function AdminTasksPage() {
       await updateMutation.mutateAsync({
         id: selectedTask.id,
         ...values,
+        // Clean up empty date string - API expects undefined or valid ISO datetime
+        dueDate: values.dueDate || undefined,
       });
       toast({
         title: 'Success',
@@ -539,37 +586,77 @@ export default function AdminTasksPage() {
           "p-6 space-y-6",
           isMobile && "p-3 space-y-4"
         )}>
+          {/* Header Skeleton */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <Skeleton className="h-8 w-48 mb-2" />
-              <Skeleton className="h-4 w-64" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-32 sm:w-48 bg-white/10 animate-pulse" />
+              <Skeleton className="h-4 w-48 sm:w-64 bg-white/5 animate-pulse" />
             </div>
-            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-28 sm:w-32 bg-white/10 animate-pulse rounded-md" />
           </div>
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-6 w-24" />
-            <Skeleton className="h-10 w-40" />
+          
+          {/* Filter Bar Skeleton */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-20 bg-white/5 animate-pulse rounded" />
+              <Skeleton className="h-8 w-24 bg-white/10 animate-pulse rounded-full" />
+            </div>
+            <Skeleton className="h-10 w-32 sm:w-40 bg-white/10 animate-pulse rounded-md" />
           </div>
-          <div className={cn(
-            "grid gap-4",
-            isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          )}>
-            {Array.from({ length: isMobile ? 3 : 6 }, (_, i) => i + 1).map((i) => (
-              <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 animate-pulse">
-                <Skeleton className="h-6 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-full mb-3" />
-                <Skeleton className="h-3 w-1/2 mb-3" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-6 w-20 rounded-full" />
-                  <Skeleton className="h-6 w-16 rounded-full" />
+          
+          {/* Mobile View - Card Grid Skeleton */}
+          {isMobile ? (
+            <div className="grid gap-3 grid-cols-1">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-3/4 bg-white/10 animate-pulse" />
+                    <Skeleton className="h-3 w-full bg-white/5 animate-pulse" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Skeleton className="h-5 w-16 bg-blue-500/20 animate-pulse rounded-full" />
+                    <Skeleton className="h-5 w-20 bg-amber-500/20 animate-pulse rounded-full" />
+                  </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <Skeleton className="h-4 w-24 bg-white/5 animate-pulse" />
+                    <Skeleton className="h-8 w-8 bg-white/10 animate-pulse rounded" />
+                  </div>
                 </div>
-                <div className="mt-3 flex justify-between items-center">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-8 w-8 rounded" />
+              ))}
+            </div>
+          ) : (
+            /* Desktop View - Table Skeleton */
+            <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+              <div className="border-b border-white/10 p-4">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-5 w-32 bg-white/10 animate-pulse" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-8 w-24 bg-white/5 animate-pulse rounded" />
+                    <Skeleton className="h-8 w-24 bg-white/5 animate-pulse rounded" />
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="divide-y divide-white/5">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      <Skeleton className="h-4 w-4 bg-white/10 animate-pulse rounded" />
+                      <div className="space-y-1 flex-1">
+                        <Skeleton className="h-5 w-2/3 bg-white/10 animate-pulse" />
+                        <Skeleton className="h-3 w-1/2 bg-white/5 animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="h-6 w-20 bg-blue-500/20 animate-pulse rounded-full" />
+                      <Skeleton className="h-6 w-24 bg-green-500/20 animate-pulse rounded-full" />
+                      <Skeleton className="h-4 w-20 bg-white/5 animate-pulse" />
+                      <Skeleton className="h-8 w-8 bg-white/10 animate-pulse rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </PageShell>
     );
@@ -590,34 +677,6 @@ export default function AdminTasksPage() {
         "p-6 space-y-6",
         isMobile && "p-3 space-y-4"
       )}>
-        {/* Mobile Header with View Toggle */}
-        {isMobile && (
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold text-white">Tasks</h1>
-            <div className="flex items-center gap-2">
-              <div className="flex bg-white/5 rounded-full p-0.5">
-                <button 
-                  onClick={() => setViewMode('card')}
-                  className={cn(
-                    "p-1.5 rounded-full transition-all",
-                    viewMode === 'card' && "bg-blue-600"
-                  )}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </button>
-                <button 
-                  onClick={() => setViewMode('list')}
-                  className={cn(
-                    "p-1.5 rounded-full transition-all",
-                    viewMode === 'list' && "bg-blue-600"
-                  )}
-                >
-                  <List className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Desktop Header */}
         {!isMobile && (
@@ -637,21 +696,6 @@ export default function AdminTasksPage() {
               )}
             </div>
           </div>
-        )}
-        
-        {/* Mobile Filter Bar */}
-        {isMobile && (
-          <TaskFilterBar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            priorityFilter={priorityFilter}
-            onPriorityFilterChange={setPriorityFilter}
-            onOpenFilterSheet={() => setIsFilterSheetOpen(true)}
-            taskCount={filteredTasks.length}
-            className="-mx-3 mb-3"
-          />
         )}
         
         {/* Desktop view toggle */}
@@ -696,7 +740,7 @@ export default function AdminTasksPage() {
         {/* Main content area */}
         <div className={cn(
           "flex-1",
-          isMobile && "pb-20" // Add padding for FAB clearance on mobile
+          isMobile && "pb-28" // Add padding for search bar + FAB clearance on mobile
         )}>
           {filteredTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -875,15 +919,112 @@ export default function AdminTasksPage() {
           />
         )}
 
+        {/* Mobile Fixed Bottom Search Bar with View Toggle */}
+        {isMobile && (
+          <div className="fixed bottom-16 left-0 right-0 z-40 p-3 bg-gray-900/95 backdrop-blur-sm border-t border-white/10">
+            <div className="flex gap-2">
+              {/* View Toggle - Integrated on left */}
+              <div className="flex items-center gap-0.5 bg-white/5 rounded-lg p-0.5 border border-white/10">
+                <button 
+                  onClick={() => setViewMode('card')}
+                  className={cn(
+                    "p-2 rounded-md transition-all",
+                    viewMode === 'card' 
+                      ? "bg-blue-600 text-white" 
+                      : "text-white/60 hover:text-white"
+                  )}
+                  aria-label="Card view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    "p-2 rounded-md transition-all",
+                    viewMode === 'list' 
+                      ? "bg-blue-600 text-white" 
+                      : "text-white/60 hover:text-white"
+                  )}
+                  aria-label="List view"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+              {/* Search Input */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white/5 border-white/10 text-white h-10"
+                />
+              </div>
+              {/* Filter Button */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsFilterSheetOpen(true)}
+                className="relative h-10 w-10"
+              >
+                <Filter className="h-4 w-4" />
+                {(statusFilter !== 'all' || priorityFilter !== 'all') && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-blue-600">
+                    {[statusFilter !== 'all', priorityFilter !== 'all'].filter(Boolean).length}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Create Dialog */}
-        <MobileTaskDialog 
+        <MobileDialog 
           open={isCreateOpen} 
           onOpenChange={setIsCreateOpen}
           title="Create New Task"
           description={!isMobile ? "Add a new task to the project. Click save when you're done." : undefined}
+          size="md"
+          showCloseButton={false}
+          footer={
+            <div className="flex gap-2">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsCreateOpen(false)}
+                disabled={isSubmitting}
+                className={cn(
+                  "border-white/10",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                form="create-task-form"
+                className={cn(
+                  "bg-blue-600 hover:bg-blue-700",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Task'
+                )}
+              </Button>
+            </div>
+          }
         >
           <Form {...form}>
             <form 
+              id="create-task-form"
               onSubmit={form.handleSubmit(handleCreate)} 
               className="space-y-4"
             >
@@ -991,54 +1132,55 @@ export default function AdminTasksPage() {
                     </FormItem>
                   )}
                 />
-                {/* Form Actions - Inside the form */}
-                <div className={cn(
-                  "flex gap-3 pt-4",
-                  isMobile && "flex-row border-t border-white/10 mt-4"
-                )}>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsCreateOpen(false)}
-                    disabled={isSubmitting}
-                    className={cn(
-                      "border-white/20 text-white hover:bg-white/10",
-                      isMobile && "flex-1 h-12 text-base"
-                    )}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    className={cn(
-                      "bg-blue-600 hover:bg-blue-700",
-                      isMobile && "flex-1 h-12 text-base"
-                    )}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Creating...
-                      </>
-                    ) : (
-                      'Create Task'
-                    )}
-                  </Button>
-                </div>
             </form>
           </Form>
-        </MobileTaskDialog>
+        </MobileDialog>
 
         {/* Edit Dialog */}
-        <MobileTaskDialog
+        <MobileDialog
           open={isEditOpen}
           onOpenChange={setIsEditOpen}
           title="Edit Task"
           description={!isMobile ? "Make changes to the task. Click save when you're done." : undefined}
+          size="md"
+          showCloseButton={false}
+          footer={
+            <div className="flex gap-2">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsEditOpen(false)}
+                disabled={isSubmitting}
+                className={cn(
+                  "border-white/10",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                form="edit-task-form"
+                className={cn(
+                  "bg-blue-600 hover:bg-blue-700",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </div>
+          }
         >
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+            <form id="edit-task-form" onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="title"
@@ -1140,44 +1282,9 @@ export default function AdminTasksPage() {
                     </FormItem>
                   )}
                 />
-                {/* Form Actions - Inside the form */}
-                <div className={cn(
-                  "flex gap-3 pt-4",
-                  isMobile && "flex-row border-t border-white/10 mt-4"
-                )}>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsEditOpen(false)}
-                    disabled={isSubmitting}
-                    className={cn(
-                      "border-white/20 text-white hover:bg-white/10",
-                      isMobile && "flex-1 h-12 text-base"
-                    )}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    className={cn(
-                      "bg-blue-600 hover:bg-blue-700",
-                      isMobile && "flex-1 h-12 text-base"
-                    )}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Changes'
-                    )}
-                  </Button>
-                </div>
             </form>
           </Form>
-        </MobileTaskDialog>
+        </MobileDialog>
 
         {/* Delete Confirmation */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

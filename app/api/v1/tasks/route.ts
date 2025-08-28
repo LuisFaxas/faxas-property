@@ -1,19 +1,20 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth, requireRole } from '@/lib/api/auth-check';
-import { successResponse, errorResponse, paginationMetadata } from '@/lib/api/response';
+import { successResponse, paginationMetadata } from '@/lib/api/response';
 import { createTaskSchema, taskQuerySchema, bulkUpdateTasksSchema } from '@/lib/validations/task';
-import { Prisma } from '@prisma/client';
+import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
+import { Prisma, Module } from '@prisma/client';
 
 // GET /api/v1/tasks - List tasks with advanced filters
-export async function GET(request: NextRequest) {
-  try {
-    const authUser = await requireAuth();
+export const GET = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const searchParams = Object.fromEntries(request.nextUrl.searchParams);
     const query = taskQuerySchema.parse(searchParams);
     
+    // Enforce project scope from security context
     const where: Prisma.TaskWhereInput = {
-      ...(query.projectId && { projectId: query.projectId }),
+      projectId: projectId!, // Required by wrapper
       ...(query.status && { status: query.status }),
       ...(query.priority && { priority: query.priority }),
       ...(query.assignedToId && { assignedToId: query.assignedToId }),
@@ -46,8 +47,11 @@ export async function GET(request: NextRequest) {
     };
     
     // Contractors can only see their assigned tasks
-    if (authUser.role === 'CONTRACTOR') {
-      where.assignedToId = authUser.uid;
+    if (auth.role === 'CONTRACTOR') {
+      where.OR = [
+        { assignedToId: auth.uid },
+        { assignedContactId: auth.user.contact?.id }
+      ];
     }
     
     // Build orderBy clause
@@ -155,15 +159,18 @@ export async function GET(request: NextRequest) {
         view: query.view || 'list'
       }
     );
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.TASKS,
+    action: 'view',
+    requireProject: true
   }
-}
+);
 
 // POST /api/v1/tasks - Create new task with all features
-export async function POST(request: NextRequest) {
-  try {
-    const authUser = await requireRole(['ADMIN', 'STAFF']);
+export const POST = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const body = await request.json();
     const data = createTaskSchema.parse(body);
     
@@ -180,7 +187,7 @@ export async function POST(request: NextRequest) {
         // Assignment
         assignedToId: data.assignedToId && data.assignedToId !== '' ? data.assignedToId : undefined,
         assignedContactId: data.assignedContactId && data.assignedContactId !== '' ? data.assignedContactId : undefined,
-        projectId: data.projectId,
+        projectId: projectId!,  // Use projectId from security context
         relatedContactIds: data.relatedContactIds || [],
         
         // Progress tracking
@@ -253,7 +260,7 @@ export async function POST(request: NextRequest) {
     // Log activity
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'CREATE',
         entity: 'TASK',
         entityId: task.id,
@@ -271,7 +278,7 @@ export async function POST(request: NextRequest) {
     await prisma.taskActivity.create({
       data: {
         taskId: task.id,
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'CREATED',
         details: {
           title: task.title,
@@ -282,15 +289,18 @@ export async function POST(request: NextRequest) {
     });
     
     return successResponse(task, 'Task created successfully');
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.TASKS,
+    action: 'edit',
+    requireProject: true
   }
-}
+);
 
 // PATCH /api/v1/tasks - Bulk update tasks
-export async function PATCH(request: NextRequest) {
-  try {
-    const authUser = await requireRole(['ADMIN', 'STAFF']);
+export const PATCH = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const body = await request.json();
     const data = bulkUpdateTasksSchema.parse(body);
     
@@ -303,10 +313,11 @@ export async function PATCH(request: NextRequest) {
     if (data.updates.trade) updateData.trade = data.updates.trade;
     if (data.updates.location) updateData.location = data.updates.location;
     
-    // Update all tasks
+    // Update all tasks - ensure they belong to the project
     const result = await prisma.task.updateMany({
       where: {
-        id: { in: data.taskIds }
+        id: { in: data.taskIds },
+        projectId: projectId!  // Ensure tasks belong to current project
       },
       data: updateData
     });
@@ -314,7 +325,7 @@ export async function PATCH(request: NextRequest) {
     // Log bulk activity
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'BULK_UPDATE',
         entity: 'TASK',
         entityId: data.taskIds.join(','),
@@ -328,7 +339,7 @@ export async function PATCH(request: NextRequest) {
     // Create activity records for each task
     const activities = data.taskIds.map(taskId => ({
       taskId,
-      userId: authUser.uid,
+      userId: auth.uid,
       action: 'BULK_UPDATED',
       details: data.updates
     }));
@@ -341,7 +352,10 @@ export async function PATCH(request: NextRequest) {
       { updated: result.count },
       `Successfully updated ${result.count} tasks`
     );
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.TASKS,
+    action: 'edit',
+    requireProject: true
   }
-}
+);

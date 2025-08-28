@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { MobileDialog } from '@/components/ui/mobile';
+import { MobileDialog } from '@/components/ui/mobile/dialog';
 import {
   Dialog,
   DialogContent,
@@ -650,41 +650,112 @@ export default function AdminSchedulePage() {
         fabLabel="Add Event"
         onFabClick={() => setIsCreateOpen(true)}
       >
-        <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6">
+        <div className={cn(
+          "p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6",
+          isMobile && "p-3 space-y-4"
+        )}>
           {/* Header Skeleton */}
           <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
-            <div>
-              <Skeleton className="h-8 w-48 mb-2" />
-              <Skeleton className="h-4 w-64" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-32 sm:w-48 bg-white/10 animate-pulse" />
+              <Skeleton className="h-4 w-48 sm:w-64 bg-white/5 animate-pulse" />
             </div>
-            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-28 sm:w-32 bg-white/10 animate-pulse rounded-md" />
           </div>
           
-          {/* KPI Cards Skeleton */}
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <Card key={i} className="bg-white/5 border-white/10 animate-pulse">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-4" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-8 w-16 mb-1" />
-                  <Skeleton className="h-3 w-32" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          
-          {/* Tabs & Calendar Skeleton */}
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-96" />
-            <Card className="bg-white/5 border-white/10">
-              <CardContent className="p-0">
-                <Skeleton className="h-[500px] w-full" />
-              </CardContent>
-            </Card>
-          </div>
+          {/* Mobile View */}
+          {isMobile ? (
+            <>
+              {/* KPI Carousel Skeleton */}
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 px-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="min-w-[140px] bg-white/5 border border-white/10 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <Skeleton className="h-3 w-16 bg-white/5 animate-pulse" />
+                      <Skeleton className="h-3 w-3 bg-white/5 animate-pulse rounded" />
+                    </div>
+                    <Skeleton className="h-6 w-12 bg-white/10 animate-pulse mb-1" />
+                    <Skeleton className="h-2 w-20 bg-white/5 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+              
+              {/* View Toggle Skeleton */}
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-8 w-24 bg-white/10 animate-pulse rounded-lg" />
+                <Skeleton className="h-8 w-20 bg-white/5 animate-pulse rounded" />
+              </div>
+              
+              {/* Calendar/List View Skeleton */}
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="border-l-4 border-blue-500/50 pl-3 py-2">
+                      <Skeleton className="h-4 w-3/4 bg-white/10 animate-pulse mb-2" />
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-3 w-16 bg-white/5 animate-pulse" />
+                        <Skeleton className="h-3 w-20 bg-blue-500/20 animate-pulse rounded-full" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Desktop View */
+            <>
+              {/* KPI Cards Skeleton */}
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i} className="bg-white/5 border-white/10">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <Skeleton className="h-4 w-24 bg-white/5 animate-pulse" />
+                      <Skeleton className="h-4 w-4 bg-white/5 animate-pulse rounded" />
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-8 w-16 bg-white/10 animate-pulse mb-1" />
+                      <Skeleton className="h-3 w-32 bg-white/5 animate-pulse" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              {/* Tabs & Calendar Skeleton */}
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-64 sm:w-96 bg-white/10 animate-pulse rounded" />
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-6">
+                    {/* Calendar Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <Skeleton className="h-6 w-32 bg-white/10 animate-pulse" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-8 w-20 bg-white/5 animate-pulse rounded" />
+                        <Skeleton className="h-8 w-20 bg-white/5 animate-pulse rounded" />
+                        <Skeleton className="h-8 w-20 bg-white/5 animate-pulse rounded" />
+                      </div>
+                    </div>
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-px bg-white/5 rounded-lg overflow-hidden">
+                      {/* Days of week */}
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                        <div key={day} className="bg-white/5 p-2 text-center">
+                          <Skeleton className="h-4 w-8 bg-white/10 animate-pulse mx-auto" />
+                        </div>
+                      ))}
+                      {/* Calendar days */}
+                      {[...Array(35)].map((_, i) => (
+                        <div key={i} className="bg-graphite-900 aspect-square p-2">
+                          <Skeleton className="h-4 w-4 bg-white/5 animate-pulse mb-1" />
+                          {i % 7 === 3 && <Skeleton className="h-2 w-full bg-blue-500/20 animate-pulse mt-1" />}
+                          {i % 5 === 2 && <Skeleton className="h-2 w-full bg-green-500/20 animate-pulse mt-1" />}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
         </div>
       </PageShell>
     );
@@ -761,65 +832,6 @@ export default function AdminSchedulePage() {
               </div>
             )}
           </div>
-          
-          {/* Create Event Dialog for Landscape */}
-          <MobileDialog
-            open={isCreateOpen}
-            onOpenChange={setIsCreateOpen}
-            title="Create Schedule Event"
-            description="Add a new event to the project calendar"
-            footer={
-              <div className="flex gap-2 w-full">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsCreateOpen(false)}
-                  disabled={isSubmitting}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleCreate} 
-                  disabled={isSubmitting}
-                  className="flex-1"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Event'
-                  )}
-                </Button>
-              </div>
-            }
-          >
-            <EventForm 
-              formData={{
-                title: formData.title,
-                type: formData.type,
-                description: formData.description,
-                location: formData.location,
-                startDate: formData.startDate,
-                startTime: formData.startTime,
-                endDate: formData.endDate,
-                endTime: formData.endTime,
-                status: formData.status,
-                attendees: formData.attendees,
-                requestedBy: formData.requestedBy,
-                approvedBy: formData.approvedBy
-              }} 
-              onChange={(data) => {
-                setFormData({
-                  ...data,
-                  notes: formData.notes,
-                  projectId: formData.projectId || ''
-                });
-              }} 
-            />
-          </MobileDialog>
-          
           {/* FAB also in landscape mode for consistency */}
           <Button
             size="lg"
@@ -873,24 +885,34 @@ export default function AdminSchedulePage() {
           onOpenChange={setIsCreateOpen}
           title="Create Schedule Event"
           description="Add a new event to the project calendar"
+          size="md"
+          showCloseButton={false}
           footer={
-            <div className="flex gap-2 w-full">
+            <div className="flex gap-2">
               <Button 
+                type="button"
                 variant="outline" 
                 onClick={() => setIsCreateOpen(false)}
                 disabled={isSubmitting}
-                className="flex-1"
+                className={cn(
+                  "border-white/10",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
               >
                 Cancel
               </Button>
               <Button 
-                onClick={handleCreate} 
+                type="submit"
+                form="create-event-form"
                 disabled={isSubmitting}
-                className="flex-1"
+                className={cn(
+                  "bg-blue-600 hover:bg-blue-700",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     Creating...
                   </>
                 ) : (
@@ -900,214 +922,33 @@ export default function AdminSchedulePage() {
             </div>
           }
         >
-          <EventForm 
-            formData={{
-              title: formData.title,
-              type: formData.type,
-              description: formData.description,
-              location: formData.location,
-              startDate: formData.startDate,
-              startTime: formData.startTime,
-              endDate: formData.endDate,
-              endTime: formData.endTime,
-              status: formData.status,
-              attendees: formData.attendees,
-              requestedBy: formData.requestedBy,
-              approvedBy: formData.approvedBy
-            }} 
-            onChange={(data) => {
-              setFormData({
-                ...data,
-                notes: formData.notes,
-                projectId: formData.projectId || ''
-              });
-            }} 
-          />
+          <form id="create-event-form" onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
+            <EventForm 
+              formData={{
+                title: formData.title,
+                type: formData.type,
+                description: formData.description,
+                location: formData.location,
+                startDate: formData.startDate,
+                startTime: formData.startTime,
+                endDate: formData.endDate,
+                endTime: formData.endTime,
+                status: formData.status,
+                attendees: formData.attendees,
+                requestedBy: formData.requestedBy,
+                approvedBy: formData.approvedBy
+              }} 
+              onChange={(data) => {
+                setFormData({
+                  ...data,
+                  notes: formData.notes,
+                  projectId: formData.projectId || ''
+                });
+              }} 
+            />
+          </form>
         </MobileDialog>
 
-        {/* KPI Carousel */}
-        {isMobile && !isLandscape && (
-          <>
-            
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogContent className="w-full h-full sm:max-w-[500px] sm:max-h-[85vh] sm:h-auto overflow-hidden flex flex-col bg-gray-900 text-white border-0 sm:border sm:border-white/10 rounded-none sm:rounded-lg">
-              <DialogHeader className="flex-shrink-0">
-                <DialogTitle>Create Schedule Event</DialogTitle>
-                <DialogDescription className="text-white/60">
-                  Add a new event to the project calendar
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto px-1">
-                <div className="grid gap-4 py-4 pr-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Event Title</Label>
-                    <Input
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="bg-white/5 border-white/10 text-white"
-                      placeholder="e.g., Site Inspection"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Event Type</Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value) => setFormData({ ...formData, type: value })}
-                    >
-                      <SelectTrigger className="bg-white/5 border-white/10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CALL">Call</SelectItem>
-                        <SelectItem value="MEETING">Meeting</SelectItem>
-                        <SelectItem value="SITE_VISIT">Site Visit</SelectItem>
-                        <SelectItem value="WORK">Work</SelectItem>
-                        <SelectItem value="EMAIL_FOLLOWUP">Email Followup</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="bg-white/5 border-white/10"
-                    placeholder="Event details..."
-                  />
-                </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Start Date</Label>
-                      <Input
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Start Time</Label>
-                      <Input
-                        type="time"
-                        value={formData.startTime}
-                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>End Date</Label>
-                      <Input
-                        type="date"
-                        value={formData.endDate}
-                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>End Time</Label>
-                      <Input
-                        type="time"
-                        value={formData.endTime}
-                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Location</Label>
-                    <Input
-                      value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                      placeholder="e.g., Main Site"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value) => setFormData({ ...formData, status: value })}
-                    >
-                      <SelectTrigger className="bg-white/5 border-white/10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PENDING">Pending Approval</SelectItem>
-                        <SelectItem value="REQUESTED">Requested</SelectItem>
-                        <SelectItem value="PLANNED">Planned</SelectItem>
-                        <SelectItem value="DONE">Done</SelectItem>
-                        <SelectItem value="CANCELED">Canceled</SelectItem>
-                        <SelectItem value="RESCHEDULE_NEEDED">Reschedule Needed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Attendees (comma-separated)</Label>
-                  <Input
-                    value={formData.attendees}
-                    onChange={(e) => setFormData({ ...formData, attendees: e.target.value })}
-                    className="bg-white/5 border-white/10 text-white"
-                    placeholder="John Doe, Jane Smith"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Requested By</Label>
-                    <Input
-                      value={formData.requestedBy}
-                      onChange={(e) => setFormData({ ...formData, requestedBy: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                      placeholder="Name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Approved By</Label>
-                    <Input
-                      value={formData.approvedBy}
-                      onChange={(e) => setFormData({ ...formData, approvedBy: e.target.value })}
-                      className="bg-white/5 border-white/10"
-                      placeholder="Name"
-                    />
-                  </div>
-                </div>
-                </div>
-              </div>
-              <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsCreateOpen(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleCreate} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Event'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          </>
-        )}
 
         {/* KPI Cards - Hidden in landscape */}
         {!isLandscape && (
@@ -1278,14 +1119,49 @@ export default function AdminSchedulePage() {
         </Tabs>
 
         {/* Edit Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="w-full h-full sm:max-w-[500px] sm:max-h-[85vh] sm:h-auto overflow-hidden flex flex-col bg-gray-900 text-white border-0 sm:border sm:border-white/10 rounded-none sm:rounded-lg">
-            <DialogHeader className="flex-shrink-0">
-              <DialogTitle>Edit Schedule Event</DialogTitle>
-              <DialogDescription className="text-white/60">
-                Update event details
-              </DialogDescription>
-            </DialogHeader>
+        <MobileDialog 
+          open={isEditOpen} 
+          onOpenChange={setIsEditOpen}
+          title="Edit Schedule Event"
+          description="Update event details"
+          size="md"
+          showCloseButton={false}
+          footer={
+            <div className="flex gap-2">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsEditOpen(false)}
+                disabled={isSubmitting}
+                className={cn(
+                  "border-white/10",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                form="edit-event-form"
+                disabled={isSubmitting}
+                className={cn(
+                  "bg-blue-600 hover:bg-blue-700",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Event'
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <form id="edit-event-form" onSubmit={(e) => { e.preventDefault(); handleEdit(); }}>
             <div className="flex-1 overflow-y-auto px-1">
               <div className="grid gap-4 py-4 pr-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1410,14 +1286,8 @@ export default function AdminSchedulePage() {
               </div>
               </div>
             </div>
-            <DialogFooter className="flex-shrink-0 border-t pt-4 mt-auto">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleEdit}>Update Event</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </form>
+        </MobileDialog>
 
         {/* Delete Confirmation */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

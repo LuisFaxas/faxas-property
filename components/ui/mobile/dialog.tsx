@@ -78,6 +78,7 @@ export function MobileDialog({
             )}
             {showCloseButton && (
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => onOpenChange(false)}
@@ -90,7 +91,7 @@ export function MobileDialog({
 
           {/* Content */}
           <div className={cn(
-            "flex-1 overflow-y-auto py-4",
+            "flex-1 overflow-y-auto py-4 px-4",
             preventScroll && "overflow-hidden"
           )}>
             {children}
@@ -98,7 +99,7 @@ export function MobileDialog({
 
           {/* Footer */}
           {footer && (
-            <div className="border-t border-white/10 pt-4 pb-safe">
+            <div className="border-t border-white/10 px-4 pt-4 pb-safe">
               {footer}
             </div>
           )}

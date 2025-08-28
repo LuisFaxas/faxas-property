@@ -678,8 +678,137 @@ When implementing mobile features:
 13. **Test on real devices** - Don't rely only on browser dev tools
 14. **Document exceptions** - Note any deviations from standards
 
+## Standard Mobile Search Bar (v3.0)
+
+### Fixed Bottom Search with Integrated Controls
+Position search bar at bottom for optimal thumb reach with integrated view toggle and filter:
+
+```tsx
+{/* Mobile Fixed Bottom Search Bar with View Toggle */}
+{isMobile && (
+  <div className="fixed bottom-16 left-0 right-0 z-40 p-3 bg-gray-900/95 backdrop-blur-sm border-t border-white/10">
+    <div className="flex gap-2">
+      {/* View Toggle - Left side for thumb access */}
+      <div className="flex items-center gap-0.5 bg-white/5 rounded-lg p-0.5 border border-white/10">
+        <button 
+          onClick={() => setViewMode('card')}
+          className={cn(
+            "p-2 rounded-md transition-all",
+            viewMode === 'card' 
+              ? "bg-blue-600 text-white" 
+              : "text-white/60 hover:text-white"
+          )}
+          aria-label="Card view"
+        >
+          <LayoutGrid className="h-4 w-4" />
+        </button>
+        <button 
+          onClick={() => setViewMode('list')}
+          className={cn(
+            "p-2 rounded-md transition-all",
+            viewMode === 'list' 
+              ? "bg-blue-600 text-white" 
+              : "text-white/60 hover:text-white"
+          )}
+          aria-label="List view"
+        >
+          <List className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Search Input */}
+      <div className="flex-1 relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+        <Input
+          type="text"
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 bg-white/5 border-white/10 text-white h-10"
+        />
+      </div>
+
+      {/* Filter Button */}
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => setIsFilterSheetOpen(true)}
+        className="relative h-10 w-10"
+      >
+        <Filter className="h-4 w-4" />
+        {activeFilters.length > 0 && (
+          <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-blue-600">
+            {activeFilters.length}
+          </Badge>
+        )}
+      </Button>
+    </div>
+  </div>
+)}
+```
+
+**Standards:**
+- Fixed position at `bottom-16` (above bottom nav)
+- View toggle on LEFT for easy thumb access
+- Search input takes remaining space
+- Filter button on RIGHT with badge for active filters
+- Glass morphism background with backdrop blur
+- All controls in single row for efficient space use
+
+## KPI Carousel Pattern (v3.0)
+
+### Looping Stats Cards with Embla Carousel
+Use KPICarousel component for consistent stats display across all pages:
+
+```tsx
+import { KPICarousel } from '@/components/schedule/kpi-carousel';
+
+{/* Mobile Stats Carousel */}
+{isMobile && (
+  <KPICarousel
+    cards={[
+      {
+        title: 'Total Items',
+        value: items.length,
+        subtitle: 'All items',
+        icon: Users,
+        iconColor: 'text-white/40',
+      },
+      {
+        title: 'Active',
+        value: activeCount,
+        subtitle: 'Currently active',
+        icon: UserCheck,
+        iconColor: 'text-green-400',
+      },
+      // More cards...
+    ]}
+    className="-mx-3"
+  />
+)}
+```
+
+**Features:**
+- Embla Carousel with smooth touch/swipe
+- 80% card width with peek effect
+- Looping enabled for continuous scroll
+- Pagination dots (active dot is blue and longer)
+- Consistent card design with icon, title, value, subtitle
+- Automatic disable on larger screens
+
+**Card Structure:**
+```typescript
+interface KPICard {
+  title: string;           // Card title
+  value: string | number;  // Main metric
+  subtitle: string;        // Description
+  icon: LucideIcon;       // Icon component
+  iconColor?: string;     // Icon color class
+}
+```
+
 ---
 
-*Last Updated: November 2024 - Standardized Mobile Components*
-*Version: 2.0*
-*Changes: Added universal mobile components (MobileDialog, MobileCard, MobileDetailSheet, MobileList), swipe gesture standards, toast notifications, progress indicators, and completed items handling patterns*
+*Last Updated: December 2024 - Added Mobile Search Bar and KPI Carousel Standards*
+*Version: 3.0*
+*Changes: Added fixed bottom search bar with integrated view toggle, KPI carousel pattern with Embla integration*

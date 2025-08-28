@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { KPICarousel } from '@/components/schedule/kpi-carousel';
 import { ContactCard } from '@/components/contacts/contact-card';
+import { MobileContactList } from '@/components/contacts/mobile-contact-list';
+import { MobileContactDetailSheet } from '@/components/contacts/mobile-contact-detail-sheet';
+import { MobileDialog } from '@/components/ui/mobile/dialog';
+import { MobileFilterSheet } from '@/components/contacts/mobile-filter-sheet';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { AssignTaskDialog } from '@/components/contacts/assign-task-dialog';
 import { PageShell } from '@/components/blocks/page-shell';
@@ -72,10 +77,12 @@ import {
   User,
   Users,
   UserPlus,
+  UserCheck,
   Download,
   LayoutGrid,
   List,
   Filter,
+  Search,
   X,
   ClipboardList,
   Unlock,
@@ -148,8 +155,12 @@ export default function AdminContactsPage() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isAssignTaskOpen, setIsAssignTaskOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card'); // Default to card view for mobile
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Get default project ID
   const [projectId, setProjectId] = useState<string>('');
@@ -160,13 +171,6 @@ export default function AdminContactsPage() {
       setTimeout(() => setIsReady(true), 500);
     }
   }, [authLoading, user]);
-
-  // Auto-switch to card view on mobile
-  useEffect(() => {
-    if (isMobile && viewMode === 'list') {
-      setViewMode('card');
-    }
-  }, [isMobile, viewMode]);
 
   // Form
   const form = useForm<ContactFormValues>({
@@ -356,6 +360,7 @@ export default function AdminContactsPage() {
 
   // Handlers
   const handleCreate = async (values: ContactFormValues) => {
+    setIsSubmitting(true);
     try {
       // Ensure we have a valid projectId
       const finalProjectId = values.projectId || projectId || 
@@ -367,6 +372,7 @@ export default function AdminContactsPage() {
           description: 'No project available. Please create a project first.',
           variant: 'destructive',
         });
+        setIsSubmitting(false);
         return;
       }
       
@@ -381,6 +387,7 @@ export default function AdminContactsPage() {
       });
       
       setIsCreateOpen(false);
+      setIsSubmitting(false);
       form.reset({
         name: '',
         email: '',
@@ -395,6 +402,7 @@ export default function AdminContactsPage() {
       refetch();
     } catch (error) {
       console.error('Error creating contact:', error);
+      setIsSubmitting(false);
     }
   };
 
@@ -417,6 +425,7 @@ export default function AdminContactsPage() {
   const handleUpdate = async (values: ContactFormValues) => {
     if (!selectedContact) return;
     
+    setIsSubmitting(true);
     try {
       await apiClient.put(`/contacts/${selectedContact.id}`, values);
       toast({
@@ -425,6 +434,7 @@ export default function AdminContactsPage() {
       });
       setIsEditOpen(false);
       setSelectedContact(null);
+      setIsSubmitting(false);
       form.reset();
       refetch();
     } catch (error) {
@@ -433,6 +443,7 @@ export default function AdminContactsPage() {
         description: 'Failed to update contact',
         variant: 'destructive',
       });
+      setIsSubmitting(false);
     }
   };
 
@@ -500,10 +511,24 @@ export default function AdminContactsPage() {
   // Get contacts array
   const contacts = Array.isArray(contactsData?.data) ? contactsData.data : Array.isArray(contactsData) ? contactsData : [];
   
-  // Filter contacts based on active filters
+  // Filter contacts based on active filters and search
   const filteredContacts = useMemo(() => {
     let filtered: any[] = contacts;
     
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter((c: any) => {
+        const searchLower = searchQuery.toLowerCase();
+        return (
+          c.name?.toLowerCase().includes(searchLower) ||
+          c.email?.toLowerCase().includes(searchLower) ||
+          c.phone?.toLowerCase().includes(searchLower) ||
+          c.company?.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+    
+    // Active filters
     if (activeFilters.includes('portal')) {
       filtered = filtered.filter((c: any) => c.portalStatus === 'ACTIVE');
     }
@@ -518,7 +543,7 @@ export default function AdminContactsPage() {
     }
     
     return filtered;
-  }, [contacts, activeFilters]);
+  }, [contacts, activeFilters, searchQuery]);
 
   const handleAssignTask = (contact: any) => {
     setSelectedContact(contact);
@@ -531,6 +556,13 @@ export default function AdminContactsPage() {
         ? prev.filter(f => f !== filter)
         : [...prev, filter]
     );
+  };
+
+  const handleContactTap = (contact: any) => {
+    if (isMobile) {
+      setSelectedContact(contact);
+      setIsDetailOpen(true);
+    }
   };
 
   const handleExport = () => {
@@ -569,9 +601,98 @@ export default function AdminContactsPage() {
         userName={user?.displayName || 'User'} 
         userEmail={user?.email || ''}
       >
-        <div className="p-6 space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-[400px] w-full" />
+        <div className={cn(
+          "p-6 space-y-6",
+          isMobile && "p-3 space-y-4"
+        )}>
+          {/* Header Skeleton */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-32 sm:w-48 bg-white/10 animate-pulse" />
+              <Skeleton className="h-4 w-48 sm:w-64 bg-white/5 animate-pulse" />
+            </div>
+            <Skeleton className="h-10 w-28 sm:w-32 bg-white/10 animate-pulse rounded-md" />
+          </div>
+          
+          {/* KPI Cards Skeleton - Mobile */}
+          {isMobile && (
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 px-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="min-w-[140px] bg-white/5 border border-white/10 rounded-lg p-3">
+                  <Skeleton className="h-3 w-20 bg-white/5 animate-pulse mb-2" />
+                  <Skeleton className="h-6 w-12 bg-white/10 animate-pulse mb-1" />
+                  <Skeleton className="h-2 w-24 bg-white/5 animate-pulse" />
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Mobile View - Contact Cards Skeleton */}
+          {isMobile ? (
+            <div className="grid gap-3 grid-cols-1">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-5 w-2/3 bg-white/10 animate-pulse" />
+                      <Skeleton className="h-3 w-full bg-white/5 animate-pulse" />
+                      <Skeleton className="h-3 w-3/4 bg-white/5 animate-pulse" />
+                    </div>
+                    <Skeleton className="h-8 w-8 bg-white/10 animate-pulse rounded" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Skeleton className="h-5 w-20 bg-green-500/20 animate-pulse rounded-full" />
+                    <Skeleton className="h-5 w-24 bg-blue-500/20 animate-pulse rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Desktop View - Table Skeleton */
+            <div className="space-y-4">
+              {/* KPI Cards - Desktop */}
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <Skeleton className="h-4 w-24 bg-white/5 animate-pulse mb-3" />
+                    <Skeleton className="h-8 w-16 bg-white/10 animate-pulse mb-1" />
+                    <Skeleton className="h-3 w-32 bg-white/5 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+              
+              {/* Table Skeleton */}
+              <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+                <div className="border-b border-white/10 p-4">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-5 w-32 bg-white/10 animate-pulse" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-8 w-24 bg-white/5 animate-pulse rounded" />
+                      <Skeleton className="h-8 w-24 bg-white/5 animate-pulse rounded" />
+                    </div>
+                  </div>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4 flex-1">
+                        <Skeleton className="h-10 w-10 bg-white/10 animate-pulse rounded-full" />
+                        <div className="space-y-1 flex-1">
+                          <Skeleton className="h-5 w-1/3 bg-white/10 animate-pulse" />
+                          <Skeleton className="h-3 w-1/2 bg-white/5 animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="h-6 w-20 bg-green-500/20 animate-pulse rounded-full" />
+                        <Skeleton className="h-4 w-32 bg-white/5 animate-pulse" />
+                        <Skeleton className="h-8 w-8 bg-white/10 animate-pulse rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </PageShell>
     );
@@ -582,36 +703,152 @@ export default function AdminContactsPage() {
       userRole={(userRole as "ADMIN" | "STAFF" | "CONTRACTOR" | "VIEWER") || 'VIEWER'} 
       userName={user?.displayName || 'User'} 
       userEmail={user?.email || ''}
+      pageTitle="Contacts"
+      fabIcon={Plus}
+      fabLabel="Add Contact"
+      onFabClick={() => setIsCreateOpen(true)}
     >
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">Contacts Management</h1>
-            <p className="text-white/60 mt-1 text-sm sm:text-base">Manage project contacts and contractors</p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline"
-              size="sm"
-              className="sm:size-default"
-              onClick={handleExport}
-            >
-              <Download className="h-4 w-4 mr-0 sm:mr-2" />
-              <span className="hidden sm:inline">Export CSV</span>
-            </Button>
-            <Button 
-              className="bg-accent-500 hover:bg-accent-600"
-              size="sm"
-              onClick={() => setIsCreateOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Contact
-            </Button>
-          </div>
-        </div>
+      <div className={cn(
+        "p-6 space-y-6 relative",
+        isMobile && "p-3 space-y-3 pb-32" // Extra padding for fixed search bar
+      )}>
+        {/* Mobile Stats Carousel - Using KPICarousel like Schedule page */}
+        {isMobile && (
+          <KPICarousel
+            cards={[
+              {
+                title: 'Total Contacts',
+                value: contacts.length,
+                subtitle: 'All contacts',
+                icon: Users,
+                iconColor: 'text-white/40',
+              },
+              {
+                title: 'Portal Access',
+                value: `${contacts.filter((c: any) => c.portalStatus === 'ACTIVE').length}/${contacts.length}`,
+                subtitle: 'Have access',
+                icon: Unlock,
+                iconColor: 'text-green-400',
+              },
+              {
+                title: 'Pending Invites',
+                value: contacts.filter((c: any) => c.portalStatus === 'INVITED').length,
+                subtitle: 'Awaiting response',
+                icon: Clock,
+                iconColor: 'text-yellow-400',
+              },
+              {
+                title: 'Active',
+                value: contacts.filter((c: any) => c.status === 'ACTIVE').length,
+                subtitle: 'Active contacts',
+                icon: UserCheck,
+                iconColor: 'text-green-400',
+              },
+              {
+                title: 'Has Tasks',
+                value: contacts.filter((c: any) => c._count?.assignedTasks > 0).length,
+                subtitle: 'Assigned tasks',
+                icon: ClipboardList,
+                iconColor: 'text-blue-400',
+              },
+            ]}
+            className="-mx-3"
+          />
+        )}
 
-        {/* Quick Filters */}
+        {/* Mobile Fixed Bottom Search Bar with View Toggle */}
+        {isMobile && (
+          <div className="fixed bottom-16 left-0 right-0 z-40 p-3 bg-gray-900/95 backdrop-blur-sm border-t border-white/10">
+            <div className="flex gap-2">
+              {/* View Toggle - Integrated on left */}
+              <div className="flex items-center gap-0.5 bg-white/5 rounded-lg p-0.5 border border-white/10">
+                <button 
+                  onClick={() => setViewMode('card')}
+                  className={cn(
+                    "p-2 rounded-md transition-all",
+                    viewMode === 'card' 
+                      ? "bg-blue-600 text-white" 
+                      : "text-white/60 hover:text-white"
+                  )}
+                  aria-label="Card view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    "p-2 rounded-md transition-all",
+                    viewMode === 'list' 
+                      ? "bg-blue-600 text-white" 
+                      : "text-white/60 hover:text-white"
+                  )}
+                  aria-label="List view"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Input
+                  type="text"
+                  placeholder="Search contacts..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-white/5 border-white/10 text-white h-10"
+                />
+              </div>
+
+              {/* Filter Button */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsFilterSheetOpen(true)}
+                className="relative h-10 w-10"
+              >
+                <Filter className="h-4 w-4" />
+                {activeFilters.length > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-blue-600">
+                    {activeFilters.length}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Desktop Header */}
+        {!isMobile && (
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">Contacts Management</h1>
+              <p className="text-white/60 mt-1 text-sm sm:text-base">Manage project contacts and contractors</p>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                size="sm"
+                className="sm:size-default"
+                onClick={handleExport}
+              >
+                <Download className="h-4 w-4 mr-0 sm:mr-2" />
+                <span className="hidden sm:inline">Export CSV</span>
+              </Button>
+              <Button 
+                className="bg-accent-500 hover:bg-accent-600"
+                size="sm"
+                onClick={() => setIsCreateOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Contact
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Filters - Desktop Only */}
+        {!isMobile && (
         <div className="flex flex-wrap items-start gap-2">
           <span className="text-sm text-white/60 w-full sm:w-auto mb-2 sm:mb-0">Quick filters:</span>
           <Button
@@ -685,45 +922,52 @@ export default function AdminContactsPage() {
             </Button>
           )}
         </div>
+        )}
 
-        {/* View Mode Toggle */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">
-            {filteredContacts.length} Contacts
-          </h2>
-          <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1 border border-white/10">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode('card')}
-              className={cn(
-                'px-3 py-1.5',
-                viewMode === 'card' 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                  : 'text-white/60 hover:text-white hover:bg-white/10'
-              )}
-            >
-              <LayoutGrid className="h-4 w-4 mr-2" />
-              Cards
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className={cn(
-                'px-3 py-1.5',
-                viewMode === 'list' 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                  : 'text-white/60 hover:text-white hover:bg-white/10'
-              )}
-            >
-              <List className="h-4 w-4 mr-2" />
-              List
-            </Button>
+        {/* Desktop View Mode Toggle */}
+        {!isMobile && (
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">
+              {filteredContacts.length} Contacts
+            </h2>
+            <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1 border border-white/10">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('card')}
+                className={cn(
+                  'px-3 py-1.5',
+                  viewMode === 'card' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                )}
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Cards
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  'px-3 py-1.5',
+                  viewMode === 'list' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                )}
+              >
+                <List className="h-4 w-4 mr-2" />
+                List
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Data Display - Card or List View */}
+        <div className={cn(
+          "flex-1",
+          isMobile && "min-h-0"
+        )}>
         {contactsLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -769,10 +1013,57 @@ export default function AdminContactsPage() {
               </Button>
             ) : null}
           </div>
+        ) : isMobile ? (
+          // Mobile View - Card or List based on viewMode
+          viewMode === 'card' ? (
+            <MobileContactList
+              contacts={filteredContacts}
+              onInvite={handleInvite}
+              onDelete={handleDelete}
+              onTap={handleContactTap}
+              showPortalProgress={false}
+            />
+          ) : (
+            // Mobile List View - Compact list format
+            <div className="space-y-1">
+              {filteredContacts.map((contact: any) => (
+                <div
+                  key={contact.id}
+                  onClick={() => handleContactTap(contact)}
+                  className="bg-graphite-800/50 backdrop-blur-sm border border-white/10 rounded-lg p-3 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white text-sm truncate">{contact.name}</p>
+                    <p className="text-xs text-white/60 truncate">
+                      {contact.company || contact.category}
+                      {contact.phone && ` • ${contact.phone}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 ml-2">
+                    {contact.portalStatus === 'ACTIVE' && (
+                      <div className="w-2 h-2 bg-green-500 rounded-full" title="Portal Active" />
+                    )}
+                    <Badge 
+                      className={cn(
+                        "text-xs shrink-0",
+                        contact.status === 'active' && "bg-green-500/20 text-green-400 border-green-500/30",
+                        contact.status === 'potential' && "bg-blue-500/20 text-blue-400 border-blue-500/30",
+                        contact.status === 'follow_up' && "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+                        contact.status === 'inactive' && "bg-gray-500/20 text-gray-400 border-gray-500/30"
+                      )}
+                    >
+                      {contact.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         ) : viewMode === 'card' ? (
+          // Desktop Card View
           <div className={cn(
             "grid gap-4",
-            isMobile ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+            "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
             isLandscape && "grid-cols-2"
           )}>
             {filteredContacts.map((contact: any) => (
@@ -796,21 +1087,53 @@ export default function AdminContactsPage() {
             />
           </div>
         )}
+        </div>
 
-        {/* Create Dialog */}
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className={cn(
-            "sm:max-w-[525px] bg-graphite-800 border-white/10",
-            isMobile && "fixed inset-4 max-w-none h-[calc(100vh-2rem)] flex flex-col overflow-hidden"
-          )}>
-            <DialogHeader>
-              <DialogTitle className="text-white">Create New Contact</DialogTitle>
-              <DialogDescription className="text-white/60">
-                Add a new contact to the project. Click save when you're done.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
+        {/* Create Dialog - Use MobileDialog on mobile */}
+        <MobileDialog
+          open={isCreateOpen}
+          onOpenChange={setIsCreateOpen}
+          title="Create New Contact"
+          description="Add a new contact to the project. Click save when you're done."
+          size="md"
+          showCloseButton={false}
+          footer={
+            <div className="flex gap-2">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsCreateOpen(false)}
+                disabled={isSubmitting}
+                className={cn(
+                  "border-white/10",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                form="create-contact-form"
+                className={cn(
+                  "bg-blue-600 hover:bg-blue-700",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Contact'
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <Form {...form}>
+              <form id="create-contact-form" onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -973,33 +1296,55 @@ export default function AdminContactsPage() {
                     </FormItem>
                   )}
                 />
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-accent-500 hover:bg-accent-600">
-                    Create Contact
-                  </Button>
-                </DialogFooter>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+        </MobileDialog>
 
-        {/* Edit Dialog - Similar to Create */}
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className={cn(
-            "sm:max-w-[525px] bg-graphite-800 border-white/10",
-            isMobile && "fixed inset-4 max-w-none h-[calc(100vh-2rem)] flex flex-col overflow-hidden"
-          )}>
-            <DialogHeader>
-              <DialogTitle className="text-white">Edit Contact</DialogTitle>
-              <DialogDescription className="text-white/60">
-                Make changes to the contact. Click save when you're done.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+        {/* Edit Dialog - Use MobileDialog on mobile */}
+        <MobileDialog
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          title="Edit Contact"
+          description="Make changes to the contact. Click save when you're done."
+          size="md"
+          showCloseButton={false}
+          footer={
+            <div className="flex gap-2">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsEditOpen(false)}
+                disabled={isSubmitting}
+                className={cn(
+                  "border-white/10",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                form="edit-contact-form"
+                className={cn(
+                  "bg-blue-600 hover:bg-blue-700",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <Form {...form}>
+              <form id="edit-contact-form" onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
                 {/* Same form fields as Create */}
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
@@ -1037,18 +1382,53 @@ export default function AdminContactsPage() {
                     )}
                   />
                 </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-accent-500 hover:bg-accent-600">
-                    Save Changes
-                  </Button>
-                </DialogFooter>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
+        </MobileDialog>
+
+        {/* Mobile Contact Detail Sheet */}
+        {isMobile && selectedContact && (
+          <MobileContactDetailSheet
+            contact={selectedContact}
+            isOpen={isDetailOpen}
+            onClose={() => {
+              setIsDetailOpen(false);
+              setSelectedContact(null);
+            }}
+            onInvite={handleInvite}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onAssignTask={handleAssignTask}
+          />
+        )}
+
+        {/* Mobile Filter Sheet */}
+        {isMobile && (
+          <MobileFilterSheet
+            open={isFilterSheetOpen}
+            onOpenChange={setIsFilterSheetOpen}
+            activeFilters={activeFilters}
+            onFiltersChange={setActiveFilters}
+            onExportCSV={handleExport}
+            filterCounts={{
+              portal: contacts.filter((c: any) => c.portalStatus === 'ACTIVE').length,
+              pending: contacts.filter((c: any) => c.portalStatus === 'INVITED').length,
+              noPortal: contacts.filter((c: any) => !c.portalStatus || c.portalStatus === 'NONE').length,
+              hasTasks: contacts.filter((c: any) => c._count?.assignedTasks > 0).length,
+              active: contacts.filter((c: any) => c.status === 'ACTIVE').length,
+              inactive: contacts.filter((c: any) => c.status === 'INACTIVE').length,
+              potential: contacts.filter((c: any) => c.status === 'POTENTIAL').length,
+              blacklisted: contacts.filter((c: any) => c.status === 'BLACKLISTED').length,
+              followUp: contacts.filter((c: any) => c.status === 'FOLLOW_UP').length,
+              subcontractor: contacts.filter((c: any) => c.category === 'SUBCONTRACTOR').length,
+              supplier: contacts.filter((c: any) => c.category === 'SUPPLIER').length,
+              consultant: contacts.filter((c: any) => c.category === 'CONSULTANT').length,
+              inspector: contacts.filter((c: any) => c.category === 'INSPECTOR').length,
+              client: contacts.filter((c: any) => c.category === 'CLIENT').length,
+              other: contacts.filter((c: any) => c.category === 'OTHER').length,
+            }}
+          />
+        )}
 
         {/* Delete Confirmation */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

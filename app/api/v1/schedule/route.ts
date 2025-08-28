@@ -1,20 +1,20 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth, requireRole } from '@/lib/api/auth-check';
 import { successResponse, errorResponse, paginationMetadata } from '@/lib/api/response';
 import { createScheduleEventSchema, scheduleQuerySchema } from '@/lib/validations/schedule';
-import { Prisma } from '@prisma/client';
+import { Prisma, Module } from '@prisma/client';
+import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
 import { sanitizeScheduleEvent, prepareScheduleEventForDb } from '@/lib/api/schedule-helpers';
 
 // GET /api/v1/schedule - List schedule events with filters
-export async function GET(request: NextRequest) {
-  try {
-    const authUser = await requireAuth();
+export const GET = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const searchParams = Object.fromEntries(request.nextUrl.searchParams);
     const query = scheduleQuerySchema.parse(searchParams);
     
     const where: Prisma.ScheduleEventWhereInput = {
-      projectId: query.projectId,
+      projectId: projectId!,  // Use projectId from security context
       ...(query.type && { type: query.type }),
       ...(query.status && { status: query.status }),
       // Remove requestedById filter as field doesn't exist
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Contractors can only see events for their projects with proper status
-    if (authUser.role === 'CONTRACTOR') {
+    if (auth.role === 'CONTRACTOR') {
       where.status = { in: ['PLANNED', 'DONE'] };
     }
     
@@ -70,21 +70,24 @@ export async function GET(request: NextRequest) {
       undefined,
       paginationMetadata(query.page, query.limit, total)
     );
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.SCHEDULE,
+    action: 'view',
+    requireProject: true
   }
-}
+);
 
 // POST /api/v1/schedule - Create new schedule event
-export async function POST(request: NextRequest) {
-  try {
-    const authUser = await requireAuth();
+export const POST = withAuth(
+  async (request: NextRequest, ctx: any, security: SecurityContext) => {
+    const { auth, projectId } = security;
     const body = await request.json();
     console.log('Schedule POST body:', body);
     const data = createScheduleEventSchema.parse(body);
     
     // Contractors can only create REQUESTED events
-    if (authUser.role === 'CONTRACTOR') {
+    if (auth.role === 'CONTRACTOR') {
       data.status = 'REQUESTED';
     }
     
@@ -97,8 +100,8 @@ export async function POST(request: NextRequest) {
         status: data.status || 'REQUESTED',
         notes: data.description,
         relatedContactIds: data.attendees || [],
-        projectId: data.projectId,
-        requesterUserId: authUser.uid
+        projectId: projectId!,  // Use projectId from security context
+        requesterUserId: auth.uid
       },
       include: {
         project: {
@@ -114,7 +117,7 @@ export async function POST(request: NextRequest) {
     // Log activity
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'CREATE',
         entity: 'SCHEDULE_EVENT',
         entityId: event.id,
@@ -127,7 +130,10 @@ export async function POST(request: NextRequest) {
     });
     
     return successResponse(event, 'Schedule event created successfully');
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.SCHEDULE,
+    action: 'edit',
+    requireProject: true
   }
-}
+);

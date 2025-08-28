@@ -8,12 +8,13 @@ datasource db {
 }
 
 model User {
-  id        String   @id
-  email     String   @unique
-  role      Role
-  createdAt DateTime @default(now())
-  contact   Contact?
-  tasks     Task[]   @relation("AssignedTasks")
+  id                 String           @id
+  email              String           @unique
+  role               Role
+  createdAt          DateTime         @default(now())
+  contact            Contact?
+  tasks              Task[]           @relation("AssignedTasks")
+  projectMemberships ProjectMember[]
 }
 
 model Project {
@@ -54,6 +55,7 @@ model Project {
   schedule      ScheduleEvent[]
   tasks         Task[]
   access        UserModuleAccess[]
+  members       ProjectMember[]
 }
 
 model Contact {
@@ -321,6 +323,22 @@ model UserModuleAccess {
   project    Project @relation(fields: [projectId], references: [id])
 
   @@id([userId, projectId, module])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      Role     // Project-level role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  project   Project  @relation(fields: [projectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId])
 }
 
 model AuditLog {

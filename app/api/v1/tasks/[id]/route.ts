@@ -1,17 +1,30 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth, requireRole } from '@/lib/api/auth-check';
 import { successResponse, errorResponse, ApiError } from '@/lib/api/response';
 import { updateTaskSchema, updateTaskStatusSchema } from '@/lib/validations/task';
+import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
+import { Module } from '@prisma/client';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+// Helper to resolve projectId from task
+async function resolveTaskProject(req: NextRequest, ctx: any): Promise<string | null> {
+  const { params } = ctx;
+  const { id } = await params;
+  const task = await prisma.task.findUnique({
+    where: { id },
+    select: { projectId: true }
+  });
+  return task?.projectId || null;
+}
+
 // GET /api/v1/tasks/[id] - Get single task with all details
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  try {
-    const authUser = await requireAuth();
+export const GET = withAuth(
+  async (request: NextRequest, ctx: RouteParams, security: SecurityContext) => {
+    const { auth } = security;
+    const { params } = ctx;
     const { id } = await params;
     
     const task = await prisma.task.findUnique({
@@ -172,9 +185,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw new ApiError(404, 'Task not found');
     }
     
+    // Verify project access
+    if (security.projectId && task.projectId !== security.projectId) {
+      throw new ApiError(403, 'Task belongs to different project');
+    }
+    
     // Check access for contractors
-    if (authUser.role === 'CONTRACTOR' && task.assignedToId !== authUser.uid) {
-      throw new ApiError(403, 'Access denied');
+    if (auth.role === 'CONTRACTOR') {
+      const hasAccess = task.assignedToId === auth.uid || 
+                       task.assignedContact?.userId === auth.uid;
+      if (!hasAccess) {
+        throw new ApiError(403, 'Access denied');
+      }
     }
     
     // Calculate completion percentage if has checklist items
@@ -201,28 +223,64 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       checklistProgress,
       subtaskProgress,
       isBlockedByDependencies,
-      isWatching: task.watchers.some(w => w.userId === authUser.uid)
+      isWatching: task.watchers.some(w => w.userId === auth.uid)
     });
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.TASKS,
+    action: 'view',
+    resolveProjectId: resolveTaskProject
   }
-}
+);
 
 // PUT /api/v1/tasks/[id] - Update task
-export async function PUT(request: NextRequest, { params }: RouteParams) {
-  try {
-    const authUser = await requireRole(['ADMIN', 'STAFF']);
+export const PUT = withAuth(
+  async (request: NextRequest, ctx: RouteParams, security: SecurityContext) => {
+    const { auth, projectId } = security;
+    const { params } = ctx;
     const { id } = await params;
     const body = await request.json();
     const data = updateTaskSchema.parse({ ...body, id });
     
-    // Check if task exists
+    // Check if task exists and belongs to project
     const existingTask = await prisma.task.findUnique({
-      where: { id }
+      where: { id },
+      select: {
+        id: true,
+        projectId: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        startDate: true,
+        assignedToId: true,
+        progressPercentage: true,
+        estimatedHours: true,
+        actualHours: true,
+        isOnCriticalPath: true,
+        isMilestone: true,
+        location: true,
+        trade: true,
+        weatherDependent: true,
+        requiresInspection: true,
+        inspectionStatus: true,
+        tags: true,
+        customFields: true,
+        latitude: true,
+        longitude: true,
+        locationName: true,
+        relatedContactIds: true
+      }
     });
     
     if (!existingTask) {
       throw new ApiError(404, 'Task not found');
+    }
+    
+    // Verify task belongs to project
+    if (projectId && existingTask.projectId !== projectId) {
+      throw new ApiError(403, 'Task belongs to different project');
     }
     
     // Build update data
@@ -291,7 +349,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     await prisma.taskActivity.create({
       data: {
         taskId: id,
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'UPDATED',
         details: changes
       }
@@ -299,7 +357,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'UPDATE',
         entity: 'TASK',
         entityId: id,
@@ -308,15 +366,19 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
     
     return successResponse(updatedTask, 'Task updated successfully');
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.TASKS,
+    action: 'edit',
+    resolveProjectId: resolveTaskProject
   }
-}
+);
 
 // DELETE /api/v1/tasks/[id] - Delete task
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  try {
-    const authUser = await requireRole(['ADMIN']);
+export const DELETE = withAuth(
+  async (request: NextRequest, ctx: RouteParams, security: SecurityContext) => {
+    const { auth, projectId } = security;
+    const { params } = ctx;
     const { id } = await params;
     
     const task = await prisma.task.findUnique({
@@ -324,6 +386,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       select: {
         id: true,
         title: true,
+        projectId: true,
         _count: {
           select: {
             subtasks: true
@@ -334,6 +397,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     
     if (!task) {
       throw new ApiError(404, 'Task not found');
+    }
+    
+    // Verify task belongs to project
+    if (projectId && task.projectId !== projectId) {
+      throw new ApiError(403, 'Task belongs to different project');
     }
     
     if (task._count.subtasks > 0) {
@@ -348,7 +416,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // Log activity
     await prisma.auditLog.create({
       data: {
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'DELETE',
         entity: 'TASK',
         entityId: id,
@@ -359,15 +427,20 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     });
     
     return successResponse(null, 'Task deleted successfully');
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    roles: ['ADMIN'],
+    module: Module.TASKS,
+    action: 'edit',
+    resolveProjectId: resolveTaskProject
   }
-}
+);
 
 // PATCH /api/v1/tasks/[id] - Quick status update
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  try {
-    const authUser = await requireAuth();
+export const PATCH = withAuth(
+  async (request: NextRequest, ctx: RouteParams, security: SecurityContext) => {
+    const { auth, projectId } = security;
+    const { params } = ctx;
     const { id } = await params;
     const body = await request.json();
     const data = updateTaskStatusSchema.parse(body);
@@ -377,8 +450,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       where: { id },
       select: {
         id: true,
+        projectId: true,
         assignedToId: true,
+        assignedContactId: true,
         status: true
+      },
+      include: {
+        assignedContact: {
+          select: {
+            userId: true
+          }
+        }
       }
     });
     
@@ -386,9 +468,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       throw new ApiError(404, 'Task not found');
     }
     
+    // Verify task belongs to project
+    if (projectId && task.projectId !== projectId) {
+      throw new ApiError(403, 'Task belongs to different project');
+    }
+    
     // Check access
-    if (authUser.role === 'CONTRACTOR' && task.assignedToId !== authUser.uid) {
-      throw new ApiError(403, 'Access denied');
+    if (auth.role === 'CONTRACTOR') {
+      const hasAccess = task.assignedToId === auth.uid || 
+                       task.assignedContact?.userId === auth.uid;
+      if (!hasAccess) {
+        throw new ApiError(403, 'Access denied');
+      }
     }
     
     // Update status
@@ -410,7 +501,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     await prisma.taskActivity.create({
       data: {
         taskId: id,
-        userId: authUser.uid,
+        userId: auth.uid,
         action: 'STATUS_CHANGED',
         details: {
           from: task.status,
@@ -420,7 +511,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     });
     
     return successResponse(updatedTask, 'Task status updated');
-  } catch (error) {
-    return errorResponse(error);
+  },
+  {
+    module: Module.TASKS,
+    action: 'edit',
+    resolveProjectId: resolveTaskProject
   }
-}
+);

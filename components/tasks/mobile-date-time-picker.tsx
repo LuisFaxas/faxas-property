@@ -145,6 +145,7 @@ export function MobileDateTimePicker({
       <div className={cn("space-y-2", className)}>
         {label && <label className="text-sm text-white">{label}</label>}
         <Button
+          type="button"
           variant="outline"
           className={cn(
             "w-full justify-start text-left font-normal h-12",

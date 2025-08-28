@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { auth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { ApiError } from './response';
-import type { User, Role } from '@prisma/client';
+import type { User, Role, Module, ProjectMember } from '@prisma/client';
 
 export type AuthenticatedUser = {
   uid: string;
@@ -78,5 +78,67 @@ export async function optionalAuth(): Promise<AuthenticatedUser | null> {
     return await requireAuth();
   } catch {
     return null;
+  }
+}
+
+// Check if user is a member of a project
+export async function assertProjectMember(
+  userId: string, 
+  projectId: string
+): Promise<ProjectMember> {
+  const member = await prisma.projectMember.findUnique({
+    where: {
+      projectId_userId: {
+        projectId,
+        userId
+      }
+    }
+  });
+  
+  if (!member) {
+    throw new ApiError(403, 'Not a member of this project');
+  }
+  
+  return member;
+}
+
+// Get all projects a user has access to
+export async function getUserProjects(userId: string): Promise<string[]> {
+  const memberships = await prisma.projectMember.findMany({
+    where: { userId },
+    select: { projectId: true }
+  });
+  
+  return memberships.map(m => m.projectId);
+}
+
+// Check if user has specific module access for a project
+export async function requireModuleAccess(
+  userId: string,
+  projectId: string,
+  module: Module,
+  action: 'view' | 'edit' | 'upload' | 'request'
+): Promise<void> {
+  const access = await prisma.userModuleAccess.findFirst({
+    where: {
+      userId,
+      projectId,
+      module
+    }
+  });
+  
+  if (!access) {
+    throw new ApiError(403, `No ${module} access for this project`);
+  }
+  
+  const actionMap = {
+    view: access.canView,
+    edit: access.canEdit,
+    upload: access.canUpload,
+    request: access.canRequest
+  };
+  
+  if (!actionMap[action]) {
+    throw new ApiError(403, `Cannot ${action} ${module} in this project`);
   }
 }
