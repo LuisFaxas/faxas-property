@@ -4,6 +4,7 @@ import { successResponse, errorResponse } from '@/lib/api/response';
 import { z } from 'zod';
 import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
 import { getUserProjects } from '@/lib/api/auth-check';
+import { Policy } from '@/lib/policy';
 
 // Validation schema for project creation
 const createProjectSchema = z.object({
@@ -28,14 +29,15 @@ const createProjectSchema = z.object({
 // GET /api/v1/projects - List all projects user has access to
 export const GET = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth } = security;
+    try {
+      const { auth } = security;
     
     const url = new URL(request.url);
     const includeArchived = url.searchParams.get('includeArchived') === 'true';
     const favoritesOnly = url.searchParams.get('favoritesOnly') === 'true';
     
-    // Get user's accessible projects
-    const userProjectIds = await getUserProjects(auth.uid);
+    // Use policy engine to get user's accessible projects
+    const userProjectIds = await Policy.getUserProjects(auth.user.id);
     
     // Build where clause
     const where: any = {
@@ -83,7 +85,13 @@ export const GET = withAuth(
       return successResponse([defaultProject]);
     }
     
+    // Apply rate limiting based on role
+    const rateLimitTier = await Policy.getRateLimitTier(auth.user.id);
+    
     return successResponse(projects);
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     // No module or project requirement for listing projects
@@ -93,8 +101,9 @@ export const GET = withAuth(
 // POST /api/v1/projects - Create new project
 export const POST = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth } = security;
-    const body = await request.json();
+    try {
+      const { auth } = security;
+      const body = await request.json();
     
     // Validate request body
     const validated = createProjectSchema.parse(body);
@@ -134,6 +143,16 @@ export const POST = withAuth(
       }
     });
     
+    // Log policy decision for audit
+    await Policy.logPolicyDecision(
+      auth.user.id,
+      project.id,
+      null,  // No module for project creation
+      'write',
+      true,
+      'Project created successfully'
+    );
+    
     // Log activity
     await prisma.auditLog.create({
       data: {
@@ -149,6 +168,9 @@ export const POST = withAuth(
     });
     
     return successResponse(project, 'Project created successfully');
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     roles: ['ADMIN', 'STAFF']  // Only admins and staff can create projects

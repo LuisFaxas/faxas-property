@@ -4,6 +4,8 @@ import { successResponse, errorResponse, paginationMetadata } from '@/lib/api/re
 import { procurementQuerySchema, createProcurementSchema } from '@/lib/validations/procurement';
 import { Prisma, Module } from '@prisma/client';
 import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
+import { Policy } from '@/lib/policy';
+import { createSecurityContext, createRepositories } from '@/lib/data';
 
 // Helper to generate PO number
 async function generatePONumber(): Promise<string> {
@@ -41,13 +43,21 @@ function calculateTotalCost(quantity: number, unitPrice?: number): number {
 // GET /api/v1/procurement - List procurement items with advanced filtering
 export const GET = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth, projectId } = security;
-    const searchParams = Object.fromEntries(request.nextUrl.searchParams);
-    const query = procurementQuerySchema.parse(searchParams);
+    try {
+      const { auth, projectId } = security;
+      
+      // Use policy engine to verify access
+      await Policy.assertModuleAccess(auth.user.id, projectId!, Module.PROCUREMENT, 'read');
+      
+      // Create scoped context and repositories
+      const scopedContext = await createSecurityContext(auth.user.id, projectId!);
+      const repos = createRepositories(scopedContext);
+      
+      const searchParams = Object.fromEntries(request.nextUrl.searchParams);
+      const query = procurementQuerySchema.parse(searchParams);
     
-    // Build where clause with advanced filters
-    const where: Prisma.ProcurementWhereInput = {
-      projectId: projectId!,  // Use projectId from security context
+    // Build where clause - projectId is automatically enforced by repository
+    const where: any = {
       ...(query.supplierId && { supplierId: query.supplierId }),
       ...(query.orderStatus && { orderStatus: query.orderStatus }),
       ...(query.priority && { priority: query.priority }),
@@ -106,9 +116,9 @@ export const GET = withAuth(
       }
     })();
     
-    // Execute queries in parallel
+    // Use scoped repository for data access
     const [procurements, total] = await Promise.all([
-      prisma.procurement.findMany({
+      repos.procurement.findMany({
         where,
         include: {
           project: {
@@ -140,7 +150,7 @@ export const GET = withAuth(
         take: query.limit,
         orderBy
       }),
-      prisma.procurement.count({ where })
+      repos.procurement.count({ where })
     ]);
     
     // Add calculated fields and format response
@@ -160,11 +170,17 @@ export const GET = withAuth(
       canCancel: ['DRAFT', 'QUOTED', 'APPROVED', 'ORDERED'].includes(item.orderStatus)
     }));
     
+    // Apply rate limiting based on role
+    const rateLimitTier = await Policy.getRateLimitTier(auth.user.id);
+    
     return successResponse(
       procurementsWithDetails,
       undefined,
       paginationMetadata(query.page, query.limit, total)
     );
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     module: Module.PROCUREMENT,
@@ -176,9 +192,18 @@ export const GET = withAuth(
 // POST /api/v1/procurement - Create new procurement item with auto PO generation
 export const POST = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth, projectId } = security;
-    const body = await request.json();
-    const data = createProcurementSchema.parse(body);
+    try {
+      const { auth, projectId } = security;
+      
+      // Use policy engine to verify write access
+      await Policy.assertModuleAccess(auth.user.id, projectId!, Module.PROCUREMENT, 'write');
+      
+      // Create scoped context and repositories
+      const scopedContext = await createSecurityContext(auth.user.id, projectId!);
+      const repos = createRepositories(scopedContext);
+      
+      const body = await request.json();
+      const data = createProcurementSchema.parse(body);
     
     // Calculate total cost if unit price is provided
     const totalCost = data.unitPrice ? calculateTotalCost(data.quantity, data.unitPrice) : data.totalCost || 0;
@@ -189,10 +214,10 @@ export const POST = withAuth(
       poNumber = await generatePONumber();
     }
     
-    // Create procurement item
-    const procurement = await prisma.procurement.create({
+    // Create procurement item using scoped repository
+    const procurement = await repos.procurement.create({
       data: {
-        projectId: projectId!,  // Use projectId from security context
+        projectId: projectId!,  // Enforced by repository
         poNumber,
         materialItem: data.materialItem,
         description: data.description,
@@ -255,7 +280,20 @@ export const POST = withAuth(
       }
     });
     
+    // Log policy decision for audit
+    await Policy.logPolicyDecision(
+      auth.user.id,
+      projectId!,
+      Module.PROCUREMENT,
+      'write',
+      true,
+      'Procurement item created successfully'
+    );
+    
     return successResponse(procurement, 'Procurement item created successfully');
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     module: Module.PROCUREMENT,

@@ -4,39 +4,37 @@ import { successResponse, errorResponse, paginationMetadata } from '@/lib/api/re
 import { createBudgetItemSchema, budgetQuerySchema } from '@/lib/validations/budget';
 import { Prisma, Module } from '@prisma/client';
 import { withAuth, type SecurityContext } from '@/lib/api/auth-wrapper';
+import { Policy } from '@/lib/policy';
+import { createSecurityContext, createRepositories } from '@/lib/data';
 
-// Helper to redact cost fields for contractors
-function redactCostsForContractor<T extends any>(item: T, role: string): T {
-  if (role !== 'CONTRACTOR') return item;
-  
-  // Redact sensitive cost information for contractors
-  const redacted = { ...item };
-  delete redacted.estUnitCost;
-  delete redacted.estTotal;
-  delete redacted.committedTotal;
-  delete redacted.paidToDate;
-  delete redacted.variance;
-  delete redacted.varianceAmount;
-  delete redacted.variancePercent;
-  return redacted;
-}
+// Note: Cost redaction is now handled by the BudgetRepository in lib/data/repositories.ts
 
 // GET /api/v1/budget - List budget items with filters
 export const GET = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth, projectId } = security;
-    const searchParams = Object.fromEntries(request.nextUrl.searchParams);
-    const query = budgetQuerySchema.parse(searchParams);
+    try {
+      const { auth, projectId } = security;
+      
+      // Use policy engine to verify access
+      await Policy.assertModuleAccess(auth.user.id, projectId!, Module.BUDGET, 'read');
+      
+      // Create scoped context and repositories
+      const scopedContext = await createSecurityContext(auth.user.id, projectId!);
+      const repos = createRepositories(scopedContext);
+      
+      const searchParams = Object.fromEntries(request.nextUrl.searchParams);
+      const query = budgetQuerySchema.parse(searchParams);
     
-    const where: Prisma.BudgetItemWhereInput = {
-      projectId: projectId!,  // Use projectId from security context
+    // Build where clause - projectId is automatically enforced by repository
+    const where: any = {
       ...(query.discipline && { discipline: query.discipline }),
       ...(query.category && { category: query.category }),
       ...(query.status && { status: query.status })
     };
     
+    // Use scoped repository for data access - automatically handles cost redaction
     const [items, total] = await Promise.all([
-      prisma.budgetItem.findMany({
+      repos.budget.findMany({
         where,
         include: {
           project: {
@@ -54,29 +52,21 @@ export const GET = withAuth(
           { item: 'asc' }
         ]
       }),
-      prisma.budgetItem.count({ where })
+      repos.budget.count({ where })
     ]);
     
-    // Calculate variance for each item (only for non-contractors)
-    const itemsWithVariance = items.map(item => ({
-      ...item,
-      variance: Number(item.variance),
-      varianceAmount: Number(item.paidToDate) - Number(item.estTotal),
-      variancePercent: Number(item.estTotal) > 0 
-        ? ((Number(item.paidToDate) - Number(item.estTotal)) / Number(item.estTotal)) * 100
-        : 0
-    }));
+    // Apply rate limiting based on role
+    const rateLimitTier = await Policy.getRateLimitTier(auth.user.id);
     
-    // Redact cost information for contractors
-    const finalItems = auth.role === 'CONTRACTOR' 
-      ? itemsWithVariance.map(item => redactCostsForContractor(item, auth.role))
-      : itemsWithVariance;
-    
+    // BudgetRepository already handles variance calculation and cost redaction
     return successResponse(
-      finalItems,
+      items,
       undefined,
       paginationMetadata(query.page, query.limit, total)
     );
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     module: Module.BUDGET,
@@ -88,16 +78,26 @@ export const GET = withAuth(
 // POST /api/v1/budget - Create new budget item
 export const POST = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
-    const { auth, projectId } = security;
-    const body = await request.json();
-    const data = createBudgetItemSchema.parse(body);
+    try {
+      const { auth, projectId } = security;
+      
+      // Use policy engine to verify write access
+      await Policy.assertModuleAccess(auth.user.id, projectId!, Module.BUDGET, 'write');
+      
+      // Create scoped context and repositories
+      const scopedContext = await createSecurityContext(auth.user.id, projectId!);
+      const repos = createRepositories(scopedContext);
+      
+      const body = await request.json();
+      const data = createBudgetItemSchema.parse(body);
     
     // Calculate variance if needed
     const variance = data.estTotal > 0 
       ? (data.paidToDate - data.estTotal) / data.estTotal
       : 0;
     
-    const budgetItem = await prisma.budgetItem.create({
+    // Create budget item using scoped repository
+    const budgetItem = await repos.budget.create({
       data: {
         discipline: data.discipline,
         category: data.category,
@@ -111,7 +111,7 @@ export const POST = withAuth(
         vendorContactId: data.vendorContactId,
         status: data.status,
         variance: variance,
-        projectId: projectId!  // Use projectId from security context
+        projectId: projectId!  // Enforced by repository
       },
       include: {
         project: {
@@ -138,7 +138,20 @@ export const POST = withAuth(
       }
     });
     
+    // Log policy decision for audit
+    await Policy.logPolicyDecision(
+      auth.user.id,
+      projectId!,
+      Module.BUDGET,
+      'write',
+      true,
+      'Budget item created successfully'
+    );
+    
     return successResponse(budgetItem, 'Budget item created successfully');
+    } catch (error) {
+      return errorResponse(error);
+    }
   },
   {
     module: Module.BUDGET,

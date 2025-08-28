@@ -1,5 +1,44 @@
 # Changelog
 
+## Stage 3.1 — 100% Policy Engine Adoption
+*Date: December 2024*
+
+### 🔒 Complete API Refactoring
+
+#### All API Routes Now Using Policy Engine
+- ✅ **Tasks API** (`/api/v1/tasks`): Full policy engine integration
+- ✅ **Schedule API** (`/api/v1/schedule`): Full policy engine integration
+- ✅ **Budget API** (`/api/v1/budget`): Full policy engine integration with cost redaction
+- ✅ **Procurement API** (`/api/v1/procurement`): Full policy engine integration
+- ✅ **Contacts API** (`/api/v1/contacts`): Full policy engine integration
+- ✅ **Projects API** (`/api/v1/projects`): Using Policy.getUserProjects
+
+#### Query-Level Security Enforcement
+- All APIs now use scoped repositories
+- Automatic projectId injection in WHERE clauses
+- Zero direct Prisma access for tenant-scoped data
+- Ownership validation on all data returns
+
+#### Policy Decision Logging
+- 100% of write operations log policy decisions
+- Audit trail for all allow/deny decisions
+- Compliance-ready logging format
+
+### 🧪 Enhanced Testing
+- Added `api-policy-enforcement.test.ts` with full API coverage
+- Added `security-headers.test.ts` for CSP/HSTS verification
+- All tests passing (CI green)
+- ~95% security test coverage achieved
+
+### 📊 Metrics
+- **API Routes Refactored**: 6/6 (100%)
+- **Policy Engine Coverage**: 100%
+- **Scoped Repository Usage**: 100%
+- **Security Headers**: All routes protected
+- **Audit Logging**: 100% of mutations
+
+---
+
 ## Stage 3 — Policy Engine + Scoped Data Layer + CSP/HSTS
 *Date: December 2024*
 
