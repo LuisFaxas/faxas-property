@@ -49,8 +49,17 @@ export function withAuth<T extends Function>(
         // For GET requests, projectId comes from query params
         if (req.method === 'GET') {
           projectId = req.nextUrl.searchParams.get('projectId');
-          if (!projectId) {
-            throw new ApiError(400, 'Project ID required');
+          // Check for null, undefined, or empty string
+          if (!projectId || projectId.trim() === '') {
+            // For backward compatibility, get the first project the user has access to
+            const { getUserProjects } = await import('./auth-check');
+            const userProjects = await getUserProjects(auth.uid);
+            if (userProjects.length > 0) {
+              projectId = userProjects[0];
+              console.warn(`No projectId provided, defaulting to first available project: ${projectId}`);
+            } else {
+              throw new ApiError(400, 'No projects available for user');
+            }
           }
         } else if (options.resolveProjectId) {
           // For mutations, resolve from resource
