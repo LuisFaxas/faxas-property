@@ -20,10 +20,18 @@ export function useInitializeUser() {
         return;
       } catch (err: any) {
         // If we get a 404 user not found, we need to initialize
-        if (err?.statusCode === 404 && err?.error?.includes('User not found')) {
+        // Check various error structures since axios wraps errors differently
+        const statusCode = err?.statusCode || err?.response?.status || err?.status;
+        const errorMessage = err?.error || err?.message || err?.response?.data?.error || '';
+        
+        if (statusCode === 404 && errorMessage.includes('User not found')) {
           console.log('User not found in database, initializing...');
+        } else if (statusCode === 404) {
+          // Any 404 on projects endpoint likely means user not found
+          console.log('404 on projects endpoint, initializing user...');
         } else {
           // Other errors, don't initialize
+          console.log('Non-initialization error:', { statusCode, errorMessage });
           return;
         }
       }
