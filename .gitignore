@@ -56,3 +56,6 @@ docker-compose.override.yml
 
 # Storybook
 storybook-static/
+
+# Database backups
+backups/

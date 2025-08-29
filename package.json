@@ -11,6 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "db:backup": "tsx scripts/backup-database.ts",
+    "db:restore": "tsx scripts/restore-database.ts",
     "create-admin": "ts-node scripts/create-admin.ts",
     "test": "jest",
     "test:security": "jest __tests__/security --coverage",
