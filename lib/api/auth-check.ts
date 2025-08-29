@@ -43,7 +43,8 @@ export async function requireAuth(request?: NextRequest): Promise<AuthenticatedU
     });
     
     if (!user) {
-      throw new ApiError(404, 'User not found');
+      console.log(`User not found in database for UID: ${decodedToken.uid}, email: ${decodedToken.email}`);
+      throw new ApiError(404, 'User not found in database. Please refresh the page to initialize your account.');
     }
     
     return {

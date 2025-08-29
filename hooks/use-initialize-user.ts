@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
 import apiClient from '@/lib/api-client';
+import axios from 'axios';
 
 export function useInitializeUser() {
   const { user } = useAuth();
@@ -31,7 +32,17 @@ export function useInitializeUser() {
       setError(null);
       
       try {
-        const response = await apiClient.post('/auth/initialize');
+        // Get the token
+        const token = await user.getIdToken();
+        
+        // Call the initialize endpoint directly (not through v1 API)
+        const response = await axios.post('/api/auth/initialize', {}, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
         console.log('User initialized:', response.data);
         setIsInitialized(true);
         
@@ -39,7 +50,7 @@ export function useInitializeUser() {
         window.location.reload();
       } catch (err: any) {
         console.error('Failed to initialize user:', err);
-        setError(err.error || 'Failed to initialize user');
+        setError(err.response?.data?.error || err.error || 'Failed to initialize user');
       } finally {
         setIsInitializing(false);
       }
