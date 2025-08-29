@@ -28,6 +28,7 @@ import {
   useTodaySchedule,
   useContacts 
 } from '@/hooks/use-api';
+import { useInitializeUser } from '@/hooks/use-initialize-user';
 import { useEffect, useState } from 'react';
 
 function LoadingCard() {
@@ -49,16 +50,17 @@ function LoadingCard() {
 
 export default function AdminDashboard() {
   const { user, userRole, loading: authLoading } = useAuth();
+  const { isInitializing, isInitialized, error: initError } = useInitializeUser();
   const [projectId, setProjectId] = useState<string>('');
   const [isReady, setIsReady] = useState(false);
 
-  // Wait for auth to be ready before making API calls
+  // Wait for auth and initialization to be ready before making API calls
   useEffect(() => {
-    if (!authLoading && user) {
-      // Give a small delay to ensure token is ready
+    if (!authLoading && user && !isInitializing && (isInitialized || initError)) {
+      // Give a small delay to ensure everything is ready
       setTimeout(() => setIsReady(true), 500);
     }
-  }, [authLoading, user]);
+  }, [authLoading, user, isInitializing, isInitialized, initError]);
 
   // Fetch real data using React Query - only when ready
   const { data: tasksData, isLoading: tasksLoading } = useTasks({ 
@@ -121,6 +123,23 @@ export default function AdminDashboard() {
       { id: 3, name: 'Plumbing Schematic', category: 'plumbing', date: '2024-01-18' }
     ]
   };
+  // Show initialization status
+  if (isInitializing) {
+    return (
+      <PageShell 
+        userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}>
+        <div className="p-6 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-500 mx-auto"></div>
+            <p className="text-white">Initializing your account...</p>
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell 
       userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 

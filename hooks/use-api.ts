@@ -388,3 +388,156 @@ export function useCreateContact() {
     }
   });
 }
+
+// RFP API hooks
+export function useRfps(projectId: string, query?: any, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['rfps', projectId, query],
+    queryFn: () => apiClient.get(`/projects/${projectId}/rfps`, { params: query }),
+    enabled: !!projectId && enabled
+  });
+}
+
+export function useRfp(projectId: string, rfpId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['rfp', projectId, rfpId],
+    queryFn: () => apiClient.get(`/projects/${projectId}/rfps/${rfpId}`),
+    enabled: !!projectId && !!rfpId && enabled
+  });
+}
+
+export function useCreateRfp(projectId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: any) => apiClient.post(`/projects/${projectId}/rfps`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['rfps', projectId] });
+      toast({
+        title: 'Success',
+        description: data.message || 'RFP created successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to create RFP',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useUpdateRfp(projectId: string, rfpId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: any) => apiClient.put(`/projects/${projectId}/rfps/${rfpId}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['rfps', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['rfp', projectId, rfpId] });
+      toast({
+        title: 'Success',
+        description: data.message || 'RFP updated successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to update RFP',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useDeleteRfp(projectId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (rfpId: string) => apiClient.delete(`/projects/${projectId}/rfps/${rfpId}`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['rfps', projectId] });
+      toast({
+        title: 'Success',
+        description: data.message || 'RFP deleted successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to delete RFP',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useUpsertRfpItems(projectId: string, rfpId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: { items: any[] }) => 
+      apiClient.post(`/projects/${projectId}/rfps/${rfpId}/items`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['rfp', projectId, rfpId] });
+      toast({
+        title: 'Success',
+        description: data.message || 'Items updated successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to update items',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useUploadAttachment(projectId: string, rfpId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: { filename: string; mime: string; size: number; content: string }) => 
+      apiClient.post(`/projects/${projectId}/rfps/${rfpId}/attachments`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['rfp', projectId, rfpId] });
+      toast({
+        title: 'Success',
+        description: data.message || 'File uploaded successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to upload file',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function usePublishRfp(projectId: string, rfpId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: () => apiClient.post(`/projects/${projectId}/rfps/${rfpId}/publish`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['rfps', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['rfp', projectId, rfpId] });
+      toast({
+        title: 'Success',
+        description: data.message || 'RFP published successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to publish RFP',
+        variant: 'destructive'
+      });
+    }
+  });
+}

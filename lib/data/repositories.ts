@@ -7,7 +7,10 @@ import { ScopedRepository, ScopedContext, BaseRepository } from './base-reposito
 import { Policy } from '@/lib/policy';
 import { ApiError } from '@/lib/api/response';
 import { prisma } from '@/lib/prisma';
-import type { Task, BudgetItem, Procurement, Contact, ScheduleEvent, Project, Module } from '@prisma/client';
+import type { 
+  Task, BudgetItem, Procurement, Contact, ScheduleEvent, Project, Module,
+  Rfp, RfpItem, Vendor, Attachment, RfpStatus, VendorStatus, AttachmentOwnerType
+} from '@prisma/client';
 
 /**
  * Task Repository with business logic
@@ -335,6 +338,259 @@ export class ProjectRepository extends BaseRepository<Project> {
 }
 
 /**
+ * RFP Repository with state management
+ */
+export class RfpRepository extends ScopedRepository<Rfp> {
+  constructor(context: ScopedContext) {
+    super(context, 'rfp');
+  }
+
+  async create(args: any): Promise<Rfp> {
+    // Ensure DRAFT status on creation
+    if (args.data) {
+      args.data.status = 'DRAFT';
+      args.data.createdBy = this.context.userId;
+    }
+    return super.create(args);
+  }
+
+  async update(args: any): Promise<Rfp> {
+    // Check if RFP is in DRAFT status
+    const rfp = await this.findUnique({ where: args.where });
+    if (!rfp) {
+      throw new ApiError(404, 'RFP not found');
+    }
+    if (rfp.status !== 'DRAFT') {
+      throw new ApiError(409, 'Can only update RFPs in DRAFT status');
+    }
+    return super.update(args);
+  }
+
+  async publish(rfpId: string): Promise<Rfp> {
+    const rfp = await this.findUnique({
+      where: { id: rfpId },
+      include: { items: true }
+    });
+
+    if (!rfp) {
+      throw new ApiError(404, 'RFP not found');
+    }
+
+    if (rfp.status !== 'DRAFT') {
+      throw new ApiError(409, 'Can only publish RFPs in DRAFT status');
+    }
+
+    // Validate publishing requirements
+    if (!rfp.items || rfp.items.length === 0) {
+      throw new ApiError(400, 'Cannot publish RFP without items');
+    }
+
+    if (new Date(rfp.dueAt) <= new Date()) {
+      throw new ApiError(400, 'Cannot publish RFP with past due date');
+    }
+
+    // Update status to PUBLISHED
+    return super.update({
+      where: { id: rfpId },
+      data: { status: 'PUBLISHED' as RfpStatus }
+    });
+  }
+
+  async delete(args: any): Promise<Rfp> {
+    const rfp = await this.findUnique({
+      where: args.where,
+      include: {
+        invitations: true,
+        bids: true
+      }
+    });
+
+    if (!rfp) {
+      throw new ApiError(404, 'RFP not found');
+    }
+
+    if (rfp.status !== 'DRAFT') {
+      throw new ApiError(409, 'Can only delete RFPs in DRAFT status');
+    }
+
+    if (rfp.invitations.length > 0 || rfp.bids.length > 0) {
+      throw new ApiError(409, 'Cannot delete RFP with invitations or bids');
+    }
+
+    return super.delete(args);
+  }
+}
+
+/**
+ * RFP Item Repository
+ */
+export class RfpItemRepository extends BaseRepository {
+  constructor(private context: ScopedContext) {
+    super();
+  }
+
+  async bulkUpsert(rfpId: string, items: any[]): Promise<RfpItem[]> {
+    // First check if RFP is in DRAFT status and belongs to project
+    const rfp = await prisma.rfp.findUnique({
+      where: { id: rfpId, projectId: this.context.projectId }
+    });
+
+    if (!rfp) {
+      throw new ApiError(404, 'RFP not found');
+    }
+
+    if (rfp.status !== 'DRAFT') {
+      throw new ApiError(409, 'Can only modify items when RFP is in DRAFT status');
+    }
+
+    // Perform bulk upsert
+    const results: RfpItem[] = [];
+    
+    for (const item of items) {
+      if (item.id) {
+        // Update existing
+        const updated = await prisma.rfpItem.update({
+          where: { id: item.id },
+          data: {
+            specCode: item.specCode,
+            description: item.description,
+            qty: item.qty,
+            uom: item.uom
+          }
+        });
+        results.push(updated);
+      } else {
+        // Create new
+        const created = await prisma.rfpItem.create({
+          data: {
+            rfpId,
+            specCode: item.specCode,
+            description: item.description,
+            qty: item.qty,
+            uom: item.uom
+          }
+        });
+        results.push(created);
+      }
+    }
+
+    // Log audit
+    await this.logAudit('UPSERT_ITEMS', 'RFP_ITEMS', rfpId, {
+      count: items.length,
+      action: 'bulk_upsert'
+    });
+
+    return results;
+  }
+}
+
+/**
+ * Vendor Repository with uniqueness checks
+ */
+export class VendorRepository extends ScopedRepository<Vendor> {
+  constructor(context: ScopedContext) {
+    super(context, 'vendor');
+  }
+
+  async create(args: any): Promise<Vendor> {
+    // Check for duplicate email in project
+    const existing = await this.findFirst({
+      where: {
+        email: args.data.email
+      }
+    });
+
+    if (existing) {
+      throw new ApiError(409, 'Vendor with this email already exists in project');
+    }
+
+    return super.create(args);
+  }
+}
+
+/**
+ * Attachment Repository with security validations
+ */
+export class AttachmentRepository extends BaseRepository {
+  private MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  private MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB per RFP
+
+  constructor(private context: ScopedContext) {
+    super();
+  }
+
+  async create(args: any): Promise<Attachment> {
+    const { ownerType, ownerId, size, contentHash } = args.data;
+
+    // Validate owner access
+    await this.validateOwnerAccess(ownerType, ownerId);
+
+    // Check file size
+    if (size > this.MAX_FILE_SIZE) {
+      throw new ApiError(413, 'File size exceeds 10MB limit');
+    }
+
+    // Check total size for RFP
+    if (ownerType === 'RFP') {
+      const existingAttachments = await prisma.attachment.findMany({
+        where: { ownerType: 'RFP' as AttachmentOwnerType, ownerId }
+      });
+
+      const totalSize = existingAttachments.reduce((sum, att) => sum + att.size, 0) + size;
+      if (totalSize > this.MAX_TOTAL_SIZE) {
+        throw new ApiError(413, 'Total attachments exceed 50MB limit for this RFP');
+      }
+    }
+
+    // Check for duplicate content
+    const duplicate = await prisma.attachment.findFirst({
+      where: { contentHash, ownerType, ownerId }
+    });
+
+    if (duplicate) {
+      throw new ApiError(409, 'This file has already been uploaded');
+    }
+
+    // Create attachment
+    const attachment = await prisma.attachment.create({ data: args.data });
+
+    // Log audit
+    await this.logAudit('UPLOAD', 'ATTACHMENT', attachment.id, {
+      ownerType,
+      ownerId,
+      filename: args.data.filename,
+      size
+    });
+
+    return attachment;
+  }
+
+  async validateOwnerAccess(ownerType: AttachmentOwnerType, ownerId: string): Promise<void> {
+    if (ownerType === 'RFP') {
+      const rfp = await prisma.rfp.findUnique({
+        where: { id: ownerId, projectId: this.context.projectId }
+      });
+      if (!rfp) {
+        throw new ApiError(404, 'RFP not found or access denied');
+      }
+    }
+    // BID validation will be added in later stages
+  }
+
+  /**
+   * Calculate content hash for deduplication
+   * Uses Web Crypto API for Edge Runtime compatibility
+   */
+  static async calculateHash(content: Buffer): Promise<string> {
+    // Convert buffer to ArrayBuffer for Web Crypto API
+    const arrayBuffer = new Uint8Array(content).buffer;
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+}
+
+/**
  * Factory function to create repositories with context
  */
 export function createRepositories(context: ScopedContext) {
@@ -345,6 +601,10 @@ export function createRepositories(context: ScopedContext) {
     contacts: new ContactRepository(context),
     schedule: new ScheduleRepository(context),
     projects: new ProjectRepository(context),
+    rfps: new RfpRepository(context),
+    rfpItems: new RfpItemRepository(context),
+    vendors: new VendorRepository(context),
+    attachments: new AttachmentRepository(context),
     
     // Generic repositories for other models
     generic: <T>(modelName: keyof typeof prisma) => 

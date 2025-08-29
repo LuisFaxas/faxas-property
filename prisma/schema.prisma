@@ -56,6 +56,8 @@ model Project {
   tasks         Task[]
   access        UserModuleAccess[]
   members       ProjectMember[]
+  rfps          Rfp[]
+  vendors       Vendor[]
 }
 
 model Contact {
@@ -351,6 +353,150 @@ model AuditLog {
   createdAt DateTime @default(now())
 }
 
+// ============ BIDDING MODELS ============
+
+model Rfp {
+  id            String           @id @default(cuid())
+  projectId     String
+  title         String
+  description   String?
+  dueAt         DateTime
+  status        RfpStatus        @default(DRAFT)
+  createdBy     String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  project       Project          @relation(fields: [projectId], references: [id])
+  items         RfpItem[]
+  invitations   BidInvitation[]
+  bids          Bid[]
+  award         Award?
+  
+  @@index([projectId, status])
+  @@unique([projectId, title])
+}
+
+model RfpItem {
+  id          String     @id @default(cuid())
+  rfpId       String
+  specCode    String
+  description String
+  qty         Decimal    @db.Decimal(12, 2)
+  uom         UnitOfMeasure
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  rfp         Rfp        @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  bidItems    BidItem[]
+  
+  @@index([rfpId])
+}
+
+model Vendor {
+  id          String          @id @default(cuid())
+  projectId   String
+  name        String
+  email       String
+  phone       String?
+  status      VendorStatus    @default(ACTIVE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  project     Project         @relation(fields: [projectId], references: [id])
+  invitations BidInvitation[]
+  bids        Bid[]
+  
+  @@unique([projectId, email])
+  @@index([projectId, status])
+}
+
+model BidInvitation {
+  id          String     @id @default(cuid())
+  rfpId       String
+  vendorId    String
+  token       String?    @unique
+  expiresAt   DateTime?
+  status      String     @default("DRAFT") // Placeholder for now
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  rfp         Rfp        @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  vendor      Vendor     @relation(fields: [vendorId], references: [id])
+  
+  @@unique([rfpId, vendorId])
+  @@index([token])
+}
+
+model Bid {
+  id          String     @id @default(cuid())
+  rfpId       String
+  vendorId    String
+  submittedAt DateTime?
+  status      BidStatus  @default(DRAFT)
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  rfp         Rfp        @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  vendor      Vendor     @relation(fields: [vendorId], references: [id])
+  items       BidItem[]
+  award       Award?
+  
+  @@unique([rfpId, vendorId])
+  @@index([rfpId, vendorId, status])
+}
+
+model BidItem {
+  id          String     @id @default(cuid())
+  bidId       String
+  rfpItemId   String
+  unitPrice   Decimal    @db.Decimal(12, 2)
+  totalPrice  Decimal    @db.Decimal(12, 2)
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  bid         Bid        @relation(fields: [bidId], references: [id], onDelete: Cascade)
+  rfpItem     RfpItem    @relation(fields: [rfpItemId], references: [id])
+  
+  @@unique([bidId, rfpItemId])
+  @@index([bidId])
+}
+
+model Attachment {
+  id          String              @id @default(cuid())
+  ownerType   AttachmentOwnerType
+  ownerId     String
+  filename    String
+  mime        String
+  size        Int
+  contentHash String              // SHA256 hash for deduplication
+  urlOrPath   String
+  createdBy   String
+  createdAt   DateTime            @default(now())
+  
+  // Note: Relations are managed programmatically based on ownerType
+  // No direct foreign key constraints to allow flexible ownership
+  
+  @@index([ownerType, ownerId])
+  @@index([contentHash])
+}
+
+model Award {
+  id                String     @id @default(cuid())
+  rfpId             String     @unique
+  winningBidId      String?    @unique
+  awardedBy         String?
+  awardedAt         DateTime?
+  totalAwardAmount  Decimal?   @db.Decimal(12, 2)
+  memo              String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  
+  rfp               Rfp        @relation(fields: [rfpId], references: [id])
+  winningBid        Bid?       @relation(fields: [winningBidId], references: [id])
+}
+
 model TaskDependency {
   id                String         @id @default(cuid())
   dependentTaskId   String
@@ -621,6 +767,7 @@ enum Module {
   INVOICES
   PROCUREMENT_READ
   DOCS_READ
+  BIDDING
 }
 
 enum ProjectType {
@@ -654,4 +801,42 @@ enum DependencyType {
   START_TO_START
   FINISH_TO_FINISH
   START_TO_FINISH
+}
+
+enum RfpStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum VendorStatus {
+  ACTIVE
+  INVITED
+  BLOCKED
+}
+
+enum BidStatus {
+  DRAFT
+  SUBMITTED
+  WITHDRAWN
+}
+
+enum AttachmentOwnerType {
+  RFP
+  BID
+}
+
+enum UnitOfMeasure {
+  EA    // Each
+  LF    // Linear Feet
+  SF    // Square Feet
+  CY    // Cubic Yard
+  CF    // Cubic Feet
+  TON   // Ton
+  LB    // Pound
+  GAL   // Gallon
+  HR    // Hour
+  DAY   // Day
+  LS    // Lump Sum
+  LOT   // Lot
 }

@@ -5,22 +5,28 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { randomBytes } from 'crypto';
 
 /**
- * Generate a nonce for CSP
+ * Generate a nonce for CSP using Web Crypto API (Edge Runtime compatible)
  */
 function generateNonce(): string {
-  return randomBytes(16).toString('base64');
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Buffer.from(array).toString('base64');
 }
 
 /**
  * Build Content Security Policy
  */
 function buildCSP(nonce: string): string {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
   const directives = [
     `default-src 'self'`,
-    `script-src 'self' 'strict-dynamic' 'nonce-${nonce}' https: 'unsafe-inline'`, // unsafe-inline is ignored when nonce is present
+    // In development, allow unsafe-eval for React Refresh
+    isDevelopment 
+      ? `script-src 'self' 'unsafe-eval' 'nonce-${nonce}' https:` 
+      : `script-src 'self' 'strict-dynamic' 'nonce-${nonce}' https: 'unsafe-inline'`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`, // Allow inline styles for now
     `font-src 'self' https://fonts.gstatic.com data:`,
     `img-src 'self' data: blob: https:`,
@@ -39,6 +45,11 @@ function buildCSP(nonce: string): string {
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   
+  // Check if we're in development mode
+  const isDevelopment = request.nextUrl.hostname === 'localhost' || 
+                       request.nextUrl.hostname === '127.0.0.1' ||
+                       request.nextUrl.hostname.startsWith('192.168.');
+  
   // Generate nonce for this request
   const nonce = generateNonce();
   
@@ -48,7 +59,7 @@ export function middleware(request: NextRequest) {
   // Security Headers
   
   // Content Security Policy with nonce
-  const csp = buildCSP(nonce);
+  const csp = buildCSP(nonce, isDevelopment);
   response.headers.set('Content-Security-Policy', csp);
   
   // Strict Transport Security (HSTS) - 1 year
