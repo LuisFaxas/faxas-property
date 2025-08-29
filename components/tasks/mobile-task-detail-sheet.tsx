@@ -86,6 +86,11 @@ export function MobileTaskDetailSheet({
         side="bottom" 
         className="h-[85vh] bg-graphite-900 border-t border-white/10 rounded-t-2xl overflow-hidden"
       >
+        {/* Hidden title for accessibility */}
+        <SheetHeader className="sr-only">
+          <SheetTitle>{task.title}</SheetTitle>
+        </SheetHeader>
+        
         {/* Header with status icon */}
         <div className="sticky top-0 bg-graphite-900 z-10 pb-4 -mx-6 px-6 -mt-6 pt-6">
           <div className="flex items-start justify-between mb-4">
