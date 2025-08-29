@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { AuthProvider } from '@/app/contexts/AuthContext';
 import { ProjectProvider } from '@/app/contexts/ProjectContext';
 import { ToastListener } from '@/components/providers/toast-listener';
+import { UserInitializer } from '@/components/providers/user-initializer';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -35,10 +36,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ProjectProvider>
-          {children}
-          <ToastListener />
-        </ProjectProvider>
+        <UserInitializer>
+          <ProjectProvider>
+            {children}
+            <ToastListener />
+          </ProjectProvider>
+        </UserInitializer>
       </AuthProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
