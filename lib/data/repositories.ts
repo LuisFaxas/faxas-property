@@ -424,9 +424,9 @@ export class RfpRepository extends ScopedRepository<Rfp> {
 /**
  * RFP Item Repository
  */
-export class RfpItemRepository extends BaseRepository {
-  constructor(private context: ScopedContext) {
-    super();
+export class RfpItemRepository extends BaseRepository<RfpItem> {
+  constructor(context: ScopedContext) {
+    super(context, 'rfpItem');
   }
 
   async bulkUpsert(rfpId: string, items: any[]): Promise<RfpItem[]> {
@@ -511,12 +511,12 @@ export class VendorRepository extends ScopedRepository<Vendor> {
 /**
  * Attachment Repository with security validations
  */
-export class AttachmentRepository extends BaseRepository {
+export class AttachmentRepository extends BaseRepository<Attachment> {
   private MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB per RFP
 
-  constructor(private context: ScopedContext) {
-    super();
+  constructor(context: ScopedContext) {
+    super(context, 'attachment');
   }
 
   async create(args: any): Promise<Attachment> {
