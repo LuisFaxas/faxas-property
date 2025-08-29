@@ -12,6 +12,13 @@ const nextConfig = {
       },
     ],
   },
+  // Disable webpack cache in development to avoid cache corruption
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.cache = false;
+    }
+    return config;
+  },
   // Headers are now handled by middleware.ts for better control
 };
 

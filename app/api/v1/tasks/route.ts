@@ -102,9 +102,10 @@ export const GET = withAuth(
               select: {
                 id: true,
                 name: true,
-                email: true,
-                phone: true,
-                company: true
+                emails: true,
+                phones: true,
+                company: true,
+                specialty: true
               }
             },
             subtasks: query.includeSubtasks ? {
