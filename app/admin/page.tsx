@@ -49,7 +49,8 @@ function LoadingCard() {
 
 export default function AdminDashboard() {
   const { user, userRole, loading: authLoading } = useAuth();
-  const [projectId, setProjectId] = useState<string>('');
+  // Default to miami-duplex project - in future this should come from ProjectContext
+  const [projectId, setProjectId] = useState<string>('miami-duplex');
   const [isReady, setIsReady] = useState(false);
 
   // Wait for auth to be ready before making API calls

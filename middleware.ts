@@ -18,9 +18,7 @@ function generateNonce(): string {
 /**
  * Build Content Security Policy
  */
-function buildCSP(nonce: string): string {
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  
+function buildCSP(nonce: string, isDevelopment: boolean): string {
   const directives = [
     `default-src 'self'`,
     // In development, allow unsafe-eval for React Refresh
@@ -30,7 +28,8 @@ function buildCSP(nonce: string): string {
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`, // Allow inline styles for now
     `font-src 'self' https://fonts.gstatic.com data:`,
     `img-src 'self' data: blob: https:`,
-    `connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com wss://localhost:* ws://localhost:*`,
+    `connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://localhost:* ws://localhost:*`,
+    `frame-src 'self' https://*.firebaseapp.com https://*.firebaseio.com`, // Allow Firebase Auth iframes
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,

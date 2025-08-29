@@ -13,11 +13,16 @@ export const GET = withAuth(
     try {
       const { auth, projectId } = security;
       
+      // Validate projectId is provided
+      if (!projectId) {
+        return errorResponse({ message: 'Project ID is required' }, 400);
+      }
+      
       // Use policy engine to verify access
-      await Policy.assertModuleAccess(auth.user.id, projectId!, Module.CONTACTS, 'read');
+      await Policy.assertModuleAccess(auth.user.id, projectId, Module.CONTACTS, 'read');
       
       // Create scoped context and repositories
-      const scopedContext = await createSecurityContext(auth.user.id, projectId!);
+      const scopedContext = await createSecurityContext(auth.user.id, projectId);
       const repos = createRepositories(scopedContext);
       
       const searchParams = Object.fromEntries(request.nextUrl.searchParams);
