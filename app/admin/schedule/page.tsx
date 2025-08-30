@@ -142,7 +142,7 @@ export default function AdminSchedulePage() {
     requestedBy: '',
     approvedBy: '',
     notes: '',
-    projectId: ''
+    projectId: 'miami-duplex' // Default to miami-duplex
   });
 
   // Computed values for API calls
@@ -216,7 +216,8 @@ export default function AdminSchedulePage() {
   const handleCreate = async () => {
     setIsSubmitting(true);
     try {
-      await apiClient.post('/schedule', {
+      // Ensure projectId is included in the request
+      const requestData = {
         title: formData.title,
         description: formData.description,
         type: formData.type,
@@ -225,8 +226,10 @@ export default function AdminSchedulePage() {
         location: formData.location,
         attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
         status: formData.status,
-        projectId: formData.projectId || undefined
-      });
+        projectId: formData.projectId || 'miami-duplex' // Fallback to miami-duplex
+      };
+      
+      await apiClient.post(`/schedule?projectId=${formData.projectId || 'miami-duplex'}`, requestData);
 
       toast({
         title: 'Success',
