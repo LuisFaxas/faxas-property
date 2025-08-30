@@ -46,9 +46,11 @@ export function withAuth<T extends Function>(
       let projectMember: ProjectMember | null = null;
       
       if (options.requireProject) {
-        // For GET requests, projectId comes from query params
-        if (req.method === 'GET') {
-          projectId = req.nextUrl.searchParams.get('projectId');
+        // First try to get projectId from query params (works for all methods)
+        projectId = req.nextUrl.searchParams.get('projectId');
+        
+        if (req.method === 'GET' || projectId) {
+          // For GET requests or any request with projectId in query params
           // Check for null, undefined, or empty string
           if (!projectId || projectId.trim() === '') {
             // For backward compatibility, get the first project the user has access to
