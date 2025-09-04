@@ -303,12 +303,12 @@ export default function AdminBudgetPage() {
         return (
           <div className={cn(
             'font-medium',
-            isOverBudget ? 'text-red-500' : 'text-green-500'
+            isOverBudget ? 'text-red-500' : variance < 0 ? 'text-green-500' : 'text-muted-foreground'
           )}>
-            {isOverBudget ? '+' : ''}${Math.abs(variance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            {row.original.variancePercent && (
+            {variance > 0 ? '+' : ''}${Math.abs(variance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            {row.original.variancePercent !== undefined && row.original.variancePercent !== 0 && (
               <span className="text-xs ml-1">
-                ({Math.abs(row.original.variancePercent).toFixed(1)}%)
+                ({variance > 0 ? '+' : ''}{row.original.variancePercent.toFixed(1)}%)
               </span>
             )}
           </div>
@@ -604,7 +604,7 @@ export default function AdminBudgetPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Paid to Date</CardTitle>
-              {metrics.variance < 0 ? (
+              {metrics.variance <= 0 ? (
                 <TrendingUp className="h-4 w-4 text-green-500" />
               ) : (
                 <TrendingDown className="h-4 w-4 text-red-500" />
@@ -616,9 +616,9 @@ export default function AdminBudgetPage() {
               </div>
               <div className={cn(
                 'text-xs',
-                metrics.variance < 0 ? 'text-green-500' : 'text-red-500'
+                metrics.variance <= 0 ? 'text-green-500' : 'text-red-500'
               )}>
-                {metrics.variance < 0 ? 'Under' : 'Over'} by ${Math.abs(metrics.variance).toLocaleString()}
+                {metrics.variance <= 0 ? 'Under budget' : 'Over budget'} by ${Math.abs(metrics.variance).toLocaleString()}
               </div>
             </CardContent>
           </Card>

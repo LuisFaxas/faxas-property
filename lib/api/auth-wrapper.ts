@@ -49,11 +49,15 @@ export function withAuth<T extends Function>(
         // First try to get projectId from query params (works for all methods)
         projectId = req.nextUrl.searchParams.get('projectId');
         
-        if (req.method === 'GET' || projectId) {
-          // For GET requests or any request with projectId in query params
-          // Check for null, undefined, or empty string
-          if (!projectId || projectId.trim() === '') {
-            // For backward compatibility, get the first project the user has access to
+        // Check for null, undefined, or empty string
+        if (!projectId || projectId.trim() === '') {
+          // Try to resolve from custom function if provided
+          if (options.resolveProjectId) {
+            projectId = await options.resolveProjectId(req, ctx);
+          }
+          
+          // If still no projectId, fall back to first available project
+          if (!projectId) {
             const { getUserProjects } = await import('./auth-check');
             const userProjects = await getUserProjects(auth.uid);
             if (userProjects.length > 0) {
@@ -62,29 +66,26 @@ export function withAuth<T extends Function>(
             } else {
               throw new ApiError(400, 'No projects available for user');
             }
-          } else {
-            // Validate that the projectId exists
-            const prisma = (await import('@/lib/prisma')).default;
-            const projectExists = await prisma.project.findUnique({
-              where: { id: projectId }
-            });
-            
-            if (!projectExists) {
-              console.warn(`Invalid projectId: ${projectId}, falling back to first available project`);
-              // Try to get a valid project for the user
-              const { getUserProjects } = await import('./auth-check');
-              const userProjects = await getUserProjects(auth.uid);
-              if (userProjects.length > 0) {
-                projectId = userProjects[0];
-                console.warn(`Using fallback project: ${projectId}`);
-              } else {
-                throw new ApiError(404, 'Project not found and no fallback available');
-              }
+          }
+        } else {
+          // Validate that the projectId exists
+          const prisma = (await import('@/lib/prisma')).default;
+          const projectExists = await prisma.project.findUnique({
+            where: { id: projectId }
+          });
+          
+          if (!projectExists) {
+            console.warn(`Invalid projectId: ${projectId}, falling back to first available project`);
+            // Try to get a valid project for the user
+            const { getUserProjects } = await import('./auth-check');
+            const userProjects = await getUserProjects(auth.uid);
+            if (userProjects.length > 0) {
+              projectId = userProjects[0];
+              console.warn(`Using fallback project: ${projectId}`);
+            } else {
+              throw new ApiError(404, 'Project not found and no fallback available');
             }
           }
-        } else if (options.resolveProjectId) {
-          // For mutations, resolve from resource
-          projectId = await options.resolveProjectId(req, ctx);
         }
         
         if (projectId) {

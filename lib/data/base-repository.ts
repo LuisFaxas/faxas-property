@@ -71,14 +71,10 @@ export abstract class BaseRepository<T> {
     await prisma.auditLog.create({
       data: {
         userId: this.context.userId,
-        projectId: this.context.projectId,
         action,
         entity: this.modelName,
-        entityId,
-        metadata: metadata || {},
-        ipAddress: '', // Would be passed from request
-        userAgent: '', // Would be passed from request
-        timestamp: new Date()
+        entityId: entityId || '',
+        meta: metadata || {}
       }
     });
   }

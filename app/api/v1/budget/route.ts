@@ -58,9 +58,18 @@ export const GET = withAuth(
     // Apply rate limiting based on role
     const rateLimitTier = await Policy.getRateLimitTier(auth.user.id);
     
-    // BudgetRepository already handles variance calculation and cost redaction
+    // Add variance calculations to each item
+    const itemsWithVariance = items.map(item => ({
+      ...item,
+      varianceAmount: Number(item.paidToDate) - Number(item.estTotal),
+      variancePercent: Number(item.estTotal) > 0 
+        ? ((Number(item.paidToDate) - Number(item.estTotal)) / Number(item.estTotal)) * 100
+        : 0
+    }));
+    
+    // BudgetRepository already handles cost redaction
     return successResponse(
-      items,
+      itemsWithVariance,
       undefined,
       paginationMetadata(query.page, query.limit, total)
     );
