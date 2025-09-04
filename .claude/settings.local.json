@@ -54,7 +54,11 @@
       "Bash(set NODE_TLS_REJECT_UNAUTHORIZED=0)",
       "Bash(npx eslint:*)",
       "Bash(git checkout:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(del next.config.ts)",
+      "Bash(npm cache clean:*)",
+      "Bash(npx tsx:*)"
     ],
     "deny": [],
     "ask": [],
