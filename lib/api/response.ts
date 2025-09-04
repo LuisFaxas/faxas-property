@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { log } from '@/lib/logger';
 
 export type ApiResponse<T = any> = {
   success: boolean;
@@ -11,6 +12,7 @@ export type ApiResponse<T = any> = {
     total?: number;
     hasMore?: boolean;
   };
+  correlationId?: string;
 };
 
 export class ApiError extends Error {
@@ -39,16 +41,27 @@ export function successResponse<T>(
 
 export function errorResponse(
   error: unknown,
-  statusCode: number = 500
+  statusCode: number = 500,
+  correlationId?: string
 ): NextResponse<ApiResponse> {
-  console.error('API Error:', error);
+  // Log the error with Winston
+  log.error('API Error', error, { correlationId, statusCode });
   
   if (error instanceof ApiError) {
+    // Log security-related errors separately
+    if (error.statusCode === 401 || error.statusCode === 403) {
+      log.security.failure('API Access', undefined, error.message, { 
+        statusCode: error.statusCode,
+        correlationId 
+      });
+    }
+    
     return NextResponse.json(
       {
         success: false,
         error: error.message,
-        code: error.code
+        code: error.code,
+        correlationId
       },
       { status: error.statusCode }
     );
@@ -58,7 +71,10 @@ export function errorResponse(
     return NextResponse.json(
       {
         success: false,
-        error: error.message
+        error: process.env.NODE_ENV === 'production' 
+          ? 'An error occurred while processing your request'
+          : error.message,
+        correlationId
       },
       { status: statusCode }
     );
@@ -67,7 +83,8 @@ export function errorResponse(
   return NextResponse.json(
     {
       success: false,
-      error: 'An unexpected error occurred'
+      error: 'An unexpected error occurred',
+      correlationId
     },
     { status: 500 }
   );

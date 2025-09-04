@@ -3,6 +3,7 @@ import { auth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { ApiError } from './response';
 import { NextRequest } from 'next/server';
+import { validateFirebaseToken, createSession, validateSession } from './session';
 import type { User, Role, Module, ProjectMember } from '@prisma/client';
 
 export type AuthenticatedUser = {
@@ -10,6 +11,8 @@ export type AuthenticatedUser = {
   email: string;
   role: Role;
   user: User;
+  sessionId?: string;
+  shouldRefresh?: boolean;
 };
 
 export async function requireAuth(request?: NextRequest): Promise<AuthenticatedUser> {
@@ -36,7 +39,19 @@ export async function requireAuth(request?: NextRequest): Promise<AuthenticatedU
   const token = authorization.split('Bearer ')[1];
   
   try {
-    const decodedToken = await auth.verifyIdToken(token);
+    // Validate Firebase token with refresh check
+    const { decodedToken, shouldRefresh } = await validateFirebaseToken(token);
+    
+    // Check for session if provided
+    const sessionId = request?.headers.get('x-session-id') || undefined;
+    if (sessionId) {
+      try {
+        await validateSession(sessionId);
+      } catch (error) {
+        // Session invalid but token is valid, create new session
+        console.log('Session validation failed, will create new session');
+      }
+    }
     
     const user = await prisma.user.findUnique({
       where: { id: decodedToken.uid }
@@ -44,14 +59,43 @@ export async function requireAuth(request?: NextRequest): Promise<AuthenticatedU
     
     if (!user) {
       console.log(`User not found in database for UID: ${decodedToken.uid}, email: ${decodedToken.email}`);
-      throw new ApiError(404, 'User not found in database. Please refresh the page to initialize your account.');
+      // Instead of throwing, try to initialize the user
+      try {
+        // Get role from Firebase custom claims
+        const firebaseUser = await auth.getUser(decodedToken.uid);
+        const role = (firebaseUser.customClaims?.role as Role) || 'VIEWER';
+        
+        // Create user in database
+        const newUser = await prisma.user.create({
+          data: {
+            id: decodedToken.uid,
+            email: decodedToken.email!,
+            role: role
+          }
+        });
+        
+        // Return the newly created user
+        return {
+          uid: decodedToken.uid,
+          email: decodedToken.email || '',
+          role: newUser.role,
+          user: newUser,
+          sessionId,
+          shouldRefresh
+        };
+      } catch (initError) {
+        console.error('Failed to auto-initialize user:', initError);
+        throw new ApiError(404, 'User not found. Please use /api/v1/auth/initialize to set up your account.');
+      }
     }
     
     return {
       uid: decodedToken.uid,
       email: decodedToken.email || '',
       role: user.role,
-      user
+      user,
+      sessionId,
+      shouldRefresh
     };
   } catch (error: any) {
     if (error instanceof ApiError) throw error;
