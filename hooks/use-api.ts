@@ -541,3 +541,126 @@ export function usePublishRfp(projectId: string, rfpId: string) {
     }
   });
 }
+
+// Users API hooks
+export function useUsers(query?: any, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['users', query],
+    queryFn: () => apiClient.get('/users', { params: query }),
+    enabled
+  });
+}
+
+export function useUser(id: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['user', id],
+    queryFn: () => apiClient.get(`/users/${id}`),
+    enabled: !!id && enabled
+  });
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: any) => apiClient.post('/users', data),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      if (variables.projectId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ['users', { projectId: variables.projectId }] 
+        });
+      }
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'User created successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to create user',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useUpdateUser(id: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: any) => apiClient.put(`/users/${id}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['user', id] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'User updated successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to update user',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/users/${id}`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'User deleted successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to delete user',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useUserPermissions(id: string, projectId?: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['user-permissions', id, projectId],
+    queryFn: () => apiClient.get(`/users/${id}/permissions`, { 
+      params: projectId ? { projectId } : {} 
+    }),
+    enabled: !!id && enabled
+  });
+}
+
+export function useUpdateUserPermissions(id: string, projectId: string) {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: any) => apiClient.put(`/users/${id}/permissions?projectId=${projectId}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['user-permissions', id] });
+      queryClient.invalidateQueries({ queryKey: ['user-permissions', id, projectId] });
+      queryClient.invalidateQueries({ queryKey: ['user', id] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Permissions updated successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to update permissions',
+        variant: 'destructive'
+      });
+    }
+  });
+}

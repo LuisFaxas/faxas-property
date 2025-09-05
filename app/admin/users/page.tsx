@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Plus, Shield, Users, Key, Lock, Unlock, AlertCircle, CheckCircle, XCircle, Settings, UserCheck } from 'lucide-react';
+import { Plus, Shield, Users, Lock, Unlock, AlertCircle, CheckCircle, XCircle, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -40,9 +40,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useProjects } from '@/hooks/use-api';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
+
+import { User } from '@/types';
 
 // Mock data for users and access
 const mockUsers = [
@@ -173,8 +175,23 @@ const moduleDescriptions = {
 
 export default function UserManagementPage() {
   const { toast } = useToast();
-  const [users, setUsers] = useState(mockUsers);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  
+  // Get current project
+  const { data: projects } = useProjects();
+  const currentProject = projects?.data?.[0]; // Use first project for now
+  
+  // API hooks
+  const { data: usersData, refetch: refetchUsers } = useUsers(
+    currentProject ? { projectId: currentProject.id } : undefined,
+    !!currentProject
+  );
+  const createUserMutation = useCreateUser();
+  const updateUserMutation = useUpdateUser('');
+  const deleteUserMutation = useDeleteUser();
+  
+  // Use API data or fallback to mock data
+  const users = usersData?.data?.users || mockUsers;
+  const [selectedUser, setSelectedUser] = useState<(typeof usersData)['data']['users'][0] | typeof mockUsers[0] | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -222,26 +239,41 @@ export default function UserManagementPage() {
     };
   }, [users]);
 
-  const handleInvite = () => {
-    const newUser = {
-      id: Date.now().toString(),
+  const handleInvite = async () => {
+    if (!currentProject) {
+      toast({
+        title: 'Error',
+        description: 'No project selected',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Convert form modules to permissions format
+    const permissions = Object.entries(formData.modules)
+      .filter(([_, canAccess]) => canAccess)
+      .map(([module]) => ({
+        module: module.toUpperCase(),
+        canView: true,
+        canEdit: ['tasks'].includes(module) || formData.role === 'ADMIN'
+      }));
+
+    const userData = {
       email: formData.email,
-      name: formData.name,
       role: formData.role,
-      status: 'PENDING',
-      modules: formData.modules,
-      lastActive: null,
-      createdAt: new Date(),
-      invitedBy: 'Current Admin'
+      projectId: currentProject.id,
+      sendInvite: true,
+      permissions
     };
 
-    setUsers([...users, newUser]);
-    toast({
-      title: 'Success',
-      description: `Invitation sent to ${formData.email}`,
-    });
-    setIsInviteOpen(false);
-    resetForm();
+    try {
+      await createUserMutation.mutateAsync(userData);
+      setIsInviteOpen(false);
+      resetForm();
+      refetchUsers();
+    } catch (error) {
+      // Error handled by the mutation's onError
+    }
   };
 
   const handleEdit = () => {
@@ -336,7 +368,7 @@ export default function UserManagementPage() {
     });
   };
 
-  const openEditDialog = (user: any) => {
+  const openEditDialog = (user: typeof mockUsers[0]) => {
     setSelectedUser(user);
     setFormData({
       email: user.email,
@@ -406,7 +438,7 @@ export default function UserManagementPage() {
     }
   };
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<typeof mockUsers[0]>[] = [
     {
       id: 'select',
       header: ({ table }) => (
