@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Plus, FileText, CheckCircle, XCircle, AlertCircle, Clock, Users, TrendingUp, MessageSquare, Gavel } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, AlertCircle, Clock, Users, TrendingUp, Gavel } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -43,6 +43,33 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
+
+interface DecisionAlternative {
+  option: string;
+  pros: string;
+  cons: string;
+  cost: number | string;
+}
+
+interface Decision {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'DEFERRED';
+  decision: string | null;
+  rationale: string | null;
+  impactCost: number;
+  impactTime: number;
+  decisionMaker: string | null;
+  stakeholders: string[];
+  dateRaised: Date;
+  dateDecided: Date | null;
+  relatedRisks: string[];
+  alternatives: DecisionAlternative[];
+  notes: string;
+}
 
 // Mock data for decisions
 const mockDecisions = [
@@ -161,7 +188,7 @@ const mockDecisions = [
 export default function AdminDecisionsPage() {
   const { toast } = useToast();
   const [decisions, setDecisions] = useState(mockDecisions);
-  const [selectedDecision, setSelectedDecision] = useState<any>(null);
+  const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -365,7 +392,7 @@ export default function AdminDecisionsPage() {
     });
   };
 
-  const openEditDialog = (decision: any) => {
+  const openEditDialog = (decision: Decision) => {
     setSelectedDecision(decision);
     setFormData({
       title: decision.title,
@@ -382,7 +409,7 @@ export default function AdminDecisionsPage() {
     setIsEditOpen(true);
   };
 
-  const openDecideDialog = (decision: any) => {
+  const openDecideDialog = (decision: Decision) => {
     setSelectedDecision(decision);
     setIsDecideOpen(true);
   };
@@ -421,7 +448,7 @@ export default function AdminDecisionsPage() {
     }
   }, [decisions, activeTab]);
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<Decision>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -939,7 +966,7 @@ export default function AdminDecisionsPage() {
                 <div className="space-y-2">
                   <Label>Available Options</Label>
                   <div className="space-y-2 rounded-lg border border-white/10 p-3">
-                    {selectedDecision.alternatives.map((alt: any, index: number) => (
+                    {selectedDecision.alternatives.map((alt: DecisionAlternative, index: number) => (
                       <div key={index} className="text-sm">
                         <div className="font-medium">{alt.option} - ${alt.cost}</div>
                         <div className="text-white/60">Pros: {alt.pros}</div>

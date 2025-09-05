@@ -42,9 +42,10 @@ export default function SimpleLoginPage() {
         // window.location.assign('/admin');
       }, 1000);
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Login error:', error);
-      setError(error.message || 'Login failed');
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

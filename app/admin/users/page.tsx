@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Plus, Shield, Users, Key, Lock, Unlock, AlertCircle, CheckCircle, Settings, UserCheck } from 'lucide-react';
+import { Plus, Shield, Users, Key, Lock, Unlock, AlertCircle, CheckCircle, XCircle, Settings, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {

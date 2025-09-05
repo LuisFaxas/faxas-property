@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { Project } from '@/types';
 import { 
   Settings, 
   Building2, 
-  Users, 
   Plug, 
   Server,
   Plus,
@@ -14,11 +14,6 @@ import {
   Copy,
   Trash2,
   Edit,
-  ChevronRight,
-  Calendar,
-  DollarSign,
-  MapPin,
-  Palette,
   Star,
   StarOff
 } from 'lucide-react';
@@ -66,7 +61,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useProjects } from '@/hooks/use-api';
@@ -113,7 +107,7 @@ export default function AdminSettingsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   
   // Form states for project
@@ -147,7 +141,7 @@ export default function AdminSettingsPage() {
   // Handle create project
   const handleCreateProject = async () => {
     try {
-      const response = await apiClient.post('/projects', {
+      await apiClient.post('/projects', {
         ...projectForm,
         totalBudget: projectForm.totalBudget ? parseFloat(projectForm.totalBudget) : null,
         contingency: projectForm.contingency ? parseFloat(projectForm.contingency) : null,
@@ -176,10 +170,10 @@ export default function AdminSettingsPage() {
         color: '#3B82F6',
       });
       refetchProjects();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create project',
+        description: (error instanceof Error ? error.message : 'Failed to create project'),
         variant: 'destructive',
       });
     }
@@ -190,7 +184,7 @@ export default function AdminSettingsPage() {
     if (!selectedProject) return;
     
     try {
-      const response = await apiClient.put(`/projects/${selectedProject.id}`, {
+      await apiClient.put(`/projects/${selectedProject.id}`, {
         ...projectForm,
         totalBudget: projectForm.totalBudget ? parseFloat(projectForm.totalBudget) : null,
         contingency: projectForm.contingency ? parseFloat(projectForm.contingency) : null,
@@ -204,10 +198,10 @@ export default function AdminSettingsPage() {
       setIsEditDialogOpen(false);
       setSelectedProject(null);
       refetchProjects();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update project',
+        description: (error instanceof Error ? error.message : 'Failed to update project'),
         variant: 'destructive',
       });
     }
@@ -225,10 +219,10 @@ export default function AdminSettingsPage() {
       
       setDeleteProjectId(null);
       refetchProjects();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete project',
+        description: (error instanceof Error ? error.message : 'Failed to delete project'),
         variant: 'destructive',
       });
     }
@@ -245,10 +239,10 @@ export default function AdminSettingsPage() {
       });
       
       refetchProjects();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to archive project',
+        description: (error instanceof Error ? error.message : 'Failed to archive project'),
         variant: 'destructive',
       });
     }
@@ -265,17 +259,17 @@ export default function AdminSettingsPage() {
       });
       
       refetchProjects();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update favorite status',
+        description: (error instanceof Error ? error.message : 'Failed to update favorite status'),
         variant: 'destructive',
       });
     }
   };
 
   // Define columns for projects table
-  const projectColumns: ColumnDef<any>[] = [
+  const projectColumns: ColumnDef<Project>[] = [
     {
       accessorKey: 'isFavorite',
       header: '',
@@ -437,7 +431,7 @@ export default function AdminSettingsPage() {
   ];
 
   // Filter projects based on search
-  const filteredProjects = projectsData?.filter((project: any) =>
+  const filteredProjects = projectsData?.filter((project: Project) =>
     project.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.address?.toLowerCase().includes(searchQuery.toLowerCase())

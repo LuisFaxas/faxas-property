@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import type { BudgetItem } from '@/types';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Plus, Download, AlertCircle, TrendingUp, TrendingDown, DollarSign, FileText, Edit, Trash, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTable } from '@/components/ui/data-table';
@@ -118,13 +118,12 @@ export default function AdminBudgetPage() {
   const { user, userRole } = useAuth();
   const isReady = !!user;
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<BudgetItem | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [projectId, setProjectId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -208,7 +207,7 @@ export default function AdminBudgetPage() {
   }, [summary]);
   
   // Columns definition
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<BudgetItem>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -386,10 +385,11 @@ export default function AdminBudgetPage() {
       setIsCreateOpen(false);
       form.reset();
       refetch();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create budget item';
       toast({
         title: 'Error',
-        description: error.error || 'Failed to create budget item',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -397,7 +397,7 @@ export default function AdminBudgetPage() {
     }
   };
   
-  const handleEdit = (item: any) => {
+  const handleEdit = (item: BudgetItem) => {
     setSelectedItem(item);
     form.reset({
       discipline: item.discipline,
@@ -432,10 +432,11 @@ export default function AdminBudgetPage() {
       setSelectedItem(null);
       form.reset();
       refetch();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update budget item';
       toast({
         title: 'Error',
-        description: error.error || 'Failed to update budget item',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -443,7 +444,7 @@ export default function AdminBudgetPage() {
     }
   };
   
-  const handleDelete = (item: any) => {
+  const handleDelete = (item: BudgetItem) => {
     setSelectedItem(item);
     setIsDeleteOpen(true);
   };
@@ -463,10 +464,11 @@ export default function AdminBudgetPage() {
       setIsDeleteOpen(false);
       setSelectedItem(null);
       refetch();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete budget item';
       toast({
         title: 'Error',
-        description: error.error || 'Failed to delete budget item',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -477,7 +479,7 @@ export default function AdminBudgetPage() {
   const handleExport = () => {
     const csv = [
       ['Discipline', 'Category', 'Item', 'Unit', 'Qty', 'Unit Cost', 'Budget', 'Committed', 'Paid', 'Variance', 'Status'],
-      ...budgetItems.map((item: any) => [
+      ...budgetItems.map((item: BudgetItem) => [
         item.discipline,
         item.category,
         item.item,
@@ -905,7 +907,7 @@ export default function AdminBudgetPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {Object.entries(summary.data.disciplineBreakdown).map(([discipline, data]: [string, any]) => (
+                    {Object.entries(summary.data.disciplineBreakdown).map(([discipline, data]) => (
                       <div key={discipline} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">{discipline}</span>
@@ -969,7 +971,7 @@ export default function AdminBudgetPage() {
               <CardContent>
                 {summary?.data?.topOverBudgetItems && summary.data.topOverBudgetItems.length > 0 ? (
                   <div className="space-y-4">
-                    {summary.data.topOverBudgetItems.map((item: any) => (
+                    {summary.data.topOverBudgetItems.map((item: BudgetItem) => (
                       <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
                           <p className="font-medium">{item.item}</p>
@@ -1237,7 +1239,7 @@ export default function AdminBudgetPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Budget Item</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{selectedItem?.item}"? This action cannot be undone.
+                Are you sure you want to delete &quot;{selectedItem?.item}&quot;? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

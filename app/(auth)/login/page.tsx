@@ -5,11 +5,10 @@ import { useAuth } from '@/app/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
 
 export default function LoginPage() {
   const { signInWithEmail, signInWithGoogle, resetPassword, loading } = useAuth();
@@ -31,11 +30,12 @@ export default function LoginPage() {
         title: 'Success',
         description: 'You have been logged in successfully.',
       });
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      setError(errorMessage);
       toast({
         title: 'Error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -50,11 +50,12 @@ export default function LoginPage() {
         title: 'Success',
         description: 'You have been logged in with Google successfully.',
       });
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      setError(errorMessage);
       toast({
         title: 'Error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -72,11 +73,12 @@ export default function LoginPage() {
         description: 'Password reset email sent. Please check your inbox.',
       });
       setResetEmail('');
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      setError(errorMessage);
       toast({
         title: 'Error',
-        description: error.message,
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

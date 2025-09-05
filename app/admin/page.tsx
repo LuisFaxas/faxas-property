@@ -29,6 +29,22 @@ import {
   useContacts 
 } from '@/hooks/use-api';
 import { useEffect, useState } from 'react';
+import { Task, Contact } from '@/types';
+
+interface ScheduleEvent {
+  id: string;
+  title: string;
+  time: string;
+  type: string;
+  status: string;
+}
+
+interface BudgetException {
+  id: string;
+  name: string;
+  variancePercent: number;
+  variance: number;
+}
 
 function LoadingCard() {
   return (
@@ -50,7 +66,7 @@ function LoadingCard() {
 export default function AdminDashboard() {
   const { user, userRole, loading: authLoading } = useAuth();
   // Default to miami-duplex project - in future this should come from ProjectContext
-  const [projectId, setProjectId] = useState<string>('miami-duplex');
+  const projectId = 'miami-duplex';
   const [isReady, setIsReady] = useState(false);
 
   // Wait for auth to be ready before making API calls
@@ -62,7 +78,7 @@ export default function AdminDashboard() {
   }, [authLoading, user]);
 
   // Fetch real data using React Query - only when ready
-  const { data: tasksData, isLoading: tasksLoading } = useTasks({ 
+  const { data: tasksData } = useTasks({ 
     projectId,
     limit: 100 
   }, isReady);
@@ -70,34 +86,36 @@ export default function AdminDashboard() {
   const { data: budgetSummary, isLoading: budgetLoading } = useBudgetSummary(projectId, isReady);
   const { data: budgetExceptions, isLoading: exceptionsLoading } = useBudgetExceptions(projectId, isReady);
   const { data: todaySchedule, isLoading: scheduleLoading } = useTodaySchedule(projectId, isReady);
-  const { data: contactsData, isLoading: contactsLoading } = useContacts({ 
+  const { data: contactsData } = useContacts({ 
     projectId,
     status: 'ACTIVE'
   }, isReady);
 
   // Calculate task metrics
   const taskMetrics = tasksData ? {
-    today: tasksData.data?.filter((t: any) => {
+    today: tasksData.data?.filter((t: Task) => {
+      if (!t.dueDate) return false;
       const due = new Date(t.dueDate);
       const today = new Date();
       return due.toDateString() === today.toDateString();
     }).length || 0,
-    thisWeek: tasksData.data?.filter((t: any) => {
+    thisWeek: tasksData.data?.filter((t: Task) => {
+      if (!t.dueDate) return false;
       const due = new Date(t.dueDate);
       const today = new Date();
       const weekFromNow = new Date(today);
       weekFromNow.setDate(weekFromNow.getDate() + 7);
       return due >= today && due <= weekFromNow;
     }).length || 0,
-    overdue: tasksData.data?.filter((t: any) => 
-      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'DONE'
+    overdue: tasksData.data?.filter((t: Task) => 
+      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED'
     ).length || 0
   } : { today: 0, thisWeek: 0, overdue: 0 };
 
   // Calculate contact metrics
   const contactMetrics = contactsData ? {
-    followUps: contactsData.data?.filter((c: any) => c.status === 'FOLLOW_UP').length || 0,
-    new: contactsData.data?.filter((c: any) => {
+    followUps: contactsData.data?.filter((c: Contact & {status?: string}) => c.status === 'FOLLOW_UP').length || 0,
+    new: contactsData.data?.filter((c: Contact) => {
       const created = new Date(c.createdAt);
       const dayAgo = new Date();
       dayAgo.setDate(dayAgo.getDate() - 1);
@@ -169,7 +187,7 @@ export default function AdminDashboard() {
           {/* Today's Schedule */}
           <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-white">Today's Schedule</CardTitle>
+              <CardTitle className="text-white">Today&apos;s Schedule</CardTitle>
               <Button size="sm" variant="ghost" className="text-accent-500">
                 <Calendar className="h-4 w-4 mr-1" />
                 View All
@@ -183,7 +201,7 @@ export default function AdminDashboard() {
                   <Skeleton className="h-16 w-full" />
                 </>
               ) : todaySchedule?.data && todaySchedule.data.length > 0 ? (
-                todaySchedule.data.map((event: any) => (
+                todaySchedule.data.map((event: ScheduleEvent) => (
                   <div key={event.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="text-xs text-white/50 w-16">{event.time}</div>
@@ -223,7 +241,7 @@ export default function AdminDashboard() {
                     <Skeleton className="h-16 w-full" />
                   </>
                 ) : budgetExceptions?.data && budgetExceptions.data.length > 0 ? (
-                  budgetExceptions.data.slice(0, 3).map((item: any) => (
+                  budgetExceptions.data.slice(0, 3).map((item: BudgetException) => (
                     <div key={item.id} className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                       <div className="flex items-center justify-between">
                         <div>

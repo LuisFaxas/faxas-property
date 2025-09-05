@@ -69,6 +69,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ColumnDef } from '@tanstack/react-table';
+import { ProcurementItem, Contact, Project, BudgetItem } from '@/types';
 import { 
   Plus, 
   MoreHorizontal, 
@@ -84,36 +85,25 @@ import {
   XCircle,
   AlertCircle,
   TrendingUp,
-  TrendingDown,
   Truck,
   Calendar,
   Filter,
   Search,
   ChevronDown,
-  ChevronRight,
   Upload,
   RefreshCw,
   BarChart3,
   ShoppingCart,
-  Layers,
-  Tag,
-  Building2,
   Users,
   FileSpreadsheet,
-  Send,
-  Archive,
-  Star,
   AlertTriangle,
   Zap,
   Target,
   Activity,
-  CreditCard,
-  Receipt,
-  Banknote,
   Paperclip,
   Hash
 } from 'lucide-react';
-import { format, differenceInDays, addDays } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import apiClient from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { createProcurementSchema } from '@/lib/validations/procurement';
@@ -189,27 +179,26 @@ export default function ProcurementPage() {
   const { toast } = useToast();
   
   // State management
-  const [procurements, setProcurements] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>(null);
+  const [procurements, setProcurements] = useState<ProcurementItem[]>([]);
+  const [summary, setSummary] = useState<{total: number; statusBreakdown: Record<string, number>; recentItems: ProcurementItem[]} | null>(null);
   const [selectedProject, setSelectedProject] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<ProcurementItem | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [filterSupplier, setFilterSupplier] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('requiredBy');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [filterCategory] = useState<string>('all');
+  const [filterSupplier] = useState<string>('all');
+  const [sortBy] = useState<string>('requiredBy');
+  const [sortOrder] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize] = useState(20);
   const [totalItems, setTotalItems] = useState(0);
   
   // Form setup
@@ -257,7 +246,7 @@ export default function ProcurementPage() {
   // Filter suppliers from contacts
   const suppliers = useMemo(() => {
     if (!contactsData || !Array.isArray(contactsData)) return [];
-    return contactsData.filter((c: any) => 
+    return contactsData.filter((c: Contact & {category?: string}) => 
       c.category === 'SUBCONTRACTOR' || c.category === 'SUPPLIER'
     );
   }, [contactsData]);
@@ -293,11 +282,12 @@ export default function ProcurementPage() {
       setProcurements(procRes?.data?.data || []);
       setTotalItems(procRes?.data?.meta?.total || 0);
       setSummary(summaryRes?.data?.data);
-    } catch (error: any) {
-      console.error('Error fetching procurement data:', error.response?.data || error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load procurement data';
+      console.error('Error fetching procurement data:', errorMessage);
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to load procurement data',
+        description: errorMessage,
         variant: 'destructive'
       });
     } finally {
@@ -322,7 +312,7 @@ export default function ProcurementPage() {
   }, [projectsData, selectedProject, form]);
   
   // Handle form submission - Add
-  const onSubmitAdd = async (values: any) => {
+  const onSubmitAdd = async (values: z.infer<typeof createProcurementSchema>) => {
     try {
       // Clean up values - convert 'none' to null for optional fields
       const cleanedValues = {
@@ -338,17 +328,18 @@ export default function ProcurementPage() {
       setShowAddDialog(false);
       form.reset();
       fetchProcurementData();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create procurement item';
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to create procurement item',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
   };
   
   // Handle form submission - Edit
-  const onSubmitEdit = async (values: any) => {
+  const onSubmitEdit = async (values: z.infer<typeof createProcurementSchema>) => {
     if (!selectedItem) return;
     
     try {
@@ -367,10 +358,11 @@ export default function ProcurementPage() {
       setSelectedItem(null);
       form.reset();
       fetchProcurementData();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update procurement item';
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to update procurement item',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -389,17 +381,18 @@ export default function ProcurementPage() {
       setShowDeleteDialog(false);
       setSelectedItem(null);
       fetchProcurementData();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete procurement item';
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to delete procurement item',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
   };
   
   // Handle status update
-  const handleStatusUpdate = async (id: string, newStatus: string, additionalData?: any) => {
+  const handleStatusUpdate = async (id: string, newStatus: string, additionalData?: Record<string, unknown>) => {
     try {
       await apiClient.patch(`/procurement/${id}`, {
         status: newStatus,
@@ -410,17 +403,18 @@ export default function ProcurementPage() {
         description: `Status updated to ${newStatus}`
       });
       fetchProcurementData();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update status';
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to update status',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
   };
   
   // Handle bulk operations
-  const handleBulkOperation = async (operation: string, data?: any) => {
+  const handleBulkOperation = async (operation: string, data?: Record<string, unknown>) => {
     if (selectedItems.length === 0) {
       toast({
         title: 'Warning',
@@ -443,10 +437,11 @@ export default function ProcurementPage() {
       setSelectedItems([]);
       setShowBulkDialog(false);
       fetchProcurementData();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Bulk operation failed';
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Bulk operation failed',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -479,7 +474,7 @@ export default function ProcurementPage() {
   };
   
   // Table columns definition
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<ProcurementItem>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -910,7 +905,7 @@ export default function ProcurementPage() {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {Array.isArray(projectsData) && projectsData.map((project: any) => (
+                                      {Array.isArray(projectsData) && projectsData.map((project: Project) => (
                                         <SelectItem key={project.id} value={project.id}>
                                           {project.name}
                                         </SelectItem>
@@ -1155,7 +1150,7 @@ export default function ProcurementPage() {
                                     </FormControl>
                                     <SelectContent>
                                       <SelectItem value="none">None</SelectItem>
-                                      {suppliers.map((supplier: any) => (
+                                      {suppliers.map((supplier: Contact) => (
                                         <SelectItem key={supplier.id} value={supplier.id}>
                                           {supplier.name} {supplier.company && `- ${supplier.company}`}
                                         </SelectItem>
@@ -1228,10 +1223,10 @@ export default function ProcurementPage() {
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {(Array.isArray(budgetData) ? budgetData : budgetData?.data || []).map((item: any) => (
+                                    {(Array.isArray(budgetData) ? budgetData : budgetData?.data || []).map((item: BudgetItem & {item?: string; discipline?: string; estTotal?: number; committedTotal?: number}) => (
                                       <SelectItem key={item.id} value={item.id}>
-                                        {item.item} - {item.discipline} 
-                                        (${Number(item.estTotal).toFixed(2)})
+                                        {item.item || item.description} - {item.discipline} 
+                                        (${Number(item.estTotal || 0).toFixed(2)})
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -1248,22 +1243,22 @@ export default function ProcurementPage() {
                             <div className="p-4 bg-muted rounded-lg space-y-2">
                               {(() => {
                                 const budgetItem = (Array.isArray(budgetData) ? budgetData : budgetData?.data || []).find(
-                                  (b: any) => b.id === form?.watch('budgetItemId')
-                                );
+                                  (b: BudgetItem & {estTotal?: number; committedTotal?: number}) => b.id === form?.watch('budgetItemId')
+                                ) as BudgetItem & {estTotal?: number; committedTotal?: number} | undefined;
                                 if (!budgetItem) return null;
                                 
-                                const remaining = Number(budgetItem.estTotal) - Number(budgetItem.committedTotal);
+                                const remaining = Number(budgetItem.estTotal || 0) - Number(budgetItem.committedTotal || 0);
                                 const willExceed = (form?.watch('totalCost') || 0) > remaining;
                                 
                                 return (
                                   <>
                                     <div className="flex justify-between text-sm">
                                       <span>Budget Allocated:</span>
-                                      <span>${Number(budgetItem.estTotal).toFixed(2)}</span>
+                                      <span>${Number(budgetItem.estTotal || 0).toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                       <span>Already Committed:</span>
-                                      <span>${Number(budgetItem.committedTotal).toFixed(2)}</span>
+                                      <span>${Number(budgetItem.committedTotal || 0).toFixed(2)}</span>
                                     </div>
                                     <Separator />
                                     <div className="flex justify-between font-medium">
@@ -1403,7 +1398,7 @@ export default function ProcurementPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
-                    {Array.isArray(projectsData) && projectsData.map((project: any) => (
+                    {Array.isArray(projectsData) && projectsData.map((project: Project) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
@@ -1590,7 +1585,7 @@ export default function ProcurementPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {summary?.statusBreakdown && Object.entries(summary.statusBreakdown).map(([status, count]: [string, any]) => {
+                    {summary?.statusBreakdown && Object.entries(summary.statusBreakdown).map(([status, count]: [string, number]) => {
                       const config = STATUS_CONFIG[status.toUpperCase() as keyof typeof STATUS_CONFIG];
                       const percentage = (count / summary.total) * 100;
                       
@@ -1620,7 +1615,7 @@ export default function ProcurementPage() {
                 <CardContent>
                   <div className="h-[300px] overflow-y-auto">
                     <div className="space-y-4">
-                      {summary?.recentItems?.slice(0, 5).map((item: any) => (
+                      {summary?.recentItems?.slice(0, 5).map((item: ProcurementItem & {project?: {name: string}}) => (
                         <div key={item.id} className="flex items-start gap-3 pb-3 border-b last:border-0">
                           <div className="p-2 bg-muted rounded-lg">
                             <Package className="h-4 w-4" />
@@ -1826,7 +1821,7 @@ export default function ProcurementPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Procurement Item</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{selectedItem?.materialItem}"? 
+                Are you sure you want to delete &quot;{selectedItem?.materialItem}&quot;? 
                 This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

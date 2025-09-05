@@ -16,14 +16,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   Form,
   FormControl,
   FormField,
@@ -66,6 +58,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
+import { Contact } from '@/types';
 import { 
   Plus, 
   MoreHorizontal, 
@@ -128,7 +121,7 @@ function CategoryBadge({ category }: { category: string }) {
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, any> = {
+  const variants: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
     ACTIVE: 'default',
     INACTIVE: 'secondary',
     POTENTIAL: 'outline',
@@ -148,13 +141,11 @@ export default function AdminContactsPage() {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
   const [isReady, setIsReady] = useState(false);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isAssignTaskOpen, setIsAssignTaskOpen] = useState(false);
-  const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card'); // Default to card view for mobile
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -210,7 +201,7 @@ export default function AdminContactsPage() {
   const createMutation = useCreateContact();
 
   // Columns definition
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<Contact>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -401,12 +392,13 @@ export default function AdminContactsPage() {
       });
       refetch();
     } catch (error) {
-      console.error('Error creating contact:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create contact';
+      console.error('Error creating contact:', errorMessage);
       setIsSubmitting(false);
     }
   };
 
-  const handleEdit = (contact: any) => {
+  const handleEdit = (contact: Contact) => {
     setSelectedContact(contact);
     form.reset({
       name: contact.name,
@@ -438,16 +430,17 @@ export default function AdminContactsPage() {
       form.reset();
       refetch();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update contact';
       toast({
         title: 'Error',
-        description: 'Failed to update contact',
+        description: errorMessage,
         variant: 'destructive',
       });
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = (contact: any) => {
+  const handleDelete = (contact: Contact) => {
     setSelectedContact(contact);
     setIsDeleteOpen(true);
   };
@@ -456,7 +449,7 @@ export default function AdminContactsPage() {
     if (!selectedContact) return;
     
     try {
-      const response = await apiClient.delete(`/contacts/${selectedContact.id}`);
+      await apiClient.delete(`/contacts/${selectedContact.id}`);
       
       // Even if there's an audit log error, if the contact was deleted, we should update the UI
       toast({
@@ -470,8 +463,9 @@ export default function AdminContactsPage() {
       setTimeout(() => {
         refetch();
       }, 100);
-    } catch (error: any) {
-      console.error('Delete error:', error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete contact';
+      console.error('Delete error:', errorMessage);
       
       // Still try to refetch in case the delete actually succeeded
       setTimeout(() => {
@@ -480,15 +474,15 @@ export default function AdminContactsPage() {
       
       toast({
         title: 'Error',
-        description: error.error || error.message || 'Failed to delete contact',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
   };
 
-  const handleInvite = async (contact: any) => {
+  const handleInvite = async (contact: Contact) => {
     try {
-      const response = await apiClient.post(`/contacts/${contact.id}/invite`, {
+      await apiClient.post(`/contacts/${contact.id}/invite`, {
         expiryDays: 7,
         accessLevel: 'standard',
       });
@@ -499,25 +493,26 @@ export default function AdminContactsPage() {
       });
       
       refetch();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send invitation';
       toast({
         title: 'Error',
-        description: error.error || error.message || 'Failed to send invitation',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
   };
   
   // Get contacts array
-  const contacts = Array.isArray(contactsData?.data) ? contactsData.data : Array.isArray(contactsData) ? contactsData : [];
+  const contacts: Contact[] = Array.isArray(contactsData?.data) ? contactsData.data : Array.isArray(contactsData) ? contactsData : [];
   
   // Filter contacts based on active filters and search
   const filteredContacts = useMemo(() => {
-    let filtered: any[] = contacts;
+    let filtered: Contact[] = contacts;
     
     // Search filter
     if (searchQuery) {
-      filtered = filtered.filter((c: any) => {
+      filtered = filtered.filter((c: Contact) => {
         const searchLower = searchQuery.toLowerCase();
         return (
           c.name?.toLowerCase().includes(searchLower) ||
@@ -530,22 +525,22 @@ export default function AdminContactsPage() {
     
     // Active filters
     if (activeFilters.includes('portal')) {
-      filtered = filtered.filter((c: any) => c.portalStatus === 'ACTIVE');
+      filtered = filtered.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'ACTIVE');
     }
     if (activeFilters.includes('pending')) {
-      filtered = filtered.filter((c: any) => c.portalStatus === 'INVITED');
+      filtered = filtered.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'INVITED');
     }
     if (activeFilters.includes('no-portal')) {
-      filtered = filtered.filter((c: any) => !c.portalStatus || c.portalStatus === 'NONE');
+      filtered = filtered.filter((c: Contact & {portalStatus?: string}) => !c.portalStatus || c.portalStatus === 'NONE');
     }
     if (activeFilters.includes('has-tasks')) {
-      filtered = filtered.filter((c: any) => c._count?.assignedTasks > 0);
+      filtered = filtered.filter((c: Contact & {_count?: {assignedTasks: number}}) => (c._count?.assignedTasks || 0) > 0);
     }
     
     return filtered;
   }, [contacts, activeFilters, searchQuery]);
 
-  const handleAssignTask = (contact: any) => {
+  const handleAssignTask = (contact: Contact) => {
     setSelectedContact(contact);
     setIsAssignTaskOpen(true);
   };
@@ -558,7 +553,7 @@ export default function AdminContactsPage() {
     );
   };
 
-  const handleContactTap = (contact: any) => {
+  const handleContactTap = (contact: Contact) => {
     if (isMobile) {
       setSelectedContact(contact);
       setIsDetailOpen(true);
@@ -567,16 +562,16 @@ export default function AdminContactsPage() {
 
   const handleExport = () => {
     // Implement CSV export
-    const contacts = Array.isArray(contactsData) ? contactsData : [];
+    const exportContacts = Array.isArray(contactsData) ? contactsData : [];
     const csv = [
       ['Name', 'Email', 'Phone', 'Company', 'Category', 'Status'],
-      ...contacts.map((c: any) => [
+      ...exportContacts.map((c: Contact) => [
         c.name,
         c.email || '',
         c.phone || '',
         c.company || '',
-        c.category,
-        c.status,
+        'category' in c ? (c as Record<string, string>).category : '',
+        'status' in c ? (c as Record<string, string>).status : ''
       ]),
     ].map(row => row.join(',')).join('\n');
     
@@ -725,28 +720,28 @@ export default function AdminContactsPage() {
               },
               {
                 title: 'Portal Access',
-                value: `${contacts.filter((c: any) => c.portalStatus === 'ACTIVE').length}/${contacts.length}`,
+                value: `${contacts.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'ACTIVE').length}/${contacts.length}`,
                 subtitle: 'Have access',
                 icon: Unlock,
                 iconColor: 'text-green-400',
               },
               {
                 title: 'Pending Invites',
-                value: contacts.filter((c: any) => c.portalStatus === 'INVITED').length,
+                value: contacts.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'INVITED').length,
                 subtitle: 'Awaiting response',
                 icon: Clock,
                 iconColor: 'text-yellow-400',
               },
               {
                 title: 'Active',
-                value: contacts.filter((c: any) => c.status === 'ACTIVE').length,
+                value: contacts.filter((c: Contact & {status?: string}) => c.status === 'ACTIVE').length,
                 subtitle: 'Active contacts',
                 icon: UserCheck,
                 iconColor: 'text-green-400',
               },
               {
                 title: 'Has Tasks',
-                value: contacts.filter((c: any) => c._count?.assignedTasks > 0).length,
+                value: contacts.filter((c: Contact & {_count?: {assignedTasks: number}}) => (c._count?.assignedTasks || 0) > 0).length,
                 subtitle: 'Assigned tasks',
                 icon: ClipboardList,
                 iconColor: 'text-blue-400',
@@ -1026,7 +1021,7 @@ export default function AdminContactsPage() {
           ) : (
             // Mobile List View - Compact list format
             <div className="space-y-1">
-              {filteredContacts.map((contact: any) => (
+              {filteredContacts.map((contact: Contact & {portalStatus?: string; status?: string; category?: string}) => (
                 <div
                   key={contact.id}
                   onClick={() => handleContactTap(contact)}
@@ -1066,7 +1061,7 @@ export default function AdminContactsPage() {
             "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
             isLandscape && "grid-cols-2"
           )}>
-            {filteredContacts.map((contact: any) => (
+            {filteredContacts.map((contact: Contact) => (
               <ContactCard
                 key={contact.id}
                 contact={contact}
@@ -1411,21 +1406,21 @@ export default function AdminContactsPage() {
             onFiltersChange={setActiveFilters}
             onExportCSV={handleExport}
             filterCounts={{
-              portal: contacts.filter((c: any) => c.portalStatus === 'ACTIVE').length,
-              pending: contacts.filter((c: any) => c.portalStatus === 'INVITED').length,
-              noPortal: contacts.filter((c: any) => !c.portalStatus || c.portalStatus === 'NONE').length,
-              hasTasks: contacts.filter((c: any) => c._count?.assignedTasks > 0).length,
-              active: contacts.filter((c: any) => c.status === 'ACTIVE').length,
-              inactive: contacts.filter((c: any) => c.status === 'INACTIVE').length,
-              potential: contacts.filter((c: any) => c.status === 'POTENTIAL').length,
-              blacklisted: contacts.filter((c: any) => c.status === 'BLACKLISTED').length,
-              followUp: contacts.filter((c: any) => c.status === 'FOLLOW_UP').length,
-              subcontractor: contacts.filter((c: any) => c.category === 'SUBCONTRACTOR').length,
-              supplier: contacts.filter((c: any) => c.category === 'SUPPLIER').length,
-              consultant: contacts.filter((c: any) => c.category === 'CONSULTANT').length,
-              inspector: contacts.filter((c: any) => c.category === 'INSPECTOR').length,
-              client: contacts.filter((c: any) => c.category === 'CLIENT').length,
-              other: contacts.filter((c: any) => c.category === 'OTHER').length,
+              portal: contacts.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'ACTIVE').length,
+              pending: contacts.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'INVITED').length,
+              noPortal: contacts.filter((c: Contact & {portalStatus?: string}) => !c.portalStatus || c.portalStatus === 'NONE').length,
+              hasTasks: contacts.filter((c: Contact & {_count?: {assignedTasks: number}}) => (c._count?.assignedTasks || 0) > 0).length,
+              active: contacts.filter((c: Contact & {status?: string}) => c.status === 'ACTIVE').length,
+              inactive: contacts.filter((c: Contact & {status?: string}) => c.status === 'INACTIVE').length,
+              potential: contacts.filter((c: Contact & {status?: string}) => c.status === 'POTENTIAL').length,
+              blacklisted: contacts.filter((c: Contact & {status?: string}) => c.status === 'BLACKLISTED').length,
+              followUp: contacts.filter((c: Contact & {status?: string}) => c.status === 'FOLLOW_UP').length,
+              subcontractor: contacts.filter((c: Contact & {category?: string}) => c.category === 'SUBCONTRACTOR').length,
+              supplier: contacts.filter((c: Contact & {category?: string}) => c.category === 'SUPPLIER').length,
+              consultant: contacts.filter((c: Contact & {category?: string}) => c.category === 'CONSULTANT').length,
+              inspector: contacts.filter((c: Contact & {category?: string}) => c.category === 'INSPECTOR').length,
+              client: contacts.filter((c: Contact & {category?: string}) => c.category === 'CLIENT').length,
+              other: contacts.filter((c: Contact & {category?: string}) => c.category === 'OTHER').length,
             }}
           />
         )}
@@ -1437,7 +1432,7 @@ export default function AdminContactsPage() {
               <AlertDialogTitle className="text-white">Are you sure?</AlertDialogTitle>
               <AlertDialogDescription className="text-white/60">
                 This action cannot be undone. This will permanently delete the contact
-                "{selectedContact?.name}".
+                &quot;{selectedContact?.name}&quot;.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

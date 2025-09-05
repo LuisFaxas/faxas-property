@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Plus, FileText, Download, Eye, Share2, Clock, CheckCircle, AlertCircle, Upload, Folder } from 'lucide-react';
+import { FileText, Download, Eye, Share2, CheckCircle, AlertCircle, Upload, Folder } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -41,7 +41,6 @@ import { PageShell } from '@/components/blocks/page-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -131,14 +130,13 @@ const mockPlans = [
 
 export default function AdminPlansPage() {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [plans, setPlans] = useState(mockPlans);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<typeof mockPlans[0] | null>(null);
   const [activeTab, setActiveTab] = useState('all');
 
   // Form state
@@ -275,7 +273,7 @@ export default function AdminPlansPage() {
     setSelectedPlan(null);
   };
 
-  const handleDownload = (plan: any) => {
+  const handleDownload = (plan: typeof mockPlans[0]) => {
     // Update download count
     const updatedPlans = plans.map(p => {
       if (p.id === plan.id) {
@@ -291,7 +289,7 @@ export default function AdminPlansPage() {
     });
   };
 
-  const handleView = (plan: any) => {
+  const handleView = (plan: typeof mockPlans[0]) => {
     // Update last viewed
     const updatedPlans = plans.map(p => {
       if (p.id === plan.id) {
@@ -319,7 +317,7 @@ export default function AdminPlansPage() {
     });
   };
 
-  const openEditDialog = (plan: any) => {
+  const openEditDialog = (plan: typeof mockPlans[0]) => {
     setSelectedPlan(plan);
     setFormData({
       name: plan.name,
@@ -357,7 +355,7 @@ export default function AdminPlansPage() {
     }
   }, [plans, activeTab]);
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<typeof mockPlans[0]>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -571,7 +569,7 @@ export default function AdminPlansPage() {
                   <Label>File</Label>
                   <Input
                     type="file"
-                    onChange={(e) => setFormData({ ...formData, file: e.target.files?.[0] || null })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, file: e.target.files?.[0] || null })}
                     className="bg-white/5 border-white/10"
                     accept=".pdf,.dwg,.dxf,.xlsx,.xls,.doc,.docx,.zip"
                   />
@@ -886,7 +884,7 @@ export default function AdminPlansPage() {
             <DialogHeader>
               <DialogTitle>Share Document</DialogTitle>
               <DialogDescription className="text-white/60">
-                Share "{selectedPlan?.name}" with team members
+                Share &quot;{selectedPlan?.name}&quot; with team members
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -926,7 +924,7 @@ export default function AdminPlansPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Document</AlertDialogTitle>
               <AlertDialogDescription className="text-white/60">
-                Are you sure you want to delete "{selectedPlan?.name}"? This action cannot be undone.
+                Are you sure you want to delete &quot;{selectedPlan?.name}&quot;? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

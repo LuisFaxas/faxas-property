@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Plus, AlertTriangle, Shield, TrendingUp, Activity, Target, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, AlertTriangle, Shield, TrendingUp, Activity, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -40,11 +40,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { PageShell } from '@/components/blocks/page-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
+import { Risk } from '@/types';
 
 // Mock data for now - will be replaced with API calls
 const mockRisks = [
@@ -142,13 +142,12 @@ const mockRisks = [
 
 export default function AdminRisksPage() {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [risks, setRisks] = useState(mockRisks);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedRisk, setSelectedRisk] = useState<any>(null);
+  const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
   const [activeTab, setActiveTab] = useState('all');
 
   // Form state
@@ -313,7 +312,7 @@ export default function AdminRisksPage() {
     });
   };
 
-  const openEditDialog = (risk: any) => {
+  const openEditDialog = (risk: Risk) => {
     setSelectedRisk(risk);
     setFormData({
       title: risk.title,
@@ -348,7 +347,7 @@ export default function AdminRisksPage() {
     }
   }, [risks, activeTab]);
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<Risk>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -683,7 +682,7 @@ export default function AdminRisksPage() {
                     value={formData.contingency}
                     onChange={(e) => setFormData({ ...formData, contingency: e.target.value })}
                     className="bg-white/5 border-white/10"
-                    placeholder="What's the backup plan if this risk occurs?"
+                    placeholder="What&apos;s the backup plan if this risk occurs?"
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-4">
@@ -1047,7 +1046,7 @@ export default function AdminRisksPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Risk Assessment</AlertDialogTitle>
               <AlertDialogDescription className="text-white/60">
-                Are you sure you want to delete "{selectedRisk?.title}"? This action cannot be undone.
+                Are you sure you want to delete &quot;{selectedRisk?.title}&quot;? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
