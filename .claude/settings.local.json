@@ -58,7 +58,15 @@
       "Bash(git remote set-url:*)",
       "Bash(del next.config.ts)",
       "Bash(npm cache clean:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(copy:*)",
+      "Bash(del favicon.ico)",
+      "Bash(del nul)",
+      "mcp__filesystem__read_multiple_files",
+      "WebFetch(domain:buildertrend.com)",
+      "WebFetch(domain:clickysoft.com)",
+      "WebFetch(domain:thedigitalprojectmanager.com)",
+      "WebFetch(domain:www.anthropic.com)"
     ],
     "deny": [],
     "ask": [],
