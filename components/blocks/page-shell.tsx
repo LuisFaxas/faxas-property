@@ -239,8 +239,10 @@ export function PageShell({
       </aside>
 
       {/* Simplified Mobile Header */}
-      <div className={cn(
-        "md:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-white/10",
+      <div 
+        data-ui="topbar"
+        className={cn(
+        "md:hidden fixed top-0 left-0 right-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-black/30 border-b border-white/10",
         isLandscape && "py-0"
       )}>
         <div className={cn(
@@ -331,7 +333,9 @@ export function PageShell({
         isLandscape && "ml-14"
       )}>
         {/* Desktop Header with Project Switcher */}
-        <div className="hidden md:flex items-center justify-between p-4 border-b border-white/10 glass">
+        <div 
+          data-ui="topbar"
+          className="hidden md:flex sticky top-0 z-40 items-center justify-between p-4 border-b border-white/10 backdrop-blur supports-[backdrop-filter]:bg-black/30">
           <ProjectSwitcher />
           <div className="flex items-center gap-4">
             <span className="text-white/50 text-sm">
@@ -345,13 +349,16 @@ export function PageShell({
           </div>
         </div>
         
-        <div className={cn(
-          "md:pt-0 pt-16",
-          isLandscape && "pt-10",
-          isMobile && !isLandscape && "pb-[60px]" // Account for bottom nav height
-        )}>
+        <main
+          id="page-content"
+          className={cn(
+            "pt-20 md:pt-4 lg:pt-6 space-y-6 md:space-y-8",
+            isLandscape && "pt-12",
+            isMobile && !isLandscape && "pb-[60px]" // Account for bottom nav height
+          )}
+        >
           {children}
-        </div>
+        </main>
       </main>
     </div>
   )
