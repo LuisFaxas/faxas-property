@@ -708,32 +708,21 @@ const ActivityFeedWidget = lazy(() => import('@/components/homepage/activity-fee
 - [ ] Git commit with message: "Phase 3: Enhanced functionality and real-time features"
 - [ ] Move to Phase 4
 
-#### PHASE 4: Construction-Specific Features
-**Status**: ⏳ PENDING PHASE 3
+#### PHASE 4: Construction-Specific Features  
+**Status**: ❌ CANCELLED (September 11, 2025)
+**Reason**: Features too complex for homepage widgets - should be separate dedicated pages
 
-**Implementation Tasks:**
-- **Specialized Components**:
-  - `components/homepage/safety-tracker-widget.tsx` - Incident tracking
-  - `components/homepage/inspection-dashboard-widget.tsx` - Calendar integration
-  - `components/homepage/progress-photos-widget.tsx` - Milestone comparisons
-  - Material delivery tracking integration
+**Original Planned Widgets (CANCELLED):**
+- ~~Safety tracking dashboard widget~~ → Should be /safety page
+- ~~Inspection management integration~~ → Already in /schedule page  
+- ~~Progress photo documentation~~ → Should be /photos page
+- ~~Material delivery tracking~~ → Should be in /schedule or /inventory page
 
-- **Business Logic Integration**:
-  - OSHA compliance tracking
-  - Inspector contact management
-  - Photo upload and organization
-  - Supply chain alert system
+**Decision Rationale:**
+Homepage widgets should be simple, glanceable, and actionable. Complex features requiring detailed interaction belong in dedicated pages, not dashboard widgets. This keeps the homepage focused and fast.
 
-**Success Criteria:**
-- Safety metrics display with incident tracking
-- Inspection schedule integrates with calendar
-- Progress photos organized by project phase
-- Material delivery alerts functional
-
-**Upon Completion:**
-- [ ] Update this section: Status → ✅ COMPLETED
-- [ ] Git commit with message: "Phase 4: Construction-specific features"
-- [ ] Move to Phase 5
+**Replacement Action:**
+Proceed directly to Phase 5 (Optimization) after completing homepage integration with Phase 1-3 widgets only.
 
 #### PHASE 5: Performance Optimization & Quality Assurance
 **Status**: ⏳ PENDING PHASE 4

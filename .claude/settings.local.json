@@ -66,7 +66,9 @@
       "WebFetch(domain:buildertrend.com)",
       "WebFetch(domain:clickysoft.com)",
       "WebFetch(domain:thedigitalprojectmanager.com)",
-      "WebFetch(domain:www.anthropic.com)"
+      "WebFetch(domain:www.anthropic.com)",
+      "WebFetch(domain:www.procore.com)",
+      "Bash(del DASHBOARD_STATUS.md DASHBOARD_DECISIONS.md)"
     ],
     "deny": [],
     "ask": [],
