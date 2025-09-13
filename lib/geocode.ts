@@ -6,13 +6,15 @@
 interface GeocodeResult {
   lat: number;
   lng: number;
+  city?: string;
+  state?: string;
   raw: any;
 }
 
 /**
  * Geocode an address using Nominatim
  * @param address The address to geocode
- * @returns Latitude, longitude, and raw response
+ * @returns Latitude, longitude, city, state, and raw response
  */
 export async function geocodeAddress(address: string): Promise<GeocodeResult> {
   if (!address || address.trim().length === 0) {
@@ -20,7 +22,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
   }
 
   const encodedAddress = encodeURIComponent(address);
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&addressdetails=1`;
 
   try {
     const response = await fetch(url, {
@@ -40,10 +42,13 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
     }
 
     const firstResult = results[0];
+    const addressDetails = firstResult.address || {};
 
     return {
       lat: parseFloat(firstResult.lat),
       lng: parseFloat(firstResult.lon),
+      city: addressDetails.city || addressDetails.town || addressDetails.village,
+      state: addressDetails.state,
       raw: firstResult
     };
   } catch (error) {

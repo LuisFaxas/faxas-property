@@ -111,120 +111,116 @@ export function computeWorkability(data: {
   const currentHour = new Date().getHours();
   const current = data.current;
 
-  // Temperature factors
+  // Temperature factors (Fahrenheit)
   const tempF = celsiusToFahrenheit(current.temperature_2m);
-  if (tempF < 32) {
-    score -= 40;
-    reasons.push('Freezing conditions');
-  } else if (tempF < 40) {
-    score -= 25;
-    reasons.push('Very cold');
-  } else if (tempF > 95) {
+  const apparentF = celsiusToFahrenheit(current.apparent_temperature);
+
+  if (tempF <= 32) {
+    score -= 20;
+    reasons.push('Freezing');
+  } else if (apparentF >= 95) {
     score -= 30;
     reasons.push('Extreme heat');
-  } else if (tempF > 85) {
+  } else if (apparentF >= 86 && apparentF < 95) {
     score -= 15;
-    reasons.push('High temperature');
+    reasons.push('High heat');
   }
 
-  // Wind factors
+  // Wind factors (mph)
   const windMph = kmhToMph(current.wind_speed_10m);
-  if (windMph > 35) {
+  if (windMph >= 25) {
     score -= 40;
-    reasons.push('Dangerous winds');
-  } else if (windMph > 25) {
-    score -= 25;
-    reasons.push('Strong winds');
-  } else if (windMph > 15) {
-    score -= 10;
-    reasons.push('Moderate winds');
+    reasons.push(`Winds ${windMph} mph`);
+  } else if (windMph >= 18 && windMph < 25) {
+    score -= 20;
+    reasons.push(`Gusts ${windMph} mph`);
   }
 
-  // Precipitation factors
+  // Precipitation factors (mm/hr)
   const precipMm = current.precipitation || 0;
-  if (precipMm > 10) {
-    score -= 50;
-    reasons.push('Heavy precipitation');
-  } else if (precipMm > 5) {
-    score -= 30;
-    reasons.push('Moderate precipitation');
-  } else if (precipMm > 0) {
-    score -= 15;
-    reasons.push('Light precipitation');
+  if (precipMm >= 0.5) {
+    score -= 40;
+    reasons.push('Rain');
+  } else if (precipMm >= 0.1 && precipMm < 0.5) {
+    score -= 20;
+    reasons.push('Light rain');
   }
 
-  // Weather code factors
+  // Weather code factors (thunderstorms)
   const code = current.weather_code;
-  if (code >= 95) {
-    score -= 50;
+  if (code >= 95 && code <= 99) {
+    score = Math.min(score, 20); // Cap at 20 for thunderstorms
     reasons.push('Thunderstorm');
-  } else if (code >= 80 && code <= 82) {
-    score -= 30;
-    reasons.push('Rain showers');
-  } else if (code >= 71 && code <= 77) {
-    score -= 35;
-    reasons.push('Snow conditions');
   }
 
-  // Find best window in next 8 hours
+  // Find best window in next 12 hours
   let bestWindow: { start: string; end: string } | undefined;
   if (data.hourly && data.hourly.time) {
-    const times = data.hourly.time.slice(currentHour, currentHour + 8);
-    const temps = data.hourly.temperature_2m.slice(currentHour, currentHour + 8);
-    const precip = data.hourly.precipitation.slice(currentHour, currentHour + 8);
-    const wind = data.hourly.wind_speed_10m.slice(currentHour, currentHour + 8);
+    const times = data.hourly.time.slice(currentHour, Math.min(currentHour + 12, data.hourly.time.length));
+    const temps = data.hourly.temperature_2m.slice(currentHour, Math.min(currentHour + 12, data.hourly.temperature_2m.length));
+    const precip = data.hourly.precipitation.slice(currentHour, Math.min(currentHour + 12, data.hourly.precipitation.length));
+    const wind = data.hourly.wind_speed_10m.slice(currentHour, Math.min(currentHour + 12, data.hourly.wind_speed_10m.length));
 
-    let bestStart = -1;
-    let bestEnd = -1;
-    let inGoodWindow = false;
+    let windowStart = -1;
+    let windowEnd = -1;
+    let currentWindowStart = -1;
 
     for (let i = 0; i < times.length; i++) {
       const tempF = celsiusToFahrenheit(temps[i]);
       const windMph = kmhToMph(wind[i]);
-      const precipMm = precip[i];
+      const precipMm = precip[i] || 0;
 
-      const isGood = tempF >= 40 && tempF <= 85 && windMph < 15 && precipMm === 0;
+      // Good/Fair conditions for work
+      const isWorkable = tempF > 32 && tempF < 95 && windMph < 25 && precipMm < 0.5;
 
-      if (isGood && !inGoodWindow) {
-        bestStart = i;
-        inGoodWindow = true;
-      } else if (!isGood && inGoodWindow) {
-        bestEnd = i - 1;
-        break;
+      if (isWorkable) {
+        if (currentWindowStart === -1) {
+          currentWindowStart = i;
+        }
+      } else {
+        if (currentWindowStart !== -1) {
+          // Window ended, check if it's at least 2 hours
+          const windowLength = i - currentWindowStart;
+          if (windowLength >= 2 && windowLength > (windowEnd - windowStart)) {
+            windowStart = currentWindowStart;
+            windowEnd = i;
+          }
+          currentWindowStart = -1;
+        }
       }
     }
 
-    if (inGoodWindow && bestEnd === -1) {
-      bestEnd = times.length - 1;
+    // Check if window extends to end
+    if (currentWindowStart !== -1) {
+      const windowLength = times.length - currentWindowStart;
+      if (windowLength >= 2 && windowLength > (windowEnd - windowStart)) {
+        windowStart = currentWindowStart;
+        windowEnd = times.length;
+      }
     }
 
-    if (bestStart !== -1 && bestEnd !== -1) {
+    if (windowStart !== -1 && windowEnd !== -1) {
       bestWindow = {
-        start: times[bestStart],
-        end: times[bestEnd]
+        start: times[windowStart],
+        end: times[windowEnd - 1]
       };
     }
   }
 
   // Determine label
   let label: 'Good' | 'Fair' | 'Poor';
-  if (score >= 70) {
+  if (score >= 75) {
     label = 'Good';
-  } else if (score >= 40) {
+  } else if (score >= 50) {
     label = 'Fair';
   } else {
     label = 'Poor';
   }
 
-  // If no reasons but score is low, add generic reason
-  if (reasons.length === 0 && score < 100) {
-    reasons.push('Suboptimal conditions');
-  }
-
   return {
     score: Math.max(0, Math.min(100, score)),
     label,
-    reasons,
+    reasons: reasons.slice(0, 2), // Max 2 reasons
     bestWindow
   };
 }

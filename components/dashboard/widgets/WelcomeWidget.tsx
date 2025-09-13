@@ -148,13 +148,13 @@ export function WelcomeWidget() {
         {/* Weather Hero Block */}
         {activeProject?.address ? (
           <div className={cn(
-            'relative overflow-hidden rounded-lg p-4 bg-gradient-to-br transition-all duration-500',
+            'relative overflow-hidden rounded-lg p-3 md:p-4 bg-gradient-to-br motion-reduce:transition-none transition-all duration-500',
             workabilityStyle.gradient
           )}>
             {weatherLoading ? (
               // Loading state
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-white/40" />
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-white/40" />
               </div>
             ) : weatherError ? (
               // Error state
@@ -172,15 +172,15 @@ export function WelcomeWidget() {
               </div>
             ) : weather ? (
               // Weather data
-              <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
                     {/* Large temperature */}
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-bold text-white">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-3xl md:text-4xl font-bold text-white">
                         {weather.current.tempF}°
                       </span>
-                      <span className="text-lg text-white/60">
+                      <span className="text-base md:text-lg text-white/60">
                         {weather.current.text}
                       </span>
                     </div>
@@ -188,29 +188,29 @@ export function WelcomeWidget() {
                     {/* Workability pill */}
                     <div
                       className={cn(
-                        'inline-flex items-center gap-1.5 px-2 py-1 mt-2 rounded-full border text-xs font-medium',
+                        'inline-flex items-center gap-1 px-2 py-0.5 mt-1.5 rounded-full border text-xs font-medium',
                         workabilityStyle.pill
                       )}
                       aria-live="polite"
                     >
                       <WorkabilityIcon className="h-3 w-3" />
-                      {weather.workability.label} Conditions
+                      {weather.workability.label}
                     </div>
                   </div>
 
                   {/* Micro stats */}
-                  <div className="text-right space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs text-white/60">
+                  <div className="text-right space-y-0.5 text-[11px] md:text-xs">
+                    <div className="flex items-center gap-1 text-white/60 justify-end">
                       <ThermometerSun className="h-3 w-3" />
-                      Feels {weather.current.apparentF}°
+                      <span>Feels {weather.current.apparentF}°</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-white/60">
+                    <div className="flex items-center gap-1 text-white/60 justify-end">
                       <Wind className="h-3 w-3" />
-                      {weather.current.windMph} mph
+                      <span>{weather.current.windMph} mph</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-white/60">
+                    <div className="flex items-center gap-1 text-white/60 justify-end">
                       <Droplets className="h-3 w-3" />
-                      {weather.current.humidity}%
+                      <span>{weather.current.humidity}%</span>
                     </div>
                   </div>
                 </div>
@@ -248,9 +248,9 @@ export function WelcomeWidget() {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="h-auto py-1 px-2 text-xs text-amber-400 hover:text-amber-300"
+                className="h-auto py-1 px-2 text-xs text-amber-400 hover:text-amber-300 motion-reduce:transition-none"
               >
-                <Link href={`/admin/projects/${projectId}/settings#site-info`}>
+                <Link href="/admin/settings">
                   Configure →
                 </Link>
               </Button>
@@ -261,10 +261,10 @@ export function WelcomeWidget() {
         {/* Quick metrics - now interactive */}
         <div className="grid grid-cols-3 gap-3">
           <Link
-            href="/admin/tasks?filter=due-today"
-            className="group text-center cursor-pointer"
+            href="/admin/tasks?filter=dueToday"
+            className="group text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg p-2 -m-2"
           >
-            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-yellow-400/10 group-hover:bg-yellow-400/20 transition-colors">
+            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-yellow-400/10 group-hover:bg-yellow-400/20 motion-reduce:transition-none transition-colors">
               <Clock className="h-5 w-5 text-yellow-400" />
             </div>
             <p className="text-2xl font-bold text-white">{metrics.dueToday}</p>
@@ -273,9 +273,9 @@ export function WelcomeWidget() {
 
           <Link
             href="/admin/tasks?filter=overdue"
-            className="group text-center cursor-pointer"
+            className="group text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg p-2 -m-2"
           >
-            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-red-400/10 group-hover:bg-red-400/20 transition-colors">
+            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-red-400/10 group-hover:bg-red-400/20 motion-reduce:transition-none transition-colors">
               <AlertCircle className="h-5 w-5 text-red-400" />
             </div>
             <p className="text-2xl font-bold text-white">{metrics.overdue}</p>
@@ -283,15 +283,26 @@ export function WelcomeWidget() {
           </Link>
 
           <Link
-            href="/admin/schedule?date=today"
-            className="group text-center cursor-pointer"
+            href="/admin/schedule?range=today"
+            className="group text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg p-2 -m-2"
           >
-            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-[#8EE3C8]/10 group-hover:bg-[#8EE3C8]/20 transition-colors">
+            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-[#8EE3C8]/10 group-hover:bg-[#8EE3C8]/20 motion-reduce:transition-none transition-colors">
               <Calendar className="h-5 w-5 text-[#8EE3C8]" />
             </div>
             <p className="text-2xl font-bold text-white">{todayEvents}</p>
             <p className="text-xs text-white/60 group-hover:text-white/80">Events Today</p>
           </Link>
+        </div>
+
+        {/* Heads-up line */}
+        <div className="text-xs text-white/60 text-center">
+          {metrics.overdue > 0 ? (
+            <span className="text-amber-400">Heads up: {metrics.overdue} overdue task{metrics.overdue !== 1 ? 's' : ''}</span>
+          ) : todayEvents > 0 ? (
+            <span>You have {todayEvents} event{todayEvents !== 1 ? 's' : ''} today</span>
+          ) : (
+            <span>You're clear for today</span>
+          )}
         </div>
       </div>
     </Widget>
