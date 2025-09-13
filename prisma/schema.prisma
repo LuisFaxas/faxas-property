@@ -24,6 +24,8 @@ model Project {
   createdAt     DateTime           @default(now())
   actualEndDate DateTime?
   address       String?
+  latitude      Float?
+  longitude     Float?
   clientEmail   String?
   clientName    String?
   clientPhone   String?
