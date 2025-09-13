@@ -7,8 +7,8 @@ import { fetchWeather, formatWeatherResponse } from '@/lib/weather';
 
 export async function GET(request: NextRequest) {
   try {
-    // Require authentication
-    await requireAuth(request);
+    // Require authentication - don't pass request, let it use headers()
+    await requireAuth();
 
     // Get projectId from query params
     const searchParams = request.nextUrl.searchParams;
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     const eventsCount = await prisma.scheduleEvent.count({
       where: {
         projectId,
-        startDate: {
+        start: {
           gte: today,
           lt: tomorrow
         }

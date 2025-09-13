@@ -67,6 +67,7 @@ import { useProjects } from '@/hooks/use-api';
 import { format } from 'date-fns';
 import apiClient from '@/lib/api-client';
 import type { ColumnDef } from '@tanstack/react-table';
+import { US_STATES } from '@/lib/constants/us-states';
 
 // Project types
 const PROJECT_TYPES = [
@@ -119,6 +120,10 @@ export default function AdminSettingsPage() {
     startDate: '',
     targetEndDate: '',
     address: '',
+    streetAddress: '',
+    city: '',
+    state: 'FL',
+    zipCode: '',
     siteDetails: '',
     totalBudget: '',
     contingency: '10',
@@ -141,8 +146,16 @@ export default function AdminSettingsPage() {
   // Handle create project
   const handleCreateProject = async () => {
     try {
+      // Combine address fields
+      const fullAddress = projectForm.streetAddress && projectForm.city && projectForm.state
+        ? `${projectForm.streetAddress}, ${projectForm.city}, ${projectForm.state}${projectForm.zipCode ? ' ' + projectForm.zipCode : ''}`
+        : '';
+
+      const { streetAddress, city, state, zipCode, ...dataToSend } = projectForm;
+
       await apiClient.post('/projects', {
-        ...projectForm,
+        ...dataToSend,
+        address: fullAddress,
         totalBudget: projectForm.totalBudget ? parseFloat(projectForm.totalBudget) : null,
         contingency: projectForm.contingency ? parseFloat(projectForm.contingency) : null,
       });
@@ -161,6 +174,10 @@ export default function AdminSettingsPage() {
         startDate: '',
         targetEndDate: '',
         address: '',
+        streetAddress: '',
+        city: '',
+        state: 'FL',
+        zipCode: '',
         siteDetails: '',
         totalBudget: '',
         contingency: '10',
@@ -182,10 +199,18 @@ export default function AdminSettingsPage() {
   // Handle edit project
   const handleEditProject = async () => {
     if (!selectedProject) return;
-    
+
     try {
+      // Combine address fields
+      const fullAddress = projectForm.streetAddress && projectForm.city && projectForm.state
+        ? `${projectForm.streetAddress}, ${projectForm.city}, ${projectForm.state}${projectForm.zipCode ? ' ' + projectForm.zipCode : ''}`
+        : '';
+
+      const { streetAddress, city, state, zipCode, ...dataToSend } = projectForm;
+
       await apiClient.put(`/projects/${selectedProject.id}`, {
-        ...projectForm,
+        ...dataToSend,
+        address: fullAddress,
         totalBudget: projectForm.totalBudget ? parseFloat(projectForm.totalBudget) : null,
         contingency: projectForm.contingency ? parseFloat(projectForm.contingency) : null,
       });
@@ -382,6 +407,24 @@ export default function AdminSettingsPage() {
               <DropdownMenuItem
                 onClick={() => {
                   setSelectedProject(project);
+
+                  // Parse address into components
+                  let streetAddress = '';
+                  let city = '';
+                  let state = 'FL';
+                  let zipCode = '';
+
+                  if (project.address) {
+                    const parts = project.address.split(',').map(p => p.trim());
+                    if (parts.length >= 3) {
+                      streetAddress = parts[0];
+                      city = parts[1];
+                      const stateZip = parts[2].split(' ');
+                      state = stateZip[0] || 'FL';
+                      zipCode = stateZip[1] || '';
+                    }
+                  }
+
                   setProjectForm({
                     name: project.name || '',
                     description: project.description || '',
@@ -390,6 +433,10 @@ export default function AdminSettingsPage() {
                     startDate: project.startDate ? format(new Date(project.startDate), 'yyyy-MM-dd') : '',
                     targetEndDate: project.targetEndDate ? format(new Date(project.targetEndDate), 'yyyy-MM-dd') : '',
                     address: project.address || '',
+                    streetAddress,
+                    city,
+                    state,
+                    zipCode,
                     siteDetails: project.siteDetails || '',
                     totalBudget: project.totalBudget?.toString() || '',
                     contingency: project.contingency?.toString() || '10',
@@ -602,13 +649,44 @@ export default function AdminSettingsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="address">Project Address</Label>
-                        <Input
-                          id="address"
-                          value={projectForm.address}
-                          onChange={(e) => setProjectForm({ ...projectForm, address: e.target.value })}
-                          placeholder="e.g., 123 Ocean Drive, Miami Beach, FL 33139"
-                        />
+                        <Label>Project Address</Label>
+                        <div className="grid gap-2">
+                          <Input
+                            id="streetAddress"
+                            value={projectForm.streetAddress}
+                            onChange={(e) => setProjectForm({ ...projectForm, streetAddress: e.target.value })}
+                            placeholder="Street Address (e.g., 123 Ocean Drive)"
+                          />
+                          <div className="grid grid-cols-3 gap-2">
+                            <Input
+                              id="city"
+                              value={projectForm.city}
+                              onChange={(e) => setProjectForm({ ...projectForm, city: e.target.value })}
+                              placeholder="City"
+                            />
+                            <Select
+                              value={projectForm.state}
+                              onValueChange={(value) => setProjectForm({ ...projectForm, state: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="State" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {US_STATES.map((state) => (
+                                  <SelectItem key={state.value} value={state.value}>
+                                    {state.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              id="zipCode"
+                              value={projectForm.zipCode}
+                              onChange={(e) => setProjectForm({ ...projectForm, zipCode: e.target.value })}
+                              placeholder="ZIP Code"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -877,13 +955,44 @@ export default function AdminSettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-address">Project Address</Label>
-              <Input
-                id="edit-address"
-                value={projectForm.address}
-                onChange={(e) => setProjectForm({ ...projectForm, address: e.target.value })}
-                placeholder="e.g., 123 Ocean Drive, Miami Beach, FL 33139"
-              />
+              <Label>Project Address</Label>
+              <div className="grid gap-2">
+                <Input
+                  id="edit-streetAddress"
+                  value={projectForm.streetAddress}
+                  onChange={(e) => setProjectForm({ ...projectForm, streetAddress: e.target.value })}
+                  placeholder="Street Address (e.g., 123 Ocean Drive)"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    id="edit-city"
+                    value={projectForm.city}
+                    onChange={(e) => setProjectForm({ ...projectForm, city: e.target.value })}
+                    placeholder="City"
+                  />
+                  <Select
+                    value={projectForm.state}
+                    onValueChange={(value) => setProjectForm({ ...projectForm, state: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="State" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {US_STATES.map((state) => (
+                        <SelectItem key={state.value} value={state.value}>
+                          {state.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="edit-zipCode"
+                    value={projectForm.zipCode}
+                    onChange={(e) => setProjectForm({ ...projectForm, zipCode: e.target.value })}
+                    placeholder="ZIP Code"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
