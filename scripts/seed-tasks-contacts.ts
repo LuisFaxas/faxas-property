@@ -70,7 +70,7 @@ async function seedTasks() {
 
   for (const task of tasks) {
     try {
-      const created = await prisma.task.create({ data: task });
+      const created = await prisma.task.create({ data: task as any });
       console.log(`Created task: ${created.title}`);
     } catch (error: any) {
       if (error.code === 'P2002') {

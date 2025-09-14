@@ -79,7 +79,7 @@ const mockDecisions = [
     description: 'Choose between solid wood vs engineered wood for kitchen cabinets',
     category: 'MATERIAL',
     priority: 'HIGH',
-    status: 'APPROVED',
+    status: 'APPROVED' as const,
     decision: 'Proceed with solid wood cabinets for durability and quality',
     rationale: 'Higher initial cost but better long-term value and customer satisfaction',
     impactCost: 3500,
@@ -101,7 +101,7 @@ const mockDecisions = [
     description: 'Upgrade to energy-efficient HVAC system vs standard',
     category: 'TECHNICAL',
     priority: 'MEDIUM',
-    status: 'PENDING',
+    status: 'PENDING' as const,
     decision: null,
     rationale: null,
     impactCost: 5000,
@@ -123,7 +123,7 @@ const mockDecisions = [
     description: 'Additional foundation reinforcement discovered necessary',
     category: 'STRUCTURAL',
     priority: 'CRITICAL',
-    status: 'APPROVED',
+    status: 'APPROVED' as const,
     decision: 'Proceed with full reinforcement immediately',
     rationale: 'Critical for structural integrity and safety compliance',
     impactCost: 8000,
@@ -145,7 +145,7 @@ const mockDecisions = [
     description: 'Client requested master bathroom layout modification',
     category: 'DESIGN',
     priority: 'LOW',
-    status: 'REJECTED',
+    status: 'REJECTED' as const,
     decision: 'Keep original layout as planned',
     rationale: 'Changes would require major plumbing rework exceeding budget',
     impactCost: -6000,
@@ -167,7 +167,7 @@ const mockDecisions = [
     description: 'Add smart home wiring and systems',
     category: 'FEATURE',
     priority: 'MEDIUM',
-    status: 'DEFERRED',
+    status: 'DEFERRED' as const,
     decision: 'Defer to Phase 2 of project',
     rationale: 'Can be added post-construction without major disruption',
     impactCost: 0,
@@ -187,7 +187,7 @@ const mockDecisions = [
 
 export default function AdminDecisionsPage() {
   const { toast } = useToast();
-  const [decisions, setDecisions] = useState(mockDecisions);
+  const [decisions, setDecisions] = useState<Decision[]>(mockDecisions as Decision[]);
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -263,7 +263,7 @@ export default function AdminDecisionsPage() {
       description: formData.description,
       category: formData.category,
       priority: formData.priority,
-      status: 'PENDING',
+      status: 'PENDING' as const,
       decision: null,
       rationale: null,
       impactCost: parseFloat(formData.impactCost) || 0,
@@ -335,7 +335,7 @@ export default function AdminDecisionsPage() {
       if (d.id === selectedDecision.id) {
         return {
           ...d,
-          status: decisionData.status,
+          status: decisionData.status as 'PENDING' | 'APPROVED' | 'REJECTED' | 'DEFERRED',
           decision: decisionData.decision,
           rationale: decisionData.rationale,
           decisionMaker: 'Current User',
@@ -404,7 +404,14 @@ export default function AdminDecisionsPage() {
       stakeholders: decision.stakeholders.join(', '),
       relatedRisks: decision.relatedRisks.join(', '),
       notes: decision.notes,
-      alternatives: decision.alternatives.length > 0 ? decision.alternatives : [{ option: '', pros: '', cons: '', cost: '' }]
+      alternatives: decision.alternatives.length > 0
+        ? decision.alternatives.map(alt => ({
+            option: alt.option,
+            pros: alt.pros,
+            cons: alt.cons,
+            cost: String(alt.cost) // Convert to string
+          }))
+        : [{ option: '', pros: '', cons: '', cost: '' }]
     });
     setIsEditOpen(true);
   };

@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     const data = createUserSchema.parse(body);
     
     // Check if user already exists in Firebase
-    let firebaseUser;
+    let firebaseUser: any;
     try {
       firebaseUser = await auth.getUserByEmail(data.email);
       throw new ApiError(400, 'User with this email already exists');
@@ -204,22 +204,22 @@ export async function POST(request: NextRequest) {
           // Define role-based permissions
           switch (data.role) {
             case 'ADMIN':
-              return { module, canView: true, canEdit: true };
+              return { module: module as any, canView: true, canEdit: true };
             case 'STAFF':
               return { 
-                module, 
+                module: module as any, 
                 canView: true, 
                 canEdit: !['BUDGET', 'PROJECTS'].includes(module) 
               };
             case 'CONTRACTOR':
               return { 
-                module, 
+                module: module as any, 
                 canView: ['TASKS', 'SCHEDULE', 'PLANS', 'PHOTOS'].includes(module),
                 canEdit: ['TASKS'].includes(module)
               };
             case 'VIEWER':
               return { 
-                module, 
+                module: module as any, 
                 canView: ['TASKS', 'SCHEDULE', 'PLANS'].includes(module),
                 canEdit: false 
               };
@@ -256,9 +256,6 @@ export async function POST(request: NextRequest) {
               select: { id: true, name: true }
             }
           }
-        },
-        access: {
-          where: { projectId: data.projectId }
         }
       }
     });

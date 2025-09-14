@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
           assignedTasks: {
             where: {
               status: {
-                not: 'DONE'
+                not: 'COMPLETED'
               }
             },
             take: 5,

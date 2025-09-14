@@ -13,7 +13,8 @@ export function ProjectOverviewWidget({ showBudget = false }: { showBudget?: boo
   const { data: projects, isLoading, error } = useProjects();
   
   // Get the first active project or fall back to first project
-  const activeProject = projects?.find(p => p.status === 'ACTIVE') || projects?.[0];
+  const projectList = Array.isArray(projects) ? projects : projects?.data || [];
+  const activeProject = projectList.find((p: any) => p.status === 'ACTIVE') || projectList[0];
   const projectId = activeProject?.id;
   
   // Early return if no projectId to prevent undefined in Link href
@@ -99,11 +100,13 @@ export function ProjectOverviewWidget({ showBudget = false }: { showBudget?: boo
   }
 
   // Handle todaySchedule shape (could be array or object with items)
-  const scheduleEvents = Array.isArray(todaySchedule) ? todaySchedule : todaySchedule?.items || [];
+  const scheduleData = (todaySchedule as any)?.data || todaySchedule;
+  const scheduleEvents = Array.isArray(scheduleData) ? scheduleData : scheduleData?.items || [];
   const nextEvent = scheduleEvents[0];
   
-  const totalBudget = toNum(budgetSummary?.totalBudget);
-  const totalSpent = toNum(budgetSummary?.totalSpent);
+  const budgetData = (budgetSummary as any)?.data || budgetSummary;
+  const totalBudget = toNum(budgetData?.totalBudget);
+  const totalSpent = toNum(budgetData?.totalSpent);
 
   return (
     <Widget>

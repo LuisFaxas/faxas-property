@@ -6,7 +6,7 @@ import { updatePermissionsSchema } from '@/lib/validations/user';
 import { Module } from '@prisma/client';
 
 interface RouteContext {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 /**
@@ -16,7 +16,7 @@ interface RouteContext {
 export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
-    const userId = params.id;
+    const { id: userId } = await params;
     
     // Get URL parameters
     const url = new URL(request.url);
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
-    const userId = params.id;
+    const { id: userId } = await params;
     
     // Get URL parameters
     const url = new URL(request.url);
@@ -154,12 +154,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
     
     // Verify user is a member of the project
-    const membership = await prisma.projectMember.findUnique({
+    const membership = await prisma.projectMember.findFirst({
       where: {
-        userId_projectId: {
-          userId: userId,
-          projectId: projectId
-        }
+        userId: userId,
+        projectId: projectId
       }
     });
     
@@ -238,7 +236,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const authUser = await requireRole(['ADMIN']);
-    const userId = params.id;
+    const { id: userId } = await params;
     
     // Parse request body
     const body = await request.json();
@@ -268,8 +266,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         // Verify project exists and user is member
         const [project, membership] = await Promise.all([
           tx.project.findUnique({ where: { id: projectId } }),
-          tx.projectMember.findUnique({
-            where: { userId_projectId: { userId, projectId } }
+          tx.projectMember.findFirst({
+            where: { userId, projectId }
           })
         ]);
         

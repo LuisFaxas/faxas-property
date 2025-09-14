@@ -58,7 +58,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
-import { Contact } from '@/types';
+import type { Contact } from '@prisma/client';
 import { 
   Plus, 
   MoreHorizontal, 
@@ -228,7 +228,7 @@ export default function AdminContactsPage() {
       ),
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          {row.original.type === 'COMPANY' ? (
+          {row.original.company ? (
             <Building className="h-4 w-4 text-white/40" />
           ) : (
             <User className="h-4 w-4 text-white/40" />
@@ -247,16 +247,16 @@ export default function AdminContactsPage() {
       header: 'Contact Info',
       cell: ({ row }) => (
         <div className="space-y-1">
-          {row.original.email && (
+          {row.original.emails?.[0] && (
             <div className="flex items-center gap-1 text-sm">
               <Mail className="h-3 w-3 text-white/40" />
-              <span className="text-white/80">{row.original.email}</span>
+              <span className="text-white/80">{row.original.emails[0]}</span>
             </div>
           )}
-          {row.original.phone && (
+          {row.original.phones?.[0] && (
             <div className="flex items-center gap-1 text-sm">
               <Phone className="h-3 w-3 text-white/40" />
-              <span className="text-white/80">{row.original.phone}</span>
+              <span className="text-white/80">{row.original.phones[0]}</span>
             </div>
           )}
         </div>
@@ -283,7 +283,7 @@ export default function AdminContactsPage() {
       accessorKey: 'tasks',
       header: 'Related Tasks',
       cell: ({ row }) => {
-        const tasks = row.original.tasks || [];
+        const tasks = (row.original as any).tasks || [];
         return (
           <span className="text-sm">
             {tasks.length > 0 ? `${tasks.length} tasks` : 'No tasks'}
@@ -402,12 +402,12 @@ export default function AdminContactsPage() {
     setSelectedContact(contact);
     form.reset({
       name: contact.name,
-      email: contact.email || '',
-      phone: contact.phone || '',
+      email: contact.emails?.[0] || '',
+      phone: contact.phones?.[0] || '',
       company: contact.company || '',
-      category: contact.category,
-      type: contact.type,
-      status: contact.status,
+      category: contact.category as 'SUBCONTRACTOR' | 'SUPPLIER' | 'CONSULTANT' | 'INSPECTOR' | 'CLIENT' | 'OTHER',
+      type: contact.company ? 'COMPANY' : 'INDIVIDUAL',
+      status: contact.status as 'ACTIVE' | 'INACTIVE' | 'POTENTIAL' | 'BLACKLISTED' | 'FOLLOW_UP',
       notes: contact.notes || '',
       projectId: contact.projectId,
     });
@@ -516,8 +516,8 @@ export default function AdminContactsPage() {
         const searchLower = searchQuery.toLowerCase();
         return (
           c.name?.toLowerCase().includes(searchLower) ||
-          c.email?.toLowerCase().includes(searchLower) ||
-          c.phone?.toLowerCase().includes(searchLower) ||
+          c.emails?.[0]?.toLowerCase().includes(searchLower) ||
+          c.phones?.[0]?.toLowerCase().includes(searchLower) ||
           c.company?.toLowerCase().includes(searchLower)
         );
       });
@@ -567,11 +567,11 @@ export default function AdminContactsPage() {
       ['Name', 'Email', 'Phone', 'Company', 'Category', 'Status'],
       ...exportContacts.map((c: Contact) => [
         c.name,
-        c.email || '',
-        c.phone || '',
+        c.emails?.[0] || '',
+        c.phones?.[0] || '',
         c.company || '',
-        'category' in c ? (c as Record<string, string>).category : '',
-        'status' in c ? (c as Record<string, string>).status : ''
+        c.category || '',
+        c.status || ''
       ]),
     ].map(row => row.join(',')).join('\n');
     
@@ -1012,10 +1012,10 @@ export default function AdminContactsPage() {
           // Mobile View - Card or List based on viewMode
           viewMode === 'card' ? (
             <MobileContactList
-              contacts={filteredContacts}
-              onInvite={handleInvite}
-              onDelete={handleDelete}
-              onTap={handleContactTap}
+              contacts={filteredContacts as any}
+              onInvite={handleInvite as any}
+              onDelete={handleDelete as any}
+              onTap={handleContactTap as any}
               showPortalProgress={false}
             />
           ) : (
@@ -1031,7 +1031,7 @@ export default function AdminContactsPage() {
                     <p className="font-medium text-white text-sm truncate">{contact.name}</p>
                     <p className="text-xs text-white/60 truncate">
                       {contact.company || contact.category}
-                      {contact.phone && ` • ${contact.phone}`}
+                      {contact.phones?.[0] && ` • ${contact.phones[0]}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 ml-2">
@@ -1064,11 +1064,11 @@ export default function AdminContactsPage() {
             {filteredContacts.map((contact: Contact) => (
               <ContactCard
                 key={contact.id}
-                contact={contact}
-                onInvite={handleInvite}
+                contact={contact as any}
+                onInvite={handleInvite as any}
                 onAssignTask={handleAssignTask}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
+                onEdit={handleEdit as any}
+                onDelete={handleDelete as any}
               />
             ))}
           </div>
@@ -1384,16 +1384,16 @@ export default function AdminContactsPage() {
         {/* Mobile Contact Detail Sheet */}
         {isMobile && selectedContact && (
           <MobileContactDetailSheet
-            contact={selectedContact}
+            contact={selectedContact as any}
             isOpen={isDetailOpen}
             onClose={() => {
               setIsDetailOpen(false);
               setSelectedContact(null);
             }}
-            onInvite={handleInvite}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onAssignTask={handleAssignTask}
+            onInvite={handleInvite as any}
+            onEdit={handleEdit as any}
+            onDelete={handleDelete as any}
+            onAssignTask={handleAssignTask as any}
           />
         )}
 
@@ -1455,7 +1455,7 @@ export default function AdminContactsPage() {
               setIsAssignTaskOpen(false);
               setSelectedContact(null);
             }}
-            contact={selectedContact}
+            contact={selectedContact as any}
             projectId={projectId}
           />
         )}

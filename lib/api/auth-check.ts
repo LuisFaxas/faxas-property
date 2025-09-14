@@ -176,7 +176,7 @@ export async function requireModuleAccess(
   userId: string,
   projectId: string,
   module: Module,
-  action: 'view' | 'edit' | 'upload' | 'request'
+  action: 'view' | 'edit' | 'upload' | 'request' | 'approve'
 ): Promise<void> {
   const access = await prisma.userModuleAccess.findFirst({
     where: {
@@ -194,7 +194,8 @@ export async function requireModuleAccess(
     view: access.canView,
     edit: access.canEdit,
     upload: access.canUpload,
-    request: access.canRequest
+    request: access.canRequest,
+    approve: access.canEdit // Map approve to edit permission
   };
   
   if (!actionMap[action]) {

@@ -82,7 +82,7 @@ export const POST = withAuth(
           items,
           rfp: {
             id: rfp?.id,
-            itemCount: rfp?._count?.items || 0
+            itemCount: (rfp as any)?._count?.items || 0
           }
         },
         `Successfully processed ${items.length} items`

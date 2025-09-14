@@ -898,7 +898,7 @@ export default function AdminPlansPage() {
                   placeholder="email@example.com"
                 />
               </div>
-              {selectedPlan?.sharedWith?.length > 0 && (
+              {selectedPlan?.sharedWith && selectedPlan.sharedWith.length > 0 && (
                 <div className="space-y-2">
                   <Label>Currently Shared With:</Label>
                   <div className="space-y-1">

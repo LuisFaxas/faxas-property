@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Plus, Shield, Users, Lock, Unlock, AlertCircle, CheckCircle, XCircle, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,7 +44,7 @@ import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useProjects } fr
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 
-import { User } from '@/types';
+import type { User } from '@prisma/client';
 
 // Mock data for users and access
 const mockUsers = [
@@ -190,8 +190,16 @@ export default function UserManagementPage() {
   const deleteUserMutation = useDeleteUser();
   
   // Use API data or fallback to mock data
-  const users = usersData?.data?.users || mockUsers;
-  const [selectedUser, setSelectedUser] = useState<(typeof usersData)['data']['users'][0] | typeof mockUsers[0] | null>(null);
+  const initialUsers = usersData?.data?.users || mockUsers;
+  const [users, setUsers] = useState(initialUsers);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  // Update users when API data changes
+  useEffect(() => {
+    if (usersData?.data?.users) {
+      setUsers(usersData.data.users);
+    }
+  }, [usersData]);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -219,11 +227,11 @@ export default function UserManagementPage() {
   // Calculate metrics
   const metrics = useMemo(() => {
     const totalUsers = users.length;
-    const activeUsers = users.filter(u => u.status === 'ACTIVE').length;
-    const pendingInvites = users.filter(u => u.status === 'PENDING').length;
-    const adminCount = users.filter(u => u.role === 'ADMIN').length;
-    const contractorCount = users.filter(u => u.role === 'CONTRACTOR').length;
-    const recentlyActive = users.filter(u => {
+    const activeUsers = users.filter((u: any) => u.status === 'ACTIVE').length;
+    const pendingInvites = users.filter((u: any) => u.status === 'PENDING').length;
+    const adminCount = users.filter((u: any) => u.role === 'ADMIN').length;
+    const contractorCount = users.filter((u: any) => u.role === 'CONTRACTOR').length;
+    const recentlyActive = users.filter((u: any) => {
       if (!u.lastActive) return false;
       const hoursSinceActive = (new Date().getTime() - u.lastActive.getTime()) / (1000 * 60 * 60);
       return hoursSinceActive <= 24;
@@ -279,7 +287,7 @@ export default function UserManagementPage() {
   const handleEdit = () => {
     if (!selectedUser) return;
 
-    const updatedUsers = users.map(u => {
+    const updatedUsers = users.map((u: any) => {
       if (u.id === selectedUser.id) {
         return {
           ...u,
@@ -304,7 +312,7 @@ export default function UserManagementPage() {
   const handleDelete = () => {
     if (!selectedUser) return;
 
-    setUsers(users.filter(u => u.id !== selectedUser.id));
+    setUsers(users.filter((u: any) => u.id !== selectedUser.id));
     toast({
       title: 'Success',
       description: 'User removed successfully',
@@ -314,7 +322,7 @@ export default function UserManagementPage() {
   };
 
   const handleActivate = (userId: string) => {
-    const updatedUsers = users.map(u => {
+    const updatedUsers = users.map((u: any) => {
       if (u.id === userId) {
         return { ...u, status: 'ACTIVE' };
       }
@@ -328,7 +336,7 @@ export default function UserManagementPage() {
   };
 
   const handleDeactivate = (userId: string) => {
-    const updatedUsers = users.map(u => {
+    const updatedUsers = users.map((u: any) => {
       if (u.id === userId) {
         return { ...u, status: 'INACTIVE' };
       }
@@ -390,7 +398,7 @@ export default function UserManagementPage() {
   };
 
   // Get role-based default permissions
-  const getDefaultPermissions = (role: string) => {
+  const getDefaultPermissions = (role: string): any => {
     switch (role) {
       case 'ADMIN':
         return Object.keys(moduleDescriptions).reduce((acc, key) => ({ ...acc, [key]: true }), {});
@@ -773,7 +781,7 @@ export default function UserManagementPage() {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-400">
-                  {users.filter(u => u.role === 'STAFF').length}
+                  {users.filter((u: any) => u.role === 'STAFF').length}
                 </div>
                 <div className="text-sm text-white/60">Staff</div>
                 <div className="text-xs text-white/40 mt-1">Manage ops</div>
@@ -785,7 +793,7 @@ export default function UserManagementPage() {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-yellow-400">
-                  {users.filter(u => u.role === 'VIEWER').length}
+                  {users.filter((u: any) => u.role === 'VIEWER').length}
                 </div>
                 <div className="text-sm text-white/60">Viewers</div>
                 <div className="text-xs text-white/40 mt-1">Read only</div>
@@ -847,7 +855,7 @@ export default function UserManagementPage() {
               <CardContent>
                 <DataTable
                   columns={columns}
-                  data={users.filter(u => u.status === 'ACTIVE')}
+                  data={users.filter((u: any) => u.status === 'ACTIVE')}
                   searchKey="name"
                   searchPlaceholder="Search active users..."
                 />
@@ -866,7 +874,7 @@ export default function UserManagementPage() {
               <CardContent>
                 <DataTable
                   columns={columns}
-                  data={users.filter(u => u.status === 'PENDING')}
+                  data={users.filter((u: any) => u.status === 'PENDING')}
                   searchKey="name"
                   searchPlaceholder="Search pending users..."
                 />

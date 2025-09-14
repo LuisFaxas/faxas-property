@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Project } from '@/types';
+import type { Project } from '@prisma/client';
 import { 
   Settings, 
   Building2, 
@@ -478,11 +478,13 @@ export default function AdminSettingsPage() {
   ];
 
   // Filter projects based on search
-  const filteredProjects = projectsData?.filter((project: Project) =>
-    project.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.address?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredProjects = Array.isArray(projectsData)
+    ? projectsData.filter((project: Project) =>
+        project.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        project.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        project.address?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
   return (
     <PageShell>
@@ -776,7 +778,6 @@ export default function AdminSettingsPage() {
                 <DataTable
                   columns={projectColumns}
                   data={filteredProjects}
-                  isLoading={projectsLoading}
                 />
               </div>
             </CardContent>

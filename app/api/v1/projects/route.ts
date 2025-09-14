@@ -147,7 +147,7 @@ export const POST = withAuth(
     await Policy.logPolicyDecision(
       auth.user.id,
       project.id,
-      null,  // No module for project creation
+      'projects' as any,  // Module for project creation
       'write',
       true,
       'Project created successfully'

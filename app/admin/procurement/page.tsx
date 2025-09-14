@@ -69,7 +69,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ColumnDef } from '@tanstack/react-table';
-import { ProcurementItem, Contact, Project, BudgetItem } from '@/types';
+import type { Procurement as ProcurementItem, Contact, Project, BudgetItem } from '@prisma/client';
 import { 
   Plus, 
   MoreHorizontal, 
@@ -189,6 +189,7 @@ export default function ProcurementPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -540,7 +541,7 @@ export default function ProcurementPage() {
       cell: ({ row }) => (
         <div className="text-center">
           <div className="font-medium">
-            {row.original.quantity} {row.original.unit}
+            {String(row.original.quantity)} {row.original.unit}
           </div>
         </div>
       )
@@ -551,7 +552,7 @@ export default function ProcurementPage() {
         <DataTableColumnHeader column={column} title="Total Cost" />
       ),
       cell: ({ row }) => {
-        const amount = row.original.totalCost || 0;
+        const amount = Number(row.original.totalCost) || 0;
         const formatted = new Intl.NumberFormat('en-US', {
           style: 'currency',
           currency: 'USD'
@@ -562,7 +563,7 @@ export default function ProcurementPage() {
             <div className="font-medium">{formatted}</div>
             {row.original.unitPrice && (
               <div className="text-xs text-muted-foreground">
-                @ ${row.original.unitPrice}/{row.original.unit}
+                @ ${Number(row.original.unitPrice)}/${row.original.unit}
               </div>
             )}
           </div>
@@ -575,7 +576,7 @@ export default function ProcurementPage() {
         <DataTableColumnHeader column={column} title="Supplier" />
       ),
       cell: ({ row }) => {
-        const supplier = row.original.supplier;
+        const supplier = (row.original as any).supplier;
         if (!supplier) return <span className="text-muted-foreground">Not assigned</span>;
         
         return (
@@ -595,8 +596,8 @@ export default function ProcurementPage() {
       ),
       cell: ({ row }) => {
         const date = new Date(row.original.requiredBy);
-        const daysUntil = row.original.daysUntilRequired;
-        const isOverdue = row.original.isOverdue;
+        const daysUntil = (row.original as any).daysUntilRequired;
+        const isOverdue = (row.original as any).isOverdue;
         
         return (
           <div className={cn('flex items-center gap-2', isOverdue && 'text-red-600')}>
@@ -620,7 +621,7 @@ export default function ProcurementPage() {
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Priority" />
       ),
-      cell: ({ row }) => <PriorityBadge priority={row.original.priority} />
+      cell: ({ row }) => <PriorityBadge priority={row.original.priority || 'MEDIUM'} />
     },
     {
       accessorKey: 'orderStatus',
@@ -696,8 +697,8 @@ export default function ProcurementPage() {
                       Mark as Installed
                     </DropdownMenuItem>
                   )}
-                  {item.canCancel && (
-                    <DropdownMenuItem 
+                  {(item as any).canCancel && (
+                    <DropdownMenuItem
                       onClick={() => handleStatusUpdate(item.id, 'CANCELLED')}
                       className="text-red-600"
                     >
@@ -709,7 +710,7 @@ export default function ProcurementPage() {
               
               <DropdownMenuSeparator />
               
-              {item.canEdit && (
+              {(item as any).canEdit && (
                 <DropdownMenuItem
                   onClick={() => {
                     setSelectedItem(item);
@@ -717,18 +718,18 @@ export default function ProcurementPage() {
                       projectId: item.projectId,
                       materialItem: item.materialItem,
                       description: item.description || '',
-                      quantity: item.quantity,
+                      quantity: Number(item.quantity),
                       unit: item.unit || 'EA',
-                      unitPrice: item.unitPrice || 0,
-                      totalCost: item.totalCost || 0,
+                      unitPrice: item.unitPrice ? Number(item.unitPrice) : 0,
+                      totalCost: item.totalCost ? Number(item.totalCost) : 0,
                       discipline: item.discipline,
                       phase: item.phase,
-                      category: item.category || 'MATERIALS',
+                      category: (item.category as any) || 'MATERIALS',
                       requiredBy: format(new Date(item.requiredBy), 'yyyy-MM-dd'),
                       leadTimeDays: item.leadTimeDays,
                       supplierId: item.supplierId || '',
                       orderStatus: item.orderStatus,
-                      priority: item.priority || 'MEDIUM',
+                      priority: (item.priority as any) || 'MEDIUM',
                       eta: item.eta ? format(new Date(item.eta), 'yyyy-MM-dd') : '',
                       notes: item.notes || '',
                       budgetItemId: item.budgetItemId || '',
@@ -743,7 +744,7 @@ export default function ProcurementPage() {
                 </DropdownMenuItem>
               )}
               
-              {item.canDelete && (
+              {(item as any).canDelete && (
                 <DropdownMenuItem
                   onClick={() => {
                     setSelectedItem(item);
@@ -778,16 +779,16 @@ export default function ProcurementPage() {
   const kpiMetrics = useMemo(() => {
     if (!summary) return null;
     
-    const totalValue = procurements.reduce((sum, item) => sum + (item.totalCost || 0), 0);
-    const overdueCount = procurements.filter(item => item.isOverdue).length;
-    const pendingApproval = procurements.filter(item => item.needsApproval).length;
+    const totalValue = procurements.reduce((sum, item) => sum + (Number(item.totalCost) || 0), 0);
+    const overdueCount = procurements.filter(item => (item as any).isOverdue).length;
+    const pendingApproval = procurements.filter(item => (item as any).needsApproval).length;
     const thisMonthSpend = procurements
       .filter(item => {
         const date = new Date(item.createdAt);
         const now = new Date();
         return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
       })
-      .reduce((sum, item) => sum + (item.totalCost || 0), 0);
+      .reduce((sum, item) => sum + (Number(item.totalCost) || 0), 0);
     
     return {
       totalValue,
@@ -1223,9 +1224,9 @@ export default function ProcurementPage() {
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {(Array.isArray(budgetData) ? budgetData : budgetData?.data || []).map((item: BudgetItem & {item?: string; discipline?: string; estTotal?: number; committedTotal?: number}) => (
+                                    {(Array.isArray(budgetData) ? budgetData : budgetData?.data || []).map((item: BudgetItem & {estTotal?: number; committedTotal?: number}) => (
                                       <SelectItem key={item.id} value={item.id}>
-                                        {item.item || item.description} - {item.discipline} 
+                                        {item.item || (item as any).description} - {item.discipline}
                                         (${Number(item.estTotal || 0).toFixed(2)})
                                       </SelectItem>
                                     ))}
@@ -1680,9 +1681,6 @@ export default function ProcurementPage() {
                     data={procurements}
                     searchKey="materialItem"
                     searchPlaceholder="Search items..."
-                    onRowSelectionChange={(rows) => {
-                      setSelectedItems(rows.map(r => r.original.id));
-                    }}
                   />
                 )}
               </CardContent>
@@ -1752,13 +1750,13 @@ export default function ProcurementPage() {
               <CardContent>
                 <div className="space-y-4">
                   {procurements
-                    .filter(item => item.needsApproval)
+                    .filter(item => (item as any).needsApproval)
                     .map(item => (
                       <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="space-y-1">
                           <p className="font-medium">{item.materialItem}</p>
                           <p className="text-sm text-muted-foreground">
-                            {item.quantity} {item.unit} • ${Number(item.totalCost).toFixed(2)}
+                            {String(item.quantity)} {item.unit} • ${Number(item.totalCost).toFixed(2)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1780,7 +1778,7 @@ export default function ProcurementPage() {
                         </div>
                       </div>
                     ))}
-                  {procurements.filter(item => item.needsApproval).length === 0 && (
+                  {procurements.filter(item => (item as any).needsApproval).length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       No items pending approval
                     </div>

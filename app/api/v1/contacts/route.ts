@@ -104,8 +104,7 @@ export const POST = withAuth(
         emails: data.email ? [data.email] : [],
         phones: data.phone ? [data.phone] : [],
         company: data.company,
-        category: data.category || 'GENERAL',
-        specialty: data.specialty,
+        category: data.category || 'OTHER',
         status: data.status || 'ACTIVE',
         notes: data.notes,
         projectId: projectId!  // Enforced by repository

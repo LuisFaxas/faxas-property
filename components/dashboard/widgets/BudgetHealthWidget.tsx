@@ -58,7 +58,8 @@ export function BudgetHealthWidget() {
   const { data: projects } = useProjects();
 
   // Choose active project (or first)
-  const activeProject = projects?.find(p => p.status === 'ACTIVE') || projects?.[0];
+  const projectList = Array.isArray(projects) ? projects : projects?.data || [];
+  const activeProject = projectList.find((p: any) => p.status === 'ACTIVE') || projectList[0];
   const projectId = activeProject?.id;
 
   const { data: summary, isLoading, error } = useBudgetSummary(projectId, !!projectId);
@@ -67,8 +68,9 @@ export function BudgetHealthWidget() {
   const runway = useMemo(() => {
     if (!activeProject?.startDate || !summary) return null;
     
-    const totalSpent = toNum(summary.totalSpent);
-    const totalBudget = toNum(summary.totalBudget);
+    const summaryData = (summary as any)?.data || summary;
+    const totalSpent = toNum(summaryData?.totalSpent);
+    const totalBudget = toNum(summaryData?.totalBudget);
     if (totalSpent === null || totalBudget === null) return null;
     
     const variance = totalBudget - totalSpent;
@@ -121,8 +123,9 @@ export function BudgetHealthWidget() {
   }
 
   // Normalize numbers & guards
-  const totalBudget = toNum(summary.totalBudget);
-  const totalSpent = toNum(summary.totalSpent);
+  const summaryData = (summary as any)?.data || summary;
+  const totalBudget = toNum(summaryData?.totalBudget);
+  const totalSpent = toNum(summaryData?.totalSpent);
   const hasBudget = totalBudget !== null && totalBudget > 0;
 
   // Show a precise empty-budget state (configured above)
@@ -250,7 +253,7 @@ export function BudgetHealthWidget() {
             )}
           </Link>
 
-          {summary.overBudgetCount > 0 && (
+          {summaryData?.overBudgetCount > 0 && (
             <Button
               asChild
               variant="outline"
@@ -259,7 +262,7 @@ export function BudgetHealthWidget() {
               className="w-full focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none"
             >
               <Link href="/admin/budget?filter=overages">
-                Review overages ({summary.overBudgetCount})
+                Review overages ({summaryData?.overBudgetCount})
                 <ArrowRight className="ml-2 h-3 w-3" />
               </Link>
             </Button>
@@ -330,7 +333,7 @@ export function BudgetHealthWidget() {
           )}
         </Link>
 
-        {summary.overBudgetCount > 0 && (
+        {summaryData?.overBudgetCount > 0 && (
           <Button
             asChild
             variant="outline"
@@ -339,7 +342,7 @@ export function BudgetHealthWidget() {
             className="w-full focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none"
           >
             <Link href="/admin/budget?filter=overages">
-              Review overages ({summary.overBudgetCount})
+              Review overages ({summaryData?.overBudgetCount})
               <ArrowRight className="ml-2 h-3 w-3" />
             </Link>
           </Button>

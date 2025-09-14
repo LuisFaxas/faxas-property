@@ -19,7 +19,8 @@ export function WelcomeWidget() {
   const { data: projects } = useProjects();
 
   // Get active project or fall back to first
-  const activeProject = projects?.find(p => p.status === 'ACTIVE') || projects?.[0];
+  const projectList = Array.isArray(projects) ? projects : projects?.data || [];
+  const activeProject = projectList.find((p: any) => p.status === 'ACTIVE') || projectList[0];
   const projectId = activeProject?.id;
 
   // Fetch data with proper guards
@@ -79,9 +80,10 @@ export function WelcomeWidget() {
   }, [tasks]);
 
   // Count today's events
-  const todayEvents = Array.isArray(todaySchedule)
-    ? todaySchedule.length
-    : todaySchedule?.items?.length || 0;
+  const scheduleData = (todaySchedule as any)?.data || todaySchedule;
+  const todayEvents = Array.isArray(scheduleData)
+    ? scheduleData.length
+    : scheduleData?.items?.length || 0;
 
   // Get workability gradient classes
   const getWorkabilityClasses = (label?: string) => {
@@ -117,7 +119,8 @@ export function WelcomeWidget() {
     }
   };
 
-  const workabilityStyle = getWorkabilityClasses(weather?.workability?.label);
+  const weatherData = (weather as any)?.data || weather;
+  const workabilityStyle = getWorkabilityClasses(weatherData?.workability?.label);
   const WorkabilityIcon = workabilityStyle.icon;
 
   // Format best window time
@@ -170,7 +173,7 @@ export function WelcomeWidget() {
                   Retry
                 </Button>
               </div>
-            ) : weather ? (
+            ) : weatherData ? (
               // Weather data
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -178,10 +181,10 @@ export function WelcomeWidget() {
                     {/* Large temperature */}
                     <div className="flex items-baseline gap-2 flex-wrap">
                       <span className="text-3xl md:text-4xl font-bold text-white">
-                        {weather.current.tempF}°
+                        {weatherData.current.tempF}°
                       </span>
                       <span className="text-base md:text-lg text-white/60">
-                        {weather.current.text}
+                        {weatherData.current.text}
                       </span>
                     </div>
 
@@ -194,7 +197,7 @@ export function WelcomeWidget() {
                       aria-live="polite"
                     >
                       <WorkabilityIcon className="h-3 w-3" />
-                      {weather.workability.label}
+                      {weatherData.workability.label}
                     </div>
                   </div>
 
@@ -202,33 +205,33 @@ export function WelcomeWidget() {
                   <div className="text-right space-y-0.5 text-[11px] md:text-xs">
                     <div className="flex items-center gap-1 text-white/60 justify-end">
                       <ThermometerSun className="h-3 w-3" />
-                      <span>Feels {weather.current.apparentF}°</span>
+                      <span>Feels {weatherData.current.apparentF}°</span>
                     </div>
                     <div className="flex items-center gap-1 text-white/60 justify-end">
                       <Wind className="h-3 w-3" />
-                      <span>{weather.current.windMph} mph</span>
+                      <span>{weatherData.current.windMph} mph</span>
                     </div>
                     <div className="flex items-center gap-1 text-white/60 justify-end">
                       <Droplets className="h-3 w-3" />
-                      <span>{weather.current.humidity}%</span>
+                      <span>{weatherData.current.humidity}%</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Status line */}
                 <div className="text-xs text-white/80">
-                  {weather.workability.label === 'Good' ? (
+                  {weatherData.workability.label === 'Good' ? (
                     <>
                       <span className="font-medium">Good to work</span>
-                      {weather.workability.bestWindow && (
-                        <> • Best {formatTime(weather.workability.bestWindow.startISO)} - {formatTime(weather.workability.bestWindow.endISO)}</>
+                      {weatherData.workability.bestWindow && (
+                        <> • Best {formatTime(weatherData.workability.bestWindow.startISO)} - {formatTime(weatherData.workability.bestWindow.endISO)}</>
                       )}
                     </>
                   ) : (
                     <>
                       <span className="font-medium">Caution</span>
-                      {weather.workability.reasons.length > 0 && (
-                        <> • {weather.workability.reasons.slice(0, 2).join('; ')}</>
+                      {weatherData.workability.reasons.length > 0 && (
+                        <> • {weatherData.workability.reasons.slice(0, 2).join('; ')}</>
                       )}
                     </>
                   )}

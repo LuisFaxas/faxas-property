@@ -6,7 +6,7 @@ import { requireRole, requireAuth } from '@/lib/api/auth-check';
 import { updateUserSchema } from '@/lib/validations/user';
 
 interface RouteContext {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 /**
@@ -16,10 +16,10 @@ interface RouteContext {
 export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     const authUser = await requireAuth();
-    const userId = params.id;
+    const { id: userId } = await params;
     
     // Users can only view their own profile unless they are ADMIN/STAFF
-    if (authUser.id !== userId && !['ADMIN', 'STAFF'].includes(authUser.role)) {
+    if (authUser.uid !== userId && !['ADMIN', 'STAFF'].includes(authUser.role)) {
       throw new ApiError(403, 'You can only view your own profile');
     }
     
@@ -162,10 +162,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     const authUser = await requireAuth();
-    const userId = params.id;
+    const { id: userId } = await params;
     
     // Only ADMIN can update other users, users can update limited fields of their own profile
-    const isUpdatingSelf = authUser.id === userId;
+    const isUpdatingSelf = authUser.uid === userId;
     const canUpdateOthers = ['ADMIN'].includes(authUser.role);
     
     if (!isUpdatingSelf && !canUpdateOthers) {
@@ -294,10 +294,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
     const authUser = await requireRole(['ADMIN']);
-    const userId = params.id;
+    const { id: userId } = await params;
     
     // Prevent self-deletion
-    if (authUser.id === userId) {
+    if (authUser.uid === userId) {
       throw new ApiError(400, 'You cannot delete your own account');
     }
     

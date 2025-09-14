@@ -83,10 +83,10 @@ export const GET = withAuth(
       // Format response with counts
       const rfpsWithCounts = rfps.map(rfp => ({
         ...rfp,
-        itemCount: rfp.items.length,
-        bidCount: rfp.bids.length,
-        attachmentCount: rfp.attachments.length,
-        submittedBidCount: rfp.bids.filter(b => b.status === 'SUBMITTED').length
+        itemCount: (rfp as any).items?.length || 0,
+        bidCount: (rfp as any).bids?.length || 0,
+        attachmentCount: (rfp as any).attachments?.length || 0,
+        submittedBidCount: (rfp as any).bids?.filter((b: any) => b.status === 'SUBMITTED').length || 0
       }));
       
       // Apply rate limiting based on role

@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         projectId,
         title: `Reply to: ${from} - ${subject}`,
         description: `Email received at ${receivedAt}\n\nSnippet: ${snippet}`,
-        status: 'new',
+        status: 'TODO',
         dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
         relatedContactIds: [contact.id]
       }
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
+        { error: 'Invalid request data', details: (error as any).errors },
         { status: 400 }
       );
     }

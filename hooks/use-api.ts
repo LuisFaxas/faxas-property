@@ -73,7 +73,7 @@ export function useUpdateTask() {
       }
       toast({
         title: 'Success',
-        description: data.message || 'Task updated successfully'
+        description: data?.data?.message || 'Task updated successfully'
       });
     },
     onError: (error: any) => {
@@ -97,7 +97,7 @@ export function useUpdateTaskStatus() {
       queryClient.invalidateQueries({ queryKey: ['task'] });
       toast({
         title: 'Success',
-        description: data.message || 'Task status updated'
+        description: data?.data?.message || 'Task status updated'
       });
     },
     onError: (error: any) => {
@@ -120,7 +120,7 @@ export function useBulkUpdateTasks() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast({
         title: 'Success',
-        description: data.message || 'Tasks updated successfully'
+        description: data?.data?.message || 'Tasks updated successfully'
       });
     },
     onError: (error: any) => {
@@ -345,7 +345,7 @@ export function useApproveScheduleEvent() {
       queryClient.invalidateQueries({ queryKey: ['schedule'] });
       toast({
         title: 'Success',
-        description: data.message
+        description: data?.data?.message
       });
     },
     onError: (error: any) => {
@@ -376,7 +376,7 @@ export function useCreateContact() {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       toast({
         title: 'Success',
-        description: data.message || 'Contact created successfully'
+        description: data?.data?.message || 'Contact created successfully'
       });
     },
     onError: (error: any) => {
@@ -415,7 +415,7 @@ export function useCreateRfp(projectId: string) {
       queryClient.invalidateQueries({ queryKey: ['rfps', projectId] });
       toast({
         title: 'Success',
-        description: data.message || 'RFP created successfully'
+        description: data?.data?.message || 'RFP created successfully'
       });
     },
     onError: (error: any) => {
@@ -438,7 +438,7 @@ export function useUpdateRfp(projectId: string, rfpId: string) {
       queryClient.invalidateQueries({ queryKey: ['rfp', projectId, rfpId] });
       toast({
         title: 'Success',
-        description: data.message || 'RFP updated successfully'
+        description: data?.data?.message || 'RFP updated successfully'
       });
     },
     onError: (error: any) => {
@@ -460,7 +460,7 @@ export function useDeleteRfp(projectId: string) {
       queryClient.invalidateQueries({ queryKey: ['rfps', projectId] });
       toast({
         title: 'Success',
-        description: data.message || 'RFP deleted successfully'
+        description: data?.data?.message || 'RFP deleted successfully'
       });
     },
     onError: (error: any) => {
@@ -483,7 +483,7 @@ export function useUpsertRfpItems(projectId: string, rfpId: string) {
       queryClient.invalidateQueries({ queryKey: ['rfp', projectId, rfpId] });
       toast({
         title: 'Success',
-        description: data.message || 'Items updated successfully'
+        description: data?.data?.message || 'Items updated successfully'
       });
     },
     onError: (error: any) => {
@@ -506,7 +506,7 @@ export function useUploadAttachment(projectId: string, rfpId: string) {
       queryClient.invalidateQueries({ queryKey: ['rfp', projectId, rfpId] });
       toast({
         title: 'Success',
-        description: data.message || 'File uploaded successfully'
+        description: data?.data?.message || 'File uploaded successfully'
       });
     },
     onError: (error: any) => {
@@ -529,7 +529,7 @@ export function usePublishRfp(projectId: string, rfpId: string) {
       queryClient.invalidateQueries({ queryKey: ['rfp', projectId, rfpId] });
       toast({
         title: 'Success',
-        description: data.message || 'RFP published successfully'
+        description: data?.data?.message || 'RFP published successfully'
       });
     },
     onError: (error: any) => {

@@ -1,8 +1,14 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import type { BudgetItem } from '@/types';
+import type { BudgetItem } from '@prisma/client';
 import { useMediaQuery } from '@/hooks/use-media-query';
+
+// Extended BudgetItem type with calculated fields
+type BudgetItemWithVariance = BudgetItem & {
+  varianceAmount?: number;
+  variancePercent?: number;
+};
 import { Plus, Download, AlertCircle, TrendingUp, TrendingDown, DollarSign, FileText, Edit, Trash, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -207,7 +213,7 @@ export default function AdminBudgetPage() {
   }, [summary]);
   
   // Columns definition
-  const columns: ColumnDef<BudgetItem>[] = [
+  const columns: ColumnDef<BudgetItemWithVariance>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -410,7 +416,7 @@ export default function AdminBudgetPage() {
       committedTotal: Number(item.committedTotal),
       paidToDate: Number(item.paidToDate),
       vendorContactId: item.vendorContactId || '',
-      status: item.status,
+      status: item.status as 'BUDGETED' | 'COMMITTED' | 'PAID',
       projectId: item.projectId
     });
     setIsEditOpen(true);
@@ -479,7 +485,7 @@ export default function AdminBudgetPage() {
   const handleExport = () => {
     const csv = [
       ['Discipline', 'Category', 'Item', 'Unit', 'Qty', 'Unit Cost', 'Budget', 'Committed', 'Paid', 'Variance', 'Status'],
-      ...budgetItems.map((item: BudgetItem) => [
+      ...budgetItems.map((item: BudgetItemWithVariance) => [
         item.discipline,
         item.category,
         item.item,
@@ -907,7 +913,7 @@ export default function AdminBudgetPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {Object.entries(summary.data.disciplineBreakdown).map(([discipline, data]) => (
+                    {Object.entries(summary.data.disciplineBreakdown).map(([discipline, data]: [string, any]) => (
                       <div key={discipline} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">{discipline}</span>
@@ -971,7 +977,7 @@ export default function AdminBudgetPage() {
               <CardContent>
                 {summary?.data?.topOverBudgetItems && summary.data.topOverBudgetItems.length > 0 ? (
                   <div className="space-y-4">
-                    {summary.data.topOverBudgetItems.map((item: BudgetItem) => (
+                    {summary.data.topOverBudgetItems.map((item: any) => (
                       <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
                           <p className="font-medium">{item.item}</p>

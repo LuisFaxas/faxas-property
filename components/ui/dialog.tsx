@@ -44,7 +44,7 @@ const DialogContent = React.forwardRef<
         // Prevent auto-focus issues that can cause aria-hidden warnings
         event.preventDefault();
         // Focus the first focusable element manually
-        const focusableElement = event.currentTarget.querySelector(
+        const focusableElement = (event.currentTarget as HTMLElement)?.querySelector(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         ) as HTMLElement;
         focusableElement?.focus();

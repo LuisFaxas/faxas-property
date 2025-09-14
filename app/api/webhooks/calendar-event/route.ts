@@ -64,29 +64,35 @@ export async function POST(req: NextRequest) {
       relatedContactIds.push(...contacts.map(c => c.id));
     }
 
-    // Upsert schedule event
-    const scheduleEvent = await prisma.scheduleEvent.upsert({
-      where: {
-        googleEventId
-      },
-      update: {
-        title,
-        start: new Date(start),
-        end: end ? new Date(end) : undefined,
-        relatedContactIds,
-        status: 'PLANNED'
-      },
-      create: {
-        projectId,
-        googleEventId,
-        title,
-        type: eventType,
-        start: new Date(start),
-        end: end ? new Date(end) : undefined,
-        status: 'PLANNED' as ScheduleStatus,
-        relatedContactIds
-      }
+    // Find existing event
+    const existing = await prisma.scheduleEvent.findFirst({
+      where: { googleEventId }
     });
+
+    // Upsert schedule event
+    const scheduleEvent = existing
+      ? await prisma.scheduleEvent.update({
+          where: { id: existing.id },
+          data: {
+            title,
+            start: new Date(start),
+            end: end ? new Date(end) : undefined,
+            relatedContactIds,
+            status: 'PLANNED'
+          }
+        })
+      : await prisma.scheduleEvent.create({
+          data: {
+            projectId,
+            googleEventId,
+            title,
+            type: eventType,
+            start: new Date(start),
+            end: end ? new Date(end) : undefined,
+            status: 'PLANNED' as ScheduleStatus,
+            relatedContactIds
+          }
+        });
 
     // Create audit log
     await prisma.auditLog.create({
@@ -114,7 +120,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
+        { error: 'Invalid request data', details: (error as any).errors },
         { status: 400 }
       );
     }

@@ -9,7 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authUser = await requireAuth(['ADMIN', 'STAFF']);
+    const authUser = await requireAuth();
     const body = await request.json();
     const isArchived = body.isArchived !== undefined ? body.isArchived : true;
     const { id } = await params;

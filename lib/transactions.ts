@@ -52,7 +52,7 @@ export async function withTransaction<T>(
                       const operation = `${String(prop)}.${String(innerProp)}`;
                       
                       try {
-                        const result = await innerOriginal.apply(innerTarget, args);
+                        const result = await (innerOriginal as any).apply(innerTarget, args);
                         const duration = Date.now() - opStartTime;
                         
                         log.db.query(operation, String(prop), duration, {

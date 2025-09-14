@@ -57,7 +57,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-6">
             {/* Today's Schedule */}
             <Widget className="lg:col-span-2">
-              <h2 className="text-lg font-semibold text-white mb-3">Today's Schedule</h2>
+              <h2 className="text-lg font-semibold text-white mb-3">Today&apos;s Schedule</h2>
               <p className="text-white/60">Schedule events will go here</p>
             </Widget>
 
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
 
             <Widget>
               <h3 className="text-sm font-medium text-white mb-2">Weather</h3>
-              <p className="text-white/60 text-sm">Today's forecast</p>
+              <p className="text-white/60 text-sm">Today&apos;s forecast</p>
             </Widget>
           </div>
         </div>

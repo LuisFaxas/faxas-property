@@ -12,7 +12,8 @@ export function TaskKPIsWidget() {
   const { data: projects } = useProjects();
   
   // Get the first active project or fall back to first project
-  const activeProject = projects?.find(p => p.status === 'ACTIVE') || projects?.[0];
+  const projectList = Array.isArray(projects) ? projects : projects?.data || [];
+  const activeProject = projectList.find((p: any) => p.status === 'ACTIVE') || projectList[0];
   const projectId = activeProject?.id;
   
   const { data: tasks, isLoading, error } = useTasks({ projectId }, !!projectId);

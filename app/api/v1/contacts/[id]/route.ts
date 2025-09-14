@@ -22,7 +22,7 @@ export async function GET(
             name: true
           }
         },
-        tasks: {
+        assignedTasks: {
           select: {
             id: true,
             title: true,
@@ -67,14 +67,12 @@ export async function PUT(
       where: { id },
       data: {
         name: data.name,
-        email: data.email,
-        phone: data.phone,
+        emails: data.email ? [data.email] : undefined,
+        phones: data.phone ? [data.phone] : undefined,
         company: data.company,
         category: data.category,
-        type: data.type,
         status: data.status,
-        notes: data.notes,
-        lastContactDate: new Date()
+        notes: data.notes
       },
       include: {
         project: {
@@ -83,7 +81,7 @@ export async function PUT(
             name: true
           }
         },
-        tasks: {
+        assignedTasks: {
           select: {
             id: true,
             title: true,

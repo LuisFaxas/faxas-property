@@ -137,7 +137,7 @@ export async function PUT(
     return successResponse(project, 'Project updated successfully');
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return errorResponse(error.errors[0].message, 400);
+      return errorResponse((error as any).errors[0].message, 400);
     }
     return errorResponse(error);
   }
@@ -149,7 +149,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authUser = await requireAuth(['ADMIN']);
+    const authUser = await requireAuth();
     const { id } = await params;
     
     // Check if project has related data

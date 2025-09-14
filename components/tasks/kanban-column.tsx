@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { TaskStatus } from '@/lib/validations/task';
+import type { TaskStatus } from '../tasks/kanban-board';
 
 interface KanbanColumnProps {
   id: string;
@@ -96,7 +96,7 @@ export function KanbanColumn({
                   onEdit={onTaskEdit}
                   onDelete={onTaskDelete}
                   onSelect={onTaskSelect}
-                  onStatusChange={onTaskMove}
+                  onStatusChange={onTaskMove ? (taskId: string, status: string) => onTaskMove(taskId, status as TaskStatus) : undefined}
                 />
               ))
             )}

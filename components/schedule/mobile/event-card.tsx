@@ -47,20 +47,22 @@ export function EventCard({
       leftSwipeAction={
         event.status !== 'DONE' && onComplete
           ? {
+              id: 'complete',
               label: 'Complete',
-              color: 'bg-green-500',
+              color: 'green' as const,
               icon: CheckCircle,
-              onAction: () => onComplete(event),
+              action: () => onComplete(event),
             }
           : undefined
       }
       rightSwipeAction={
         onEdit
           ? {
+              id: 'edit',
               label: 'Edit',
-              color: 'bg-blue-500',
+              color: 'blue' as const,
               icon: Edit,
-              onAction: () => onEdit(event),
+              action: () => onEdit(event),
             }
           : undefined
       }

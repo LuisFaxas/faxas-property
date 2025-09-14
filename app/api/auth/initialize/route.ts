@@ -67,12 +67,12 @@ export async function POST(request: NextRequest) {
         'WEATHER', 'PHOTOS', 'PLANS', 'UPLOADS', 'INVOICES'
       ];
       
-      for (const module of modules) {
+      for (const moduleName of modules) {
         await prisma.userModuleAccess.create({
           data: {
             userId: user.id,
             projectId: project.id,
-            module: module as any,
+            module: moduleName as any,
             canView: true,
             canEdit: true,
             canUpload: true,

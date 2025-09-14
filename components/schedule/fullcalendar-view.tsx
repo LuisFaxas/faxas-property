@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
-import { EventApi, DateSelectArg, EventClickArg, EventChangeArg, CalendarApi } from '@fullcalendar/core';
+import { DateSelectArg, EventClickArg, EventChangeArg, CalendarApi } from '@fullcalendar/core';
 import '@/styles/fullcalendar.css';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -20,13 +20,7 @@ import {
   MoreHorizontal,
   ChevronDown
 } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// Removed unused Select imports - using dropdown menu instead
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useCalendarSwipe } from '@/hooks/use-swipe-gestures';
-import { AdaptiveToolbar } from '@/components/ui/adaptive-toolbar';
+// Removed unused AdaptiveToolbar import
 
 interface ScheduleEvent {
   id: string;
@@ -75,22 +69,22 @@ export function FullCalendarView({
   onSelectEvent,
   onSelectSlot,
   onEventDrop,
-  onEventResize,
+  onEventResize: _onEventResize,
 }: FullCalendarViewProps) {
   const calendarRef = useRef<FullCalendar>(null);
   const [currentView, setCurrentView] = useState('dayGridMonth');
   const [calendarTitle, setCalendarTitle] = useState('');
-  const { 
-    isMobile, 
-    isTablet, 
-    isSmallDesktop,
+  const {
+    isMobile,
+    isTablet,
+    isSmallDesktop: _isSmallDesktop,
     isInCriticalZone,
     needsDropdownMenu,
-    isCompact,
+    isCompact: _isCompact,
     isTouch,
-    isPortrait,
+    isPortrait: _isPortrait,
     toolbarLayout,
-    optimalCalendarView 
+    optimalCalendarView
   } = useResponsive();
   const [mounted, setMounted] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -261,7 +255,7 @@ export function FullCalendarView({
         setCurrentView(defaultView);
       }
     }
-  }, []);
+  }, [currentView, getDefaultView]);
 
   return (
     <div className="flex flex-col h-full min-h-[400px] sm:min-h-[500px]">

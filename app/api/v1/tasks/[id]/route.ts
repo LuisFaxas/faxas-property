@@ -192,8 +192,8 @@ export const GET = withAuth(
     
     // Check access for contractors
     if (auth.role === 'CONTRACTOR') {
-      const hasAccess = task.assignedToId === auth.uid || 
-                       task.assignedContact?.userId === auth.uid;
+      const hasAccess = task.assignedToId === auth.uid ||
+                       (task as any).assignedContact?.userId === auth.uid;
       if (!hasAccess) {
         throw new ApiError(403, 'Access denied');
       }
@@ -448,13 +448,6 @@ export const PATCH = withAuth(
     // Check if task exists and user has access
     const task = await prisma.task.findUnique({
       where: { id },
-      select: {
-        id: true,
-        projectId: true,
-        assignedToId: true,
-        assignedContactId: true,
-        status: true
-      },
       include: {
         assignedContact: {
           select: {

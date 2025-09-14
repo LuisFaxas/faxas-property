@@ -90,10 +90,9 @@ export const PUT = withAuth(
         title: data.title,
         start: data.startTime ? new Date(data.startTime) : undefined,
         end: data.endTime ? new Date(data.endTime) : undefined,
-        type: data.type,
+        type: data.type as any,
         status: data.status,
         notes: data.description,
-        location: data.location,
         relatedContactIds: data.attendees || undefined
         // Don't allow changing projectId
       },
@@ -210,7 +209,6 @@ export const PATCH = withAuth(
       where: { id },
       data: {
         status: newStatus,
-        approverUserId: auth.uid,
         notes: body.notes ? `${existingEvent.notes}\n\nApproval Note: ${body.notes}` : existingEvent.notes
       },
       include: {

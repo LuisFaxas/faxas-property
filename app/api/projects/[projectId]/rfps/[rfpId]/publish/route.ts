@@ -68,8 +68,8 @@ export const POST = withAuth(
           meta: {
             title: rfp.title,
             dueAt: rfp.dueAt,
-            itemCount: publishedRfp?._count?.items || 0,
-            attachmentCount: publishedRfp?._count?.attachments || 0,
+            itemCount: (publishedRfp as any)?._count?.items || 0,
+            attachmentCount: (publishedRfp as any)?._count?.attachments || 0,
             projectId
           }
         }
