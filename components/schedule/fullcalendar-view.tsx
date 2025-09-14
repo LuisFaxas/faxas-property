@@ -166,9 +166,17 @@ export function FullCalendarView({
     if (isTransitioning) return;
     setIsTransitioning(true);
     const calendarApi = calendarRef.current?.getApi();
-    calendarApi?.changeView(view);
-    setCurrentView(view);
-    updateTitle(calendarApi);
+    if (calendarApi) {
+      // Check if the view is available before trying to change to it
+      const availableViews = ['dayGridMonth', 'timeGridWeek', 'timeGridDay', 'listWeek'];
+      if (availableViews.includes(view)) {
+        calendarApi.changeView(view);
+        setCurrentView(view);
+        updateTitle(calendarApi);
+      } else {
+        console.warn(`View type "${view}" is not available`);
+      }
+    }
     setTimeout(() => setIsTransitioning(false), 300);
   }, [isTransitioning]);
 
@@ -246,16 +254,21 @@ export function FullCalendarView({
 
   useEffect(() => {
     const calendarApi = calendarRef.current?.getApi();
-    if (calendarApi) {
+    if (calendarApi && mounted) {
       updateTitle(calendarApi);
-      // Set initial view based on device
-      const defaultView = getDefaultView();
-      if (defaultView !== currentView) {
-        calendarApi.changeView(defaultView);
-        setCurrentView(defaultView);
+      // Only set initial view once when component mounts
+      // Don't change view if user has already selected one
+      if (!currentView || currentView === 'dayGridMonth') {
+        const defaultView = getDefaultView();
+        // Check if the view is available before trying to change to it
+        const availableViews = ['dayGridMonth', 'timeGridWeek', 'timeGridDay', 'listWeek'];
+        if (availableViews.includes(defaultView)) {
+          calendarApi.changeView(defaultView);
+          setCurrentView(defaultView);
+        }
       }
     }
-  }, [currentView, getDefaultView]);
+  }, [mounted]); // Only run when mounted changes
 
   return (
     <div className="flex flex-col h-full min-h-[400px] sm:min-h-[500px]">

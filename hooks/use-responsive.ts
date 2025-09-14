@@ -66,7 +66,7 @@ export function useResponsive() {
   // Helper to determine optimal calendar view based on screen size
   const getOptimalCalendarView = (): string => {
     if (isSmallMobile && isPortrait) return 'listWeek'; // List for very small portrait
-    if (isSmallMobile && isLandscape) return 'timeGridThreeDay'; // Custom 3-day view
+    if (isSmallMobile && isLandscape) return 'timeGridDay'; // Day view for small mobile landscape
     if (isMobile && isPortrait) return 'dayGridMonth'; // Month for mobile portrait
     if (isMobile && isLandscape) return 'timeGridWeek'; // Week for mobile landscape
     if (isTablet) return 'timeGridWeek'; // Week view for tablets
