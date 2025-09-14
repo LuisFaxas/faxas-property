@@ -16,26 +16,24 @@ function generateNonce(): string {
 }
 
 /**
- * Build Content Security Policy
+ * Build Content Security Policy - Simplified for production
  */
 function buildCSP(nonce: string, isDevelopment: boolean): string {
+  // Temporarily disable strict CSP to fix production issues
+  // TODO: Implement proper nonce injection with Next.js
   const directives = [
     `default-src 'self'`,
-    // In development, allow unsafe-eval for React Refresh
-    isDevelopment 
-      ? `script-src 'self' 'unsafe-eval' 'nonce-${nonce}' https:` 
-      : `script-src 'self' 'strict-dynamic' 'nonce-${nonce}' https: 'unsafe-inline'`,
-    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`, // Allow inline styles for now
+    // Allow all scripts temporarily until we fix nonce injection
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' https:`,
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com data:`,
     `img-src 'self' data: blob: https:`,
     `connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebasestorage.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://localhost:* ws://localhost:*`,
-    `frame-src 'self' https://*.firebaseapp.com https://*.firebaseio.com`, // Allow Firebase Auth iframes
+    `frame-src 'self' https://*.firebaseapp.com https://*.firebaseio.com`,
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
-    `frame-ancestors 'none'`,
-    `block-all-mixed-content`,
-    `upgrade-insecure-requests`
+    `frame-ancestors 'none'`
   ];
 
   return directives.join('; ');
