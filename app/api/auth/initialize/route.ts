@@ -8,6 +8,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api/response';
+import { Module } from '@prisma/client';
 import { Role } from '@prisma/client';
 
 export async function POST(request: NextRequest) {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             projectId: project.id,
-            module: moduleName as any,
+            module: moduleName as Module,
             canView: true,
             canEdit: true,
             canUpload: true,
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       message: 'User initialized successfully'
     });
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('Initialize user error:', error);
     return errorResponse(error);
   }

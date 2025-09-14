@@ -24,7 +24,7 @@ export type WithAuthOptions = {
   resolveProjectId?: (req: NextRequest, ctx: any) => Promise<string | null>;
 };
 
-export function withAuth<T extends Function>(
+export function withAuth<T extends (...args: any[]) => any>(
   handler: T,
   options: WithAuthOptions = {}
 ) {

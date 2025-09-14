@@ -11,12 +11,35 @@ import { fmtPercentSafe, widthPercent, toNum } from '@/lib/ui/format';
 
 export function ProjectOverviewWidget({ showBudget = false }: { showBudget?: boolean }) {
   const { data: projects, isLoading, error } = useProjects();
-  
+
   // Get the first active project or fall back to first project
   const projectList = Array.isArray(projects) ? projects : projects?.data || [];
   const activeProject = projectList.find((p: any) => p.status === 'ACTIVE') || projectList[0];
   const projectId = activeProject?.id;
-  
+
+  // Always call hooks, but conditionally enable them
+  const { data: tasks } = useTasks({ projectId }, !!projectId);
+  const { data: todaySchedule } = useTodaySchedule(projectId, !!projectId);
+  const { data: budgetSummary } = useBudgetSummary(projectId, !!projectId);
+
+  const taskStats = useMemo(() => {
+    if (!tasks || !Array.isArray(tasks)) {
+      return { total: 0, completed: 0, overdue: 0 };
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const completed = tasks.filter(t => t.status === 'COMPLETED').length;
+    const overdue = tasks.filter(t => {
+      if (t.status === 'COMPLETED' || t.status === 'CANCELLED') return false;
+      const dueDate = t.dueDate ? new Date(t.dueDate) : null;
+      return dueDate && dueDate < today;
+    }).length;
+    
+    return { total: tasks.length, completed, overdue };
+  }, [tasks]);
+
   // Early return if no projectId to prevent undefined in Link href
   if (!isLoading && !projectId) {
     return (
@@ -39,28 +62,6 @@ export function ProjectOverviewWidget({ showBudget = false }: { showBudget?: boo
       </Widget>
     );
   }
-  
-  const { data: tasks } = useTasks({ projectId }, !!projectId);
-  const { data: todaySchedule } = useTodaySchedule(projectId, !!projectId);
-  const { data: budgetSummary } = useBudgetSummary(projectId, !!projectId);
-
-  const taskStats = useMemo(() => {
-    if (!tasks || !Array.isArray(tasks)) {
-      return { total: 0, completed: 0, overdue: 0 };
-    }
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const completed = tasks.filter(t => t.status === 'COMPLETED').length;
-    const overdue = tasks.filter(t => {
-      if (t.status === 'COMPLETED' || t.status === 'CANCELLED') return false;
-      const dueDate = t.dueDate ? new Date(t.dueDate) : null;
-      return dueDate && dueDate < today;
-    }).length;
-    
-    return { total: tasks.length, completed, overdue };
-  }, [tasks]);
 
   if (isLoading) {
     return (

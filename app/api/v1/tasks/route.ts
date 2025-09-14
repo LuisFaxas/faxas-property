@@ -170,7 +170,7 @@ export const POST = withAuth(
       const validatedData = createTaskSchema.parse(body);
       
       // Handle assignee - can be either a user or contact
-      let assigneeData: any = {};
+      const assigneeData: Record<string, string> = {};
       if ((validatedData as any).assigneeType === 'USER' && validatedData.assignedToId) {
         assigneeData.assignedToId = validatedData.assignedToId;
       } else if ((validatedData as any).assigneeType === 'CONTACT' && validatedData.assignedContactId) {

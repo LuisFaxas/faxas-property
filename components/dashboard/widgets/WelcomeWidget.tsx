@@ -304,7 +304,7 @@ export function WelcomeWidget() {
           ) : todayEvents > 0 ? (
             <span>You have {todayEvents} event{todayEvents !== 1 ? 's' : ''} today</span>
           ) : (
-            <span>You're clear for today</span>
+            <span>You&apos;re clear for today</span>
           )}
         </div>
       </div>
