@@ -16,13 +16,33 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Disable webpack cache entirely to avoid corruption
-  webpack: (config) => {
+  // Completely disable all caching to avoid webpack issues
+  webpack: (config, { dev, isServer }) => {
+    // Disable all caching
     config.cache = false;
+
+    // Additional webpack fixes for module resolution
+    config.resolve = {
+      ...config.resolve,
+      fallback: {
+        ...config.resolve?.fallback,
+      },
+    };
+
+    // Disable splitChunks in development to avoid module issues
+    if (dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: false,
+      };
+    }
+
     return config;
   },
-  // Ensure proper output
-  output: 'standalone',
+  // Use default output for stability
+  // output: 'standalone', // Commenting out for now
+  // External packages for server components
+  serverExternalPackages: ['@prisma/client', 'prisma'],
   // Headers are now handled by middleware.ts for better control
 };
 
