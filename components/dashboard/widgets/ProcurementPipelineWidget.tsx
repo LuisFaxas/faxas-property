@@ -106,7 +106,7 @@ export function ProcurementPipelineWidget() {
     <Widget>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-medium text-white">Procurement Pipeline</h3>
-        {summary?.overdue > 0 && (
+        {summary && summary.overdue > 0 && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">
             {summary.overdue} overdue
           </span>
@@ -153,7 +153,7 @@ export function ProcurementPipelineWidget() {
       </div>
 
       {/* Recent items if available */}
-      {summary?.recent && summary.recent.length > 0 && (
+      {summary && summary.recent && summary.recent.length > 0 && (
         <div className="space-y-1 mb-3">
           <div className="text-[10px] uppercase tracking-wider text-white/40 mb-1">
             Recent

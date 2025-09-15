@@ -702,13 +702,15 @@ export function useProcurementSummary(projectId?: string, enabled = true) {
           INSTALLED:data?.statusBreakdown?.installed ?? 0,
         },
         overdue: data?.overdueItems ?? 0,
-        recent:  (data?.recentItems ?? []).map((it: any) => ({
-          id:       String(it?.id ?? ''),
-          title:    String(it?.title ?? it?.name ?? 'Untitled'),
-          stage:    (String(it?.orderStatus ?? '').toUpperCase() as ProcurementSummary['recent'][number]['stage']) || 'QUOTED',
-          dueDate:  it?.requiredBy ?? undefined,
-          daysLate: typeof it?.daysLate === 'number' ? it.daysLate : undefined,
-        })),
+        recent: Array.isArray(data?.recentItems)
+          ? data.recentItems.map((it: any) => ({
+              id:       String(it?.id ?? ''),
+              title:    String(it?.title ?? it?.name ?? 'Untitled'),
+              stage:    (String(it?.orderStatus ?? '').toUpperCase() as 'QUOTED' | 'ORDERED' | 'DELIVERED' | 'INSTALLED') || 'QUOTED',
+              dueDate:  it?.requiredBy ?? undefined,
+              daysLate: typeof it?.daysLate === 'number' ? it.daysLate : undefined,
+            }))
+          : undefined,
       };
     },
     enabled: !!projectId && enabled,
