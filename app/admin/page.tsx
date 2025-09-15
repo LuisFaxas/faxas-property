@@ -10,6 +10,7 @@ import { BudgetHealthWidget } from '@/components/dashboard/widgets/BudgetHealthW
 import { TaskKPIsWidget } from '@/components/dashboard/widgets/TaskKPIsWidget';
 import { TodayScheduleWidget } from '@/components/dashboard/widgets/TodayScheduleWidget';
 import { PriorityTasksWidget } from '@/components/dashboard/widgets/PriorityTasksWidget';
+import { BudgetExceptionsWidget } from '@/components/dashboard/widgets/BudgetExceptionsWidget';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { Plus } from 'lucide-react';
 
@@ -70,10 +71,7 @@ export default function AdminDashboard() {
 
           {/* Status Zone - 4 smaller cards */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-6">
-            <Widget>
-              <h3 className="text-sm font-medium text-white mb-2">Budget Exceptions</h3>
-              <p className="text-white/60 text-sm">Status info</p>
-            </Widget>
+            <BudgetExceptionsWidget />
 
             <Widget>
               <h3 className="text-sm font-medium text-white mb-2">Procurement</h3>
