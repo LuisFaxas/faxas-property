@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { PageShell } from '@/components/blocks/page-shell';
-import { Widget } from '@/components/dashboard/Widget';
 import { QuickActionsSheet } from '@/components/dashboard/QuickActionsSheet';
 import { WelcomeWidget } from '@/components/dashboard/widgets/WelcomeWidget';
 import { ProjectOverviewWidget } from '@/components/dashboard/widgets/ProjectOverviewWidget';
@@ -13,6 +12,7 @@ import { PriorityTasksWidget } from '@/components/dashboard/widgets/PriorityTask
 import { BudgetExceptionsWidget } from '@/components/dashboard/widgets/BudgetExceptionsWidget';
 import { ProcurementPipelineWidget } from '@/components/dashboard/widgets/ProcurementPipelineWidget';
 import { TeamVendorsWidget } from '@/components/dashboard/widgets/TeamVendorsWidget';
+import { RfpStatusWidget } from '@/components/dashboard/widgets/RfpStatusWidget';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { Plus } from 'lucide-react';
 
@@ -76,11 +76,7 @@ export default function AdminDashboard() {
             <BudgetExceptionsWidget />
             <ProcurementPipelineWidget />
             <TeamVendorsWidget />
-
-            <Widget>
-              <h3 className="text-sm font-medium text-white mb-2">Weather</h3>
-              <p className="text-white/60 text-sm">Today&apos;s forecast</p>
-            </Widget>
+            <RfpStatusWidget />
           </div>
         </div>
       </PageShell>
