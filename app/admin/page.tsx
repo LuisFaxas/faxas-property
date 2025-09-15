@@ -9,6 +9,7 @@ import { ProjectOverviewWidget } from '@/components/dashboard/widgets/ProjectOve
 import { BudgetHealthWidget } from '@/components/dashboard/widgets/BudgetHealthWidget';
 import { TaskKPIsWidget } from '@/components/dashboard/widgets/TaskKPIsWidget';
 import { TodayScheduleWidget } from '@/components/dashboard/widgets/TodayScheduleWidget';
+import { PriorityTasksWidget } from '@/components/dashboard/widgets/PriorityTasksWidget';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { Plus } from 'lucide-react';
 
@@ -62,10 +63,9 @@ export default function AdminDashboard() {
             </div>
 
             {/* Priority Tasks */}
-            <Widget className="lg:col-span-2">
-              <h2 className="text-lg font-semibold text-white mb-3">Priority Tasks</h2>
-              <p className="text-white/60">High priority tasks will go here</p>
-            </Widget>
+            <div className="lg:col-span-2">
+              <PriorityTasksWidget />
+            </div>
           </div>
 
           {/* Status Zone - 4 smaller cards */}
