@@ -643,7 +643,7 @@ export function useUserPermissions(id: string, projectId?: string, enabled: bool
 
 export function useUpdateUserPermissions(id: string, projectId: string) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: any) => apiClient.put(`/users/${id}/permissions?projectId=${projectId}`, data),
     onSuccess: (data) => {
@@ -662,5 +662,57 @@ export function useUpdateUserPermissions(id: string, projectId: string) {
         variant: 'destructive'
       });
     }
+  });
+}
+
+// -------------------- Procurement Summary Types --------------------
+export interface ProcurementSummary {
+  totals: {
+    QUOTED: number;
+    ORDERED: number;
+    DELIVERED: number;
+    INSTALLED: number;
+  };
+  overdue: number;
+  recent?: Array<{
+    id: string;
+    title: string;
+    stage: 'QUOTED' | 'ORDERED' | 'DELIVERED' | 'INSTALLED';
+    dueDate?: string;      // ISO string if available
+    daysLate?: number;     // optional, if API returns it
+  }>;
+}
+
+// -------------------- Procurement Summary Hook --------------------
+export function useProcurementSummary(projectId?: string, enabled = true) {
+  return useQuery<ProcurementSummary>({
+    queryKey: ['procurement-summary', projectId],
+    queryFn: async () => {
+      if (!projectId) throw new Error('Missing projectId');
+
+      // Call the existing procurement summary endpoint
+      const { data } = await apiClient.get(`/procurement/summary?projectId=${projectId}`);
+
+      // Normalize server response to a stable DTO the widgets can consume without mapping
+      return {
+        totals: {
+          QUOTED:   data?.statusBreakdown?.quoted    ?? 0,
+          ORDERED:  data?.statusBreakdown?.ordered   ?? 0,
+          DELIVERED:data?.statusBreakdown?.delivered ?? 0,
+          INSTALLED:data?.statusBreakdown?.installed ?? 0,
+        },
+        overdue: data?.overdueItems ?? 0,
+        recent:  (data?.recentItems ?? []).map((it: any) => ({
+          id:       String(it?.id ?? ''),
+          title:    String(it?.title ?? it?.name ?? 'Untitled'),
+          stage:    (String(it?.orderStatus ?? '').toUpperCase() as ProcurementSummary['recent'][number]['stage']) || 'QUOTED',
+          dueDate:  it?.requiredBy ?? undefined,
+          daysLate: typeof it?.daysLate === 'number' ? it.daysLate : undefined,
+        })),
+      };
+    },
+    enabled: !!projectId && enabled,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    retry: 1,
   });
 }
