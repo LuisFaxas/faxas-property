@@ -145,9 +145,14 @@ async function seedContacts() {
     }
   ];
 
-  for (const contact of contacts) {
+  for (const [index, contact] of contacts.entries()) {
     try {
-      const created = await prisma.contact.create({ data: contact });
+      const created = await prisma.contact.create({
+        data: {
+          ...contact,
+          id: `contact_seed_${Date.now()}_${index}`
+        }
+      });
       console.log(`Created contact: ${created.name}`);
     } catch (error: any) {
       if (error.code === 'P2002') {

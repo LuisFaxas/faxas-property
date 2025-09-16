@@ -62,9 +62,11 @@ async function main() {
           role
         },
         create: {
+          id: `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           projectId: project.id,
           userId: uid,
-          role
+          role,
+          updatedAt: new Date()
         }
       });
       

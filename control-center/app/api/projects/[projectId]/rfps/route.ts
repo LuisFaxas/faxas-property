@@ -138,6 +138,7 @@ export const POST = withAuth(
       // Log audit
       await prisma.auditLog.create({
         data: {
+          id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           userId: auth.user.id,
           action: 'CREATE',
           entity: 'RFP',

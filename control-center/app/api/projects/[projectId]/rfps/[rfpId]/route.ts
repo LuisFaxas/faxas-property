@@ -104,6 +104,7 @@ export const PUT = withAuth(
       // Log audit
       await prisma.auditLog.create({
         data: {
+          id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           userId: auth.user.id,
           action: 'UPDATE',
           entity: 'RFP',
@@ -163,6 +164,7 @@ export const DELETE = withAuth(
       // Log audit
       await prisma.auditLog.create({
         data: {
+          id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           userId: auth.user.id,
           action: 'DELETE',
           entity: 'RFP',

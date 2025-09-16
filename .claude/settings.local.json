@@ -94,7 +94,16 @@
       "Bash(git merge:*)",
       "Bash(echo \"SELECT id, name, status FROM \"\"Project\"\";\")",
       "Bash(git cherry-pick:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(while read f)",
+      "Bash(echo \"$f\")",
+      "Bash(done)",
+      "Bash(for f in app/api/**/*.ts)",
+      "Bash(do grep -l \"await prisma.auditLog.create\" \"$f\")",
+      "Bash(while read file)",
+      "Bash(do if ! grep -q 'id: `audit_' \"$file\")",
+      "Bash(then echo \"$file\")",
+      "Bash(fi)"
     ],
     "deny": [],
     "ask": [],

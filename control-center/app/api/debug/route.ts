@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
     });
     const members = await prisma.projectMember.findMany({
       include: {
-        user: true,
-        project: true
+        User: true,
+        Project: true
       }
     });
 
@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
         membershipCount: members.length,
         memberships: members.map(m => ({
           userId: m.userId,
-          userEmail: m.user.email,
+          userEmail: m.User.email,
           projectId: m.projectId,
-          projectName: m.project.name,
+          projectName: m.Project.name,
           role: m.role
         }))
       },

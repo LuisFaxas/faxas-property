@@ -112,6 +112,7 @@ export async function POST(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: 'INVITE_SENT',
         entity: 'CONTACT',

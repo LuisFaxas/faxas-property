@@ -16,13 +16,13 @@ export async function GET(
     const contact = await prisma.contact.findUnique({
       where: { id },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
           }
         },
-        assignedTasks: {
+        Task: {
           select: {
             id: true,
             title: true,
@@ -75,13 +75,13 @@ export async function PUT(
         notes: data.notes
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
           }
         },
-        assignedTasks: {
+        Task: {
           select: {
             id: true,
             title: true,
@@ -94,6 +94,7 @@ export async function PUT(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: 'UPDATE',
         entity: 'CONTACT',
@@ -125,7 +126,7 @@ export async function DELETE(
     const contact = await prisma.contact.findUnique({
       where: { id },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
@@ -158,6 +159,7 @@ export async function DELETE(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: 'DELETE',
         entity: 'CONTACT',

@@ -100,6 +100,7 @@ export async function PUT(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: 'UPDATE',
         entity: 'BUDGET_ITEM',
@@ -143,6 +144,7 @@ export async function DELETE(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: 'DELETE',
         entity: 'BUDGET_ITEM',

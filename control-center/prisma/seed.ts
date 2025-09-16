@@ -89,29 +89,35 @@ async function main() {
   const vendors = await Promise.all([
     prisma.vendor.create({
       data: {
+        id: `vendor_${Date.now()}_1`,
         projectId: project.id,
         name: 'Miami Electric Solutions',
         email: 'contact@miamielectric.com',
         phone: '305-555-0100',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        updatedAt: new Date()
       }
     }),
     prisma.vendor.create({
       data: {
+        id: `vendor_${Date.now()}_2`,
         projectId: project.id,
         name: 'Sunshine State Electrical',
         email: 'info@sunshineelectrical.com',
         phone: '305-555-0200',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        updatedAt: new Date()
       }
     }),
     prisma.vendor.create({
       data: {
+        id: `vendor_${Date.now()}_3`,
         projectId: project.id,
         name: 'Premium Power Systems',
         email: 'sales@premiumpower.com',
         phone: '305-555-0300',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        updatedAt: new Date()
       }
     })
   ]);
@@ -122,6 +128,7 @@ async function main() {
   const attachments = await Promise.all([
     prisma.attachment.create({
       data: {
+        id: `attach_${Date.now()}_1`,
         ownerType: 'RFP',
         ownerId: rfp.id,
         filename: 'electrical_specifications.pdf',
@@ -134,6 +141,7 @@ async function main() {
     }),
     prisma.attachment.create({
       data: {
+        id: `attach_${Date.now()}_2`,
         ownerType: 'RFP',
         ownerId: rfp.id,
         filename: 'site_plans.pdf',

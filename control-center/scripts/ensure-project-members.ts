@@ -34,9 +34,11 @@ async function ensureProjectMembers() {
           // Add user as project member with their system role
           await prisma.projectMember.create({
             data: {
+              id: `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
               projectId: project.id,
               userId: user.id,
-              role: user.role
+              role: user.role,
+              updatedAt: new Date()
             }
           });
           console.log(`Added ${user.email} (${user.role}) to project ${project.name}`);

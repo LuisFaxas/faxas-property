@@ -69,9 +69,11 @@ export async function POST(request: NextRequest) {
       // 3. Create project membership
       await tx.projectMember.create({
         data: {
+          id: `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           projectId: project.id,
           userId: user.id,
-          role: role
+          role: role,
+          updatedAt: new Date()
         }
       });
       
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
       // 5. Log the initialization
       await tx.auditLog.create({
         data: {
+          id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           userId: user.id,
           action: 'USER_INITIALIZED',
           entity: 'user',
@@ -139,9 +142,9 @@ export async function GET(request: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: decodedToken.uid },
       include: {
-        projectMemberships: {
+        ProjectMember: {
           include: {
-            project: true
+            Project: true
           }
         }
       }
@@ -150,7 +153,7 @@ export async function GET(request: NextRequest) {
     return successResponse({
       initialized: !!user,
       user: user,
-      projects: user?.projectMemberships.map(m => m.project) || []
+      projects: user?.ProjectMember.map(m => m.Project) || []
     });
     
   } catch (error) {
