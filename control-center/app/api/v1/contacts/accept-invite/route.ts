@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
           ...(data.phone && { phones: [data.phone] }),
         },
         include: {
-          project: true,
-          assignedTasks: {
+          Project: true,
+          Task: {
             where: {
               status: {
                 not: 'COMPLETED'
@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
       // Log activity
       await prisma.auditLog.create({
         data: {
+          id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           userId: userRecord.uid,
           action: 'PORTAL_ACTIVATED',
           entity: 'CONTACT',
@@ -195,7 +196,7 @@ export async function GET(request: NextRequest) {
         portalStatus: 'INVITED',
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true,
@@ -220,7 +221,7 @@ export async function GET(request: NextRequest) {
         name: contact.name,
         email: contact.emails?.[0] || '',
         company: contact.company,
-        project: contact.project,
+        project: contact.Project,
       }
     });
   } catch (error) {

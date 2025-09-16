@@ -103,7 +103,8 @@
       "Bash(while read file)",
       "Bash(do if ! grep -q 'id: `audit_' \"$file\")",
       "Bash(then echo \"$file\")",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(npm ci:*)"
     ],
     "deny": [],
     "ask": [],

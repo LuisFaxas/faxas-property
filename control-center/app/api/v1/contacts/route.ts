@@ -110,7 +110,7 @@ export const POST = withAuth(
         projectId: projectId!  // Enforced by repository
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
@@ -122,6 +122,7 @@ export const POST = withAuth(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: auth.uid,
         action: 'CREATE',
         entity: 'CONTACT',

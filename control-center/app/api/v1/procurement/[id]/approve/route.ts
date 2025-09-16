@@ -44,7 +44,7 @@ export async function POST(
     // Get procurement item
     const procurement = await prisma.procurement.findUnique({
       where: { id },
-      include: { budgetItem: true }
+      include: { BudgetItem: true }
     });
     
     if (!procurement) {
@@ -98,15 +98,16 @@ export async function POST(
       where: { id },
       data: updateData,
       include: {
-        project: true,
-        supplier: true,
-        budgetItem: true
+        Project: true,
+        Contact: true,
+        BudgetItem: true
       }
     });
     
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: data.action === 'approve' ? 'APPROVE' : 'REJECT',
         entity: 'PROCUREMENT',

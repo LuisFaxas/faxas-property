@@ -58,7 +58,7 @@ export async function GET(
             status: true
           }
         },
-        budgetItem: {
+        BudgetItem: {
           select: {
             id: true,
             item: true,
@@ -169,7 +169,7 @@ export async function PUT(
       include: {
         project: true,
         supplier: true,
-        budgetItem: true
+        BudgetItem: true
       }
     });
     
@@ -269,7 +269,7 @@ export async function PATCH(
     
     const existing = await prisma.procurement.findUnique({
       where: { id },
-      include: { budgetItem: true }
+      include: { BudgetItem: true }
     });
     
     if (!existing) {
@@ -340,7 +340,7 @@ export async function PATCH(
       include: {
         project: true,
         supplier: true,
-        budgetItem: true
+        BudgetItem: true
       }
     });
     

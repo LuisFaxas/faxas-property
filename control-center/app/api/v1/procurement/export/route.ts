@@ -48,7 +48,7 @@ export const GET = withAuth(
         supplier: {
           select: { name: true, company: true }
         },
-        budgetItem: {
+        BudgetItem: {
           select: { item: true, discipline: true }
         }
       },
