@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
     // Create audit log
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: user.uid,
         action: 'INVITE_CONTRACTOR',
         entity: 'User',
