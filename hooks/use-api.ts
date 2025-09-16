@@ -395,18 +395,27 @@ export function useRfps(projectId: string, query?: any, enabled: boolean = true)
     queryKey: ['rfps', projectId, query],
     queryFn: async () => {
       // RFP routes are at /api/projects, not /api/v1/projects
-      const response = await fetch(`/api/projects/${projectId}/rfps?${new URLSearchParams(query || {})}`, {
+      // Create a custom axios instance for this specific route
+      const axios = (await import('axios')).default;
+      const { auth } = await import('@/lib/firebaseClient');
+
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : null;
+
+      const params = new URLSearchParams(query || {});
+      const response = await axios.get(`/api/projects/${projectId}/rfps?${params}`, {
         headers: {
           'Content-Type': 'application/json',
-        },
-        credentials: 'include',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
       });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch RFPs: ${response.statusText}`);
-      }
-      return response.json();
+
+      // Extract data from standard API response structure
+      return response.data?.data || response.data;
     },
-    enabled: !!projectId && enabled
+    enabled: !!projectId && enabled,
+    staleTime: 5 * 60 * 1000,
+    retry: 1
   });
 }
 

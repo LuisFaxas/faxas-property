@@ -12,7 +12,8 @@ export const GET = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
     try {
       const { auth } = security;
-      const projectId = ctx.params.projectId;
+      const params = await ctx.params;
+      const projectId = params.projectId;
       
       // Use policy engine to verify access
       await Policy.assertModuleAccess(auth.user.id, projectId, Module.BIDDING, 'read');
@@ -66,11 +67,6 @@ export const GET = withAuth(
                 id: true,
                 status: true
               }
-            },
-            attachments: {
-              select: {
-                id: true
-              }
             }
           },
           skip: (query.page - 1) * query.limit,
@@ -85,7 +81,6 @@ export const GET = withAuth(
         ...rfp,
         itemCount: (rfp as any).items?.length || 0,
         bidCount: (rfp as any).bids?.length || 0,
-        attachmentCount: (rfp as any).attachments?.length || 0,
         submittedBidCount: (rfp as any).bids?.filter((b: any) => b.status === 'SUBMITTED').length || 0
       }));
       
@@ -111,7 +106,8 @@ export const POST = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
     try {
       const { auth } = security;
-      const projectId = ctx.params.projectId;
+      const params = await ctx.params;
+      const projectId = params.projectId;
       
       // Use policy engine to verify write access
       await Policy.assertModuleAccess(auth.user.id, projectId, Module.BIDDING, 'write');
@@ -135,8 +131,7 @@ export const POST = withAuth(
           createdBy: auth.user.id
         },
         include: {
-          items: true,
-          attachments: true
+          items: true
         }
       });
       
