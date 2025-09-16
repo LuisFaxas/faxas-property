@@ -57,12 +57,12 @@ export const GET = withAuth(
         repos.rfps.findMany({
           where,
           include: {
-            items: {
+            RfpItem: {
               select: {
                 id: true
               }
             },
-            bids: {
+            Bid: {
               select: {
                 id: true,
                 status: true
@@ -79,9 +79,9 @@ export const GET = withAuth(
       // Format response with counts
       const rfpsWithCounts = rfps.map(rfp => ({
         ...rfp,
-        itemCount: (rfp as any).items?.length || 0,
-        bidCount: (rfp as any).bids?.length || 0,
-        submittedBidCount: (rfp as any).bids?.filter((b: any) => b.status === 'SUBMITTED').length || 0
+        itemCount: (rfp as any).RfpItem?.length || 0,
+        bidCount: (rfp as any).Bid?.length || 0,
+        submittedBidCount: (rfp as any).Bid?.filter((b: any) => b.status === 'SUBMITTED').length || 0
       }));
       
       // Apply rate limiting based on role

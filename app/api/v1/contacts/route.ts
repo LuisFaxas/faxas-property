@@ -46,7 +46,7 @@ export const GET = withAuth(
       repos.contacts.findMany({
         where,
         include: {
-          project: {
+          Project: {
             select: {
               id: true,
               name: true

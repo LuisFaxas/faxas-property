@@ -16,7 +16,7 @@ export async function GET(
     const budgetItem = await prisma.budgetItem.findUnique({
       where: { id },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
@@ -88,7 +88,7 @@ export async function PUT(
         variance: variance
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true

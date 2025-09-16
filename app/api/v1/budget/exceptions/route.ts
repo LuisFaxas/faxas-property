@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
         ...(projectId && { projectId })
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true

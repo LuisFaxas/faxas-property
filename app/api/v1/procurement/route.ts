@@ -121,13 +121,13 @@ export const GET = withAuth(
       repos.procurement.findMany({
         where,
         include: {
-          project: {
+          Project: {
             select: {
               id: true,
               name: true
             }
           },
-          supplier: {
+          Contact: {
             select: {
               id: true,
               name: true,
@@ -136,7 +136,7 @@ export const GET = withAuth(
               phones: true
             }
           },
-          budgetItem: {
+          BudgetItem: {
             select: {
               id: true,
               item: true,
@@ -244,9 +244,9 @@ export const POST = withAuth(
         updatedBy: auth.uid
       },
       include: {
-        project: true,
-        supplier: true,
-        budgetItem: true
+        Project: true,
+        Contact: true,
+        BudgetItem: true
       }
     });
     

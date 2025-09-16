@@ -45,7 +45,7 @@ export const POST = withAuth(
         include: {
           _count: {
             select: {
-              items: true
+              RfpItem: true
             }
           }
         }
@@ -82,7 +82,7 @@ export const POST = withAuth(
           items,
           rfp: {
             id: rfp?.id,
-            itemCount: (rfp as any)?._count?.items || 0
+            itemCount: (rfp as any)?._count?.RfpItem || 0
           }
         },
         `Successfully processed ${items.length} items`

@@ -27,7 +27,7 @@ export async function POST(
     // Get contact
     const contact = await prisma.contact.findUnique({
       where: { id },
-      include: { project: true }
+      include: { Project: true }
     });
 
     if (!contact) {
@@ -64,9 +64,9 @@ export async function POST(
     const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite?token=${inviteToken}`;
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>You're Invited to ${contact.project.name} Portal</h2>
+        <h2>You're Invited to ${contact.Project.name} Portal</h2>
         <p>Hi ${contact.name},</p>
-        <p>You've been invited to access the project portal for ${contact.project.name}.</p>
+        <p>You've been invited to access the project portal for ${contact.Project.name}.</p>
         ${data.message ? `<p><strong>Message from admin:</strong> ${data.message}</p>` : ''}
         <p>Click the link below to set up your account:</p>
         <div style="margin: 30px 0;">
@@ -92,7 +92,7 @@ export async function POST(
     try {
       await sendEmail({
         to: contact.emails[0],
-        subject: `Invitation to ${contact.project.name} Portal`,
+        subject: `Invitation to ${contact.Project.name} Portal`,
         html: emailHtml,
       });
     } catch (emailError) {

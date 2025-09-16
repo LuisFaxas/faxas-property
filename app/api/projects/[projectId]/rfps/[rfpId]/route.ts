@@ -25,23 +25,12 @@ export const GET = withAuth(
       const rfp = await repos.rfps.findUnique({
         where: { id: rfpId },
         include: {
-          items: {
+          RfpItem: {
             orderBy: { specCode: 'asc' }
           },
-          attachments: {
-            select: {
-              id: true,
-              filename: true,
-              mime: true,
-              size: true,
-              createdAt: true,
-              createdBy: true
-            },
-            orderBy: { createdAt: 'desc' }
-          },
-          invitations: {
+          BidInvitation: {
             include: {
-              vendor: {
+              Vendor: {
                 select: {
                   id: true,
                   name: true,
@@ -51,7 +40,7 @@ export const GET = withAuth(
               }
             }
           },
-          bids: {
+          Bid: {
             select: {
               id: true,
               vendorId: true,
@@ -59,7 +48,7 @@ export const GET = withAuth(
               submittedAt: true
             }
           },
-          award: true
+          Award: true
         }
       });
       
@@ -108,14 +97,7 @@ export const PUT = withAuth(
         where: { id: rfpId },
         data: updateData,
         include: {
-          items: true,
-          attachments: {
-            select: {
-              id: true,
-              filename: true,
-              size: true
-            }
-          }
+          RfpItem: true
         }
       });
       

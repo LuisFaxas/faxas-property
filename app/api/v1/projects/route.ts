@@ -56,11 +56,11 @@ export const GET = withAuth(
       include: {
         _count: {
           select: {
-            tasks: true,
-            contacts: true,
-            budgets: true,
-            schedule: true,
-            procurement: true,
+            Task: true,
+            Contact: true,
+            BudgetItem: true,
+            ScheduleEvent: true,
+            Procurement: true,
           },
         },
       },

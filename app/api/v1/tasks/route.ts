@@ -91,14 +91,14 @@ export const GET = withAuth(
         repos.tasks.findMany({
           where,
           include: {
-            assignedTo: {
+            User: {
               select: {
                 id: true,
                 email: true,
                 role: true
               }
             },
-            assignedContact: {
+            Contact: {
               select: {
                 id: true,
                 name: true,
@@ -108,7 +108,7 @@ export const GET = withAuth(
                 specialty: true
               }
             },
-            subtasks: query.includeSubtasks ? {
+            other_Task: query.includeSubtasks ? {
               select: {
                 id: true,
                 title: true,
@@ -116,15 +116,15 @@ export const GET = withAuth(
                 completedAt: true
               }
             } : false,
-            attachments: true,
-            dependencies: (query as any).includeDependencies ? {
+            TaskAttachment: true,
+            TaskDependency_TaskDependency_dependentTaskIdToTask: (query as any).includeDependencies ? {
               include: {
-                dependsOn: true
+                Task_TaskDependency_predecessorTaskIdToTask: true
               }
             } : false,
-            dependents: (query as any).includeDependencies ? {
+            TaskDependency_TaskDependency_predecessorTaskIdToTask: (query as any).includeDependencies ? {
               include: {
-                task: true
+                Task_TaskDependency_dependentTaskIdToTask: true
               }
             } : false
           },

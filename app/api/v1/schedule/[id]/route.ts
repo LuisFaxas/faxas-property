@@ -26,7 +26,7 @@ export const GET = withAuth(
     const event = await prisma.scheduleEvent.findUnique({
       where: { id },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
@@ -97,7 +97,7 @@ export const PUT = withAuth(
         // Don't allow changing projectId
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true
@@ -212,7 +212,7 @@ export const PATCH = withAuth(
         notes: body.notes ? `${existingEvent.notes}\n\nApproval Note: ${body.notes}` : existingEvent.notes
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true

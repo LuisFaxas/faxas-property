@@ -33,7 +33,7 @@ export const POST = withAuth(
       const publishedRfp = await repos.rfps.findUnique({
         where: { id: rfpId },
         include: {
-          items: {
+          RfpItem: {
             select: {
               id: true,
               specCode: true,
@@ -42,17 +42,9 @@ export const POST = withAuth(
               uom: true
             }
           },
-          attachments: {
-            select: {
-              id: true,
-              filename: true,
-              size: true
-            }
-          },
           _count: {
             select: {
-              items: true,
-              attachments: true
+              RfpItem: true
             }
           }
         }
@@ -68,8 +60,7 @@ export const POST = withAuth(
           meta: {
             title: rfp.title,
             dueAt: rfp.dueAt,
-            itemCount: (publishedRfp as any)?._count?.items || 0,
-            attachmentCount: (publishedRfp as any)?._count?.attachments || 0,
+            itemCount: (publishedRfp as any)?._count?.RfpItem || 0,
             projectId
           }
         }

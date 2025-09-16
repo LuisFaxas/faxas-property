@@ -60,7 +60,7 @@ export const GET = withAuth(
       repos.schedule.findMany({
         where,
         include: {
-          project: {
+          Project: {
             select: {
               id: true,
               name: true
@@ -131,7 +131,7 @@ export const POST = withAuth(
         requesterUserId: auth.uid
       },
       include: {
-        project: {
+        Project: {
           select: {
             id: true,
             name: true

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         take: 5,
         orderBy: { requiredBy: 'desc' },
         include: {
-          project: {
+          Project: {
             select: {
               name: true
             }

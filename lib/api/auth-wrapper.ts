@@ -113,7 +113,12 @@ export function withAuth<T extends (...args: any[]) => any>(
       // 7. Call handler with security context
       return handler(req, ctx, security);
     } catch (error) {
-      return errorResponse(error);
+      // Properly handle ApiError with its status code
+      if (error instanceof ApiError) {
+        return errorResponse(error, error.statusCode);
+      }
+      // For other errors, return 500
+      return errorResponse(error, 500);
     }
   };
 }

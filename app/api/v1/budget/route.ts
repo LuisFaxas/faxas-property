@@ -37,7 +37,7 @@ export const GET = withAuth(
       repos.budget.findMany({
         where,
         include: {
-          project: {
+          Project: {
             select: {
               id: true,
               name: true
