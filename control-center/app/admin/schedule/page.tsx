@@ -1,0 +1,1321 @@
+'use client';
+
+import { useState, useMemo, useEffect } from 'react';
+import apiClient from '@/lib/api-client';
+import { Plus, Calendar, CalendarDays, List, CheckCircle, XCircle, Clock, AlertCircle, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { MobileDialog } from '@/components/ui/mobile/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable } from '@/components/ui/data-table';
+import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
+import { Checkbox } from '@/components/ui/checkbox';
+import { PageShell } from '@/components/blocks/page-shell';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { useSchedule, useTodaysSchedule, useProjects } from '@/hooks/use-api';
+import { useAuth } from '@/app/contexts/AuthContext';
+import { format } from 'date-fns';
+import type { ColumnDef } from '@tanstack/react-table';
+import { FullCalendarView } from '@/components/schedule/fullcalendar-view';
+import { cn } from '@/lib/utils';
+import { KPICarousel } from '@/components/schedule/kpi-carousel';
+import { Loader2 } from 'lucide-react';
+import { EventForm } from '@/components/schedule/mobile/event-form';
+import { useMediaQuery } from '@/hooks/use-media-query';
+
+// Type definitions - matches FullCalendarView's expectations
+interface ScheduleEvent {
+  id: string;
+  title: string;
+  description?: string;
+  type: string; // Changed to string for compatibility with FullCalendarView
+  start?: string;
+  end?: string;
+  startTime?: string; // Alternative field name used in API
+  endTime?: string; // Alternative field name used in API
+  eventType?: 'WORK' | 'MEETING' | 'SITE_VISIT' | 'CALL' | 'EMAIL_FOLLOWUP'; // Strict type for validation
+  location?: string;
+  attendees?: string[];
+  relatedContactIds?: string[]; // Alternative field for attendees
+  status: string; // Changed to string for compatibility with FullCalendarView
+  statusType?: 'PENDING' | 'REQUESTED' | 'PLANNED' | 'DONE' | 'CANCELED' | 'RESCHEDULE_NEEDED'; // Strict type for validation
+  requestedBy?: string;
+  approvedBy?: string;
+  notes?: string;
+  projectId?: string; // Made optional to match FullCalendarView
+}
+
+// Helper functions for date and time handling
+const getDefaultDate = () => {
+  const now = new Date();
+  return now.toISOString().split('T')[0]; // YYYY-MM-DD
+};
+
+const getDefaultTime = (hoursOffset = 1) => {
+  const now = new Date();
+  now.setHours(now.getHours() + hoursOffset);
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`; // HH:mm
+};
+
+const combineDateAndTime = (date: string, time: string) => {
+  if (!date || !time) return '';
+  // Add Z for UTC timezone to match API datetime format
+  return `${date}T${time}:00.000Z`;
+};
+
+const splitDateTime = (datetime: string) => {
+  if (!datetime) return { date: getDefaultDate(), time: getDefaultTime() };
+  const [date, timeWithZ] = datetime.split('T');
+  const time = timeWithZ ? timeWithZ.substring(0, 5) : getDefaultTime();
+  return { date, time };
+};
+
+// Event types for filtering
+const EVENT_TYPES = [
+  { value: 'WORK', label: 'Work', color: 'bg-blue-600' },
+  { value: 'MEETING', label: 'Meeting', color: 'bg-purple-600' },
+  { value: 'SITE_VISIT', label: 'Site Visit', color: 'bg-green-600' },
+  { value: 'CALL', label: 'Call', color: 'bg-orange-600' },
+  { value: 'EMAIL_FOLLOWUP', label: 'Email', color: 'bg-gray-600' },
+];
+
+export default function AdminSchedulePage() {
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape) and (max-height: 430px)');
+  const { toast } = useToast();
+  const { user, userRole } = useAuth();
+  const isReady = !!user;
+  // No need for extra state - media queries handle this
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
+  const [activeTab, setActiveTab] = useState('all');
+  const [typeFilters, setTypeFilters] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form state with separate date and time fields
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    type: 'WORK',
+    startDate: getDefaultDate(),
+    startTime: getDefaultTime(1),
+    endDate: getDefaultDate(),
+    endTime: getDefaultTime(2),
+    location: '',
+    attendees: '',
+    status: 'PLANNED',
+    requestedBy: '',
+    approvedBy: '',
+    notes: '',
+    projectId: 'miami-duplex' // Default to miami-duplex
+  });
+
+  // Computed values for API calls
+  const startDateTime = combineDateAndTime(formData.startDate, formData.startTime);
+  const endDateTime = combineDateAndTime(formData.endDate, formData.endTime);
+
+  // Fetch schedule data
+  const { data: scheduleEvents, isLoading, refetch } = useSchedule(undefined, isReady);
+  const { data: todaysEvents } = useTodaysSchedule(undefined, isReady);
+  const { data: projectsData } = useProjects(isReady);
+  
+  // Set default projectId when projects are loaded
+  useEffect(() => {
+    if (projectsData && Array.isArray(projectsData) && projectsData.length > 0 && !formData.projectId) {
+      const defaultProjectId = projectsData[0].id;
+      setFormData(prev => ({ ...prev, projectId: defaultProjectId }));
+    }
+  }, [projectsData, formData.projectId]);
+
+  // Filter events based on active tab and type filters
+  const filteredEvents = useMemo(() => {
+    let events: ScheduleEvent[] = [];
+    
+    // Get events based on active tab
+    if (activeTab === 'today') {
+      events = Array.isArray(todaysEvents) ? todaysEvents : todaysEvents?.data || [];
+    } else {
+      events = Array.isArray(scheduleEvents) ? scheduleEvents : scheduleEvents?.data || [];
+    }
+    
+    if (!Array.isArray(events)) return [];
+    
+    // Apply type filters
+    if (typeFilters.length > 0) {
+      events = events.filter((event: ScheduleEvent) => typeFilters.includes(event.type));
+    }
+    
+    return events;
+  }, [scheduleEvents, todaysEvents, activeTab, typeFilters]);
+
+
+  // Calculate metrics
+  const metrics = useMemo(() => {
+    const defaultMetrics = {
+      totalEvents: 0,
+      todayEvents: 0,
+      pendingApprovals: 0,
+      upcomingWork: 0
+    };
+
+    if (!scheduleEvents || !Array.isArray(scheduleEvents)) return defaultMetrics;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return {
+      totalEvents: scheduleEvents.length,
+      todayEvents: Array.isArray(todaysEvents) ? todaysEvents.length : 0,
+      pendingApprovals: scheduleEvents.filter((e: ScheduleEvent) => e.status === 'REQUESTED').length,
+      upcomingWork: scheduleEvents.filter((e: ScheduleEvent) => {
+        const dateString = e.start || e.startTime;
+        if (!dateString) return false;
+        const eventDate = new Date(dateString);
+        return e.type === 'WORK' && eventDate >= today && e.status === 'PLANNED';
+      }).length
+    };
+  }, [scheduleEvents, todaysEvents]);
+
+  const handleCreate = async () => {
+    setIsSubmitting(true);
+    try {
+      // Ensure projectId is included in the request
+      const requestData = {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        location: formData.location,
+        attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
+        status: formData.status,
+        projectId: formData.projectId || 'miami-duplex' // Fallback to miami-duplex
+      };
+      
+      await apiClient.post(`/schedule?projectId=${formData.projectId || 'miami-duplex'}`, requestData);
+
+      toast({
+        title: 'Success',
+        description: 'Schedule event created successfully',
+      });
+
+      setIsCreateOpen(false);
+      resetForm();
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to create event',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!selectedEvent) return;
+
+    setIsSubmitting(true);
+    try {
+      await apiClient.put(`/schedule/${selectedEvent.id}`, {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        location: formData.location,
+        attendees: formData.attendees.split(',').map(a => a.trim()).filter(Boolean),
+        status: formData.status,
+        projectId: formData.projectId || undefined
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Schedule event updated successfully',
+      });
+
+      setIsEditOpen(false);
+      setSelectedEvent(null);
+      resetForm();
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to update event',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedEvent) return;
+
+    setIsSubmitting(true);
+    try {
+      await apiClient.delete(`/schedule/${selectedEvent.id}`);
+
+      toast({
+        title: 'Success',
+        description: 'Schedule event deleted successfully',
+      });
+
+      setIsDeleteOpen(false);
+      setSelectedEvent(null);
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete event',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleApprove = async (eventId: string) => {
+    try {
+      const response = await fetch(`/api/v1/schedule/${eventId}/approve`, {
+        method: 'PUT',
+      });
+
+      if (!response.ok) throw new Error('Failed to approve event');
+
+      toast({
+        title: 'Success',
+        description: 'Event approved successfully',
+      });
+
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to approve event',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleReject = async (eventId: string) => {
+    try {
+      const response = await fetch(`/api/v1/schedule/${eventId}/reject`, {
+        method: 'PUT',
+      });
+
+      if (!response.ok) throw new Error('Failed to reject event');
+
+      toast({
+        title: 'Success',
+        description: 'Event rejected',
+      });
+
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to reject event',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle updating event status and other fields
+  const handleUpdateEvent = async (eventId: string, updates: Partial<ScheduleEvent>) => {
+    try {
+      await apiClient.put(`/api/v1/schedule/${eventId}`, updates);
+      
+      toast({
+        title: 'Success',
+        description: 'Event updated successfully',
+      });
+      
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to update event',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: '',
+      type: 'WORK',
+      startDate: getDefaultDate(),
+      startTime: getDefaultTime(1),
+      endDate: getDefaultDate(),
+      endTime: getDefaultTime(2),
+      location: '',
+      attendees: '',
+      status: 'PLANNED',
+      requestedBy: '',
+      approvedBy: '',
+      notes: '',
+      projectId: projectsData && Array.isArray(projectsData) && projectsData.length > 0 ? projectsData[0].id : ''
+    });
+  };
+
+  const openEditDialog = (event: ScheduleEvent) => {
+    setSelectedEvent(event);
+    const startDateTime = event.start || event.startTime ? splitDateTime((event.start || event.startTime) as string) : { date: getDefaultDate(), time: getDefaultTime(1) };
+    const endDateTime = event.end || event.endTime ? splitDateTime((event.end || event.endTime) as string) : { date: getDefaultDate(), time: getDefaultTime(2) };
+    
+    setFormData({
+      title: event.title,
+      description: event.description || event.notes || '',
+      type: event.type || event.eventType || 'WORK',
+      startDate: startDateTime.date,
+      startTime: startDateTime.time,
+      endDate: endDateTime.date,
+      endTime: endDateTime.time,
+      location: event.location || '',
+      attendees: event.attendees?.join ? event.attendees.join(', ') : (event.relatedContactIds?.join ? event.relatedContactIds.join(', ') : ''),
+      status: event.status || 'PLANNED',
+      requestedBy: event.requestedBy || '',
+      approvedBy: event.approvedBy || '',
+      notes: event.notes || '',
+      projectId: event.projectId || (projectsData && Array.isArray(projectsData) && projectsData.length > 0 ? projectsData[0].id : '')
+    });
+    setIsEditOpen(true);
+  };
+
+  // Handle calendar drag and drop
+  const handleEventDrop = async ({ event, start, end }: { event: ScheduleEvent; start: Date; end: Date }) => {
+    try {
+      await apiClient.put(`/schedule/${event.id}`, {
+        title: event.title,
+        description: event.description || event.notes,
+        type: event.type,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        location: event.location,
+        attendees: event.attendees || event.relatedContactIds || [],
+        status: event.status,
+        projectId: event.projectId
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Event rescheduled successfully',
+      });
+
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to reschedule event',
+        variant: 'destructive',
+      });
+    }
+  };
+
+
+  const columns: ColumnDef<ScheduleEvent>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'title',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Event" />
+      ),
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.getValue('title')}</div>
+          {row.original.description && (
+            <div className="text-sm text-white/60">{row.original.description}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'type',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Type" />
+      ),
+      cell: ({ row }) => {
+        const type = row.getValue<string>('type');
+        return (
+          <Badge
+            variant={
+              type === 'WORK' ? 'default' :
+              type === 'MEETING' ? 'secondary' :
+              type === 'SITE_VISIT' ? 'outline' :
+              type === 'CALL' ? 'secondary' :
+              type === 'EMAIL_FOLLOWUP' ? 'outline' :
+              'default'
+            }
+          >
+            {type.replace('_', ' ')}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'start',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Date & Time" />
+      ),
+      cell: ({ row }) => {
+        const startValue = row.getValue('start') || row.original.startTime;
+        const endValue = row.original.end || row.original.endTime;
+        
+        if (!startValue) {
+          return <div className="text-white/40">No date set</div>;
+        }
+        
+        try {
+          const start = startValue ? new Date(startValue as string) : new Date();
+          const end = endValue ? new Date(endValue as string) : null;
+          
+          // Check if dates are valid
+          if (isNaN(start.getTime())) {
+            return <div className="text-white/40">Invalid date</div>;
+          }
+          
+          return (
+            <div>
+              <div className="font-medium">{format(start, 'MMM dd, yyyy')}</div>
+              <div className="text-sm text-white/60">
+                {format(start, 'h:mm a')}
+                {end && !isNaN(end.getTime()) && ` - ${format(end, 'h:mm a')}`}
+              </div>
+            </div>
+          );
+        } catch {
+          return <div className="text-white/40">Invalid date</div>;
+        }
+      },
+    },
+    {
+      accessorKey: 'location',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Location" />
+      ),
+      cell: ({ row }) => row.getValue('location') || '-',
+    },
+    {
+      accessorKey: 'attendees',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Attendees" />
+      ),
+      cell: ({ row }) => {
+        const attendees = row.getValue<string[]>('attendees');
+        if (!attendees || attendees.length === 0) return '-';
+        return (
+          <div className="flex items-center gap-1">
+            <Users className="h-4 w-4 text-white/40" />
+            <span>{attendees.length}</span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Status" />
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue<string>('status');
+        return (
+          <Badge
+            variant={
+              status === 'PLANNED' ? 'default' :
+              status === 'REQUESTED' ? 'secondary' :
+              status === 'DONE' ? 'outline' :
+              status === 'CANCELED' ? 'destructive' :
+              status === 'RESCHEDULE_NEEDED' ? 'destructive' :
+              'destructive'
+            }
+          >
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const event = row.original;
+        return (
+          <div className="flex items-center gap-2">
+            {event.status === 'PENDING' && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleApprove(event.id)}
+                  className="text-green-400 hover:text-green-300"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleReject(event.id)}
+                  className="text-red-400 hover:text-red-300"
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openEditDialog(event)}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedEvent(event);
+                setIsDeleteOpen(true);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <PageShell 
+        pageTitle="Schedule"
+        userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+        fabIcon={Plus}
+        fabLabel="Add Event"
+        onFabClick={() => setIsCreateOpen(true)}
+      >
+        <div className={cn(
+          "p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6",
+          isMobile && "p-3 space-y-4"
+        )}>
+          {/* Header Skeleton */}
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-32 sm:w-48 bg-white/10 animate-pulse" />
+              <Skeleton className="h-4 w-48 sm:w-64 bg-white/5 animate-pulse" />
+            </div>
+            <Skeleton className="h-10 w-28 sm:w-32 bg-white/10 animate-pulse rounded-md" />
+          </div>
+          
+          {/* Mobile View */}
+          {isMobile ? (
+            <>
+              {/* KPI Carousel Skeleton */}
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 px-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="min-w-[140px] bg-white/5 border border-white/10 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <Skeleton className="h-3 w-16 bg-white/5 animate-pulse" />
+                      <Skeleton className="h-3 w-3 bg-white/5 animate-pulse rounded" />
+                    </div>
+                    <Skeleton className="h-6 w-12 bg-white/10 animate-pulse mb-1" />
+                    <Skeleton className="h-2 w-20 bg-white/5 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+              
+              {/* View Toggle Skeleton */}
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-8 w-24 bg-white/10 animate-pulse rounded-lg" />
+                <Skeleton className="h-8 w-20 bg-white/5 animate-pulse rounded" />
+              </div>
+              
+              {/* Calendar/List View Skeleton */}
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="border-l-4 border-blue-500/50 pl-3 py-2">
+                      <Skeleton className="h-4 w-3/4 bg-white/10 animate-pulse mb-2" />
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-3 w-16 bg-white/5 animate-pulse" />
+                        <Skeleton className="h-3 w-20 bg-blue-500/20 animate-pulse rounded-full" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Desktop View */
+            <>
+              {/* KPI Cards Skeleton */}
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i} className="bg-white/5 border-white/10">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <Skeleton className="h-4 w-24 bg-white/5 animate-pulse" />
+                      <Skeleton className="h-4 w-4 bg-white/5 animate-pulse rounded" />
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-8 w-16 bg-white/10 animate-pulse mb-1" />
+                      <Skeleton className="h-3 w-32 bg-white/5 animate-pulse" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              {/* Tabs & Calendar Skeleton */}
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-64 sm:w-96 bg-white/10 animate-pulse rounded" />
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-6">
+                    {/* Calendar Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <Skeleton className="h-6 w-32 bg-white/10 animate-pulse" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-8 w-20 bg-white/5 animate-pulse rounded" />
+                        <Skeleton className="h-8 w-20 bg-white/5 animate-pulse rounded" />
+                        <Skeleton className="h-8 w-20 bg-white/5 animate-pulse rounded" />
+                      </div>
+                    </div>
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-px bg-white/5 rounded-lg overflow-hidden">
+                      {/* Days of week */}
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                        <div key={day} className="bg-white/5 p-2 text-center">
+                          <Skeleton className="h-4 w-8 bg-white/10 animate-pulse mx-auto" />
+                        </div>
+                      ))}
+                      {/* Calendar days */}
+                      {[...Array(35)].map((_, i) => (
+                        <div key={i} className="bg-graphite-900 aspect-square p-2">
+                          <Skeleton className="h-4 w-4 bg-white/5 animate-pulse mb-1" />
+                          {i % 7 === 3 && <Skeleton className="h-2 w-full bg-blue-500/20 animate-pulse mt-1" />}
+                          {i % 5 === 2 && <Skeleton className="h-2 w-full bg-green-500/20 animate-pulse mt-1" />}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+        </div>
+      </PageShell>
+    );
+  }
+
+  // Landscape-specific layout for mobile phones
+  if (isLandscape) {
+    return (
+      <PageShell 
+        pageTitle="Schedule"
+        userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
+        userName={user?.displayName || 'User'} 
+        userEmail={user?.email || ''}
+        fabIcon={Plus}
+        fabLabel="Add Event"
+        onFabClick={() => setIsCreateOpen(true)}
+      >
+        <div className="h-full flex flex-col relative overflow-hidden">
+          {/* Floating view toggle - absolute positioned */}
+          <div className="absolute top-1 right-1 z-20 flex gap-1">
+            <Button 
+              size="icon" 
+              variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+              className="h-6 w-6 bg-black/50 backdrop-blur-sm"
+              onClick={() => setViewMode('calendar')}
+            >
+              <CalendarDays className="h-3 w-3" />
+            </Button>
+            <Button 
+              size="icon"
+              variant={viewMode === 'table' ? 'default' : 'ghost'} 
+              className="h-6 w-6 bg-black/50 backdrop-blur-sm"
+              onClick={() => setViewMode('table')}
+            >
+              <List className="h-3 w-3" />
+            </Button>
+          </div>
+          
+          {/* Calendar takes ALL remaining space */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {viewMode === 'calendar' ? (
+              <FullCalendarView
+                events={filteredEvents}
+                onSelectEvent={openEditDialog}
+                onSelectSlot={(start, end) => {
+                  setFormData({
+                    ...formData,
+                    startDate: start.toISOString().split('T')[0],
+                    startTime: start.toTimeString().substring(0, 5),
+                    endDate: end.toISOString().split('T')[0],
+                    endTime: end.toTimeString().substring(0, 5),
+                  });
+                  setIsCreateOpen(true);
+                }}
+                onEventDrop={(event, start, end) => {
+                  handleUpdateEvent(event.id, { 
+                    start: start.toISOString(), 
+                    end: end.toISOString() 
+                  });
+                }}
+                onEventResize={(event, start, end) => {
+                  handleUpdateEvent(event.id, { 
+                    start: start.toISOString(), 
+                    end: end.toISOString() 
+                  });
+                }}
+              />
+            ) : (
+              <div className="h-full overflow-auto text-xs">
+                <DataTable 
+                  columns={columns} 
+                  data={filteredEvents}
+                />
+              </div>
+            )}
+          </div>
+          {/* FAB also in landscape mode for consistency */}
+          <Button
+            size="lg"
+            className="fixed bottom-3 right-3 z-[9999] rounded-full h-10 w-10 shadow-md bg-blue-600 hover:bg-blue-700 active:scale-95 transition-transform border border-white/10 glass"
+            aria-label="Add new event"
+            onClick={() => setIsCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4 text-white" />
+          </Button>
+        </div>
+      </PageShell>
+    );
+  }
+
+  // Regular portrait layout
+  return (
+    <PageShell 
+      pageTitle="Schedule"
+      userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
+      userName={user?.displayName || 'User'} 
+      userEmail={user?.email || ''}
+      fabIcon={Plus}
+      fabLabel="Add Event"
+      onFabClick={() => setIsCreateOpen(true)}
+    >
+      <div className={cn(
+        "p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 h-full flex flex-col",
+        isMobile && "p-2 space-y-2" // Tighter spacing on mobile
+      )}>
+        {/* Header - Hidden on mobile since title is in navbar */}
+        {!isMobile && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-2 sm:mb-4">
+            <div>
+              <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-white">Schedule Management</h1>
+              <p className="text-white/60 text-xs sm:text-sm lg:text-base">Manage project calendar and events</p>
+            </div>
+            <Button 
+              size="sm" 
+              className="sm:size-default w-full sm:w-auto"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Event
+            </Button>
+        </div>
+        )}
+
+        {/* Universal Create Event Dialog - Works for both mobile and desktop */}
+        <MobileDialog
+          open={isCreateOpen}
+          onOpenChange={setIsCreateOpen}
+          title="Create Schedule Event"
+          description="Add a new event to the project calendar"
+          size="md"
+          showCloseButton={false}
+          footer={
+            <div className="flex gap-2">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsCreateOpen(false)}
+                disabled={isSubmitting}
+                className={cn(
+                  "border-white/10",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                form="create-event-form"
+                disabled={isSubmitting}
+                className={cn(
+                  "bg-blue-600 hover:bg-blue-700",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Event'
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <form id="create-event-form" onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
+            <EventForm 
+              formData={{
+                title: formData.title,
+                type: formData.type,
+                description: formData.description,
+                location: formData.location,
+                startDate: formData.startDate,
+                startTime: formData.startTime,
+                endDate: formData.endDate,
+                endTime: formData.endTime,
+                status: formData.status,
+                attendees: formData.attendees,
+                requestedBy: formData.requestedBy,
+                approvedBy: formData.approvedBy
+              }} 
+              onChange={(data) => {
+                setFormData({
+                  ...data,
+                  notes: formData.notes,
+                  projectId: formData.projectId || ''
+                });
+              }} 
+            />
+          </form>
+        </MobileDialog>
+
+
+        {/* KPI Cards - Hidden in landscape */}
+        {!isLandscape && (
+          <KPICarousel
+            cards={[
+            {
+              title: 'Total Events',
+              value: metrics.totalEvents,
+              subtitle: 'All scheduled events',
+              icon: Calendar,
+              iconColor: 'text-white/40',
+            },
+            {
+              title: "Today's Events",
+              value: metrics.todayEvents,
+              subtitle: 'Events scheduled today',
+              icon: Clock,
+              iconColor: 'text-white/40',
+            },
+            {
+              title: 'Pending Approvals',
+              value: metrics.pendingApprovals,
+              subtitle: 'Awaiting approval',
+              icon: AlertCircle,
+              iconColor: 'text-yellow-400',
+            },
+            {
+              title: 'Upcoming Work',
+              value: metrics.upcomingWork,
+              subtitle: 'Work sessions scheduled',
+              icon: Users,
+              iconColor: 'text-white/40',
+            },
+          ]}
+          />
+        )}
+
+        {/* Tabs with View Mode Toggle - Hidden in landscape */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col">
+          {/* Mobile: Combined row for tabs and view toggle */}
+          <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
+            <TabsList className="bg-white/5 border-white/10 flex flex-nowrap gap-1 h-8 sm:h-10 p-1">
+              <TabsTrigger value="all" className="text-[11px] sm:text-sm px-2 sm:px-3 py-1 min-w-fit">
+                <span className="sm:hidden">All</span>
+                <span className="hidden sm:inline">All Events</span>
+              </TabsTrigger>
+              <TabsTrigger value="today" className="text-[11px] sm:text-sm px-2 sm:px-3 py-1 min-w-fit">
+                Today
+                {metrics.todayEvents > 0 && (
+                  <Badge variant="secondary" className="ml-1 sm:ml-2 text-[9px] sm:text-xs h-3.5 sm:h-5 px-1 sm:px-1.5">
+                    {metrics.todayEvents}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="text-[11px] sm:text-sm px-2 sm:px-3 py-1 min-w-fit">
+                Pending
+                {metrics.pendingApprovals > 0 && (
+                  <Badge variant="destructive" className="ml-1 sm:ml-2 text-[9px] sm:text-xs h-3.5 sm:h-5 px-1 sm:px-1.5">
+                    {metrics.pendingApprovals}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="approved" className="text-[11px] sm:text-sm px-2 sm:px-3 py-1 min-w-fit">
+                <span className="sm:hidden">OK</span>
+                <span className="hidden sm:inline">Approved</span>
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* View Mode Toggle - Better spacing and alignment */}
+            <div className="flex gap-0 bg-white/5 rounded-lg p-1 border border-white/10 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('calendar')}
+                className={cn(
+                  'h-6 px-2 sm:h-7 sm:px-3 rounded-md',
+                  viewMode === 'calendar' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                )}
+                title="Calendar View"
+              >
+                <CalendarDays className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden sm:inline text-xs ml-1.5">Calendar</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className={cn(
+                  'h-6 px-2 sm:h-7 sm:px-3 rounded-md',
+                  viewMode === 'table' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                )}
+                title="Table View"
+              >
+                <List className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden sm:inline text-xs ml-1.5">Table</span>
+              </Button>
+            </div>
+          </div>
+
+          <TabsContent value={activeTab} className="mt-1 sm:mt-2 flex-1 min-h-0 flex flex-col">
+            <Card className="bg-white/5 border-white/10 flex-1 flex flex-col min-h-0">
+              <CardContent className="flex-1 flex flex-col p-1 sm:p-3">
+                {/* Compact Quick Filters */}
+                <div className="mb-2 sm:mb-4">
+                  <div className="overflow-x-auto pb-2 sm:overflow-visible">
+                    <div className="flex gap-2 sm:flex-wrap min-w-max sm:min-w-0">
+                      {EVENT_TYPES.map((type) => (
+                        <Button
+                          key={type.value}
+                          variant={typeFilters.includes(type.value) ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            const newFilters = typeFilters.includes(type.value)
+                              ? typeFilters.filter(t => t !== type.value)
+                              : [...typeFilters, type.value];
+                            setTypeFilters(newFilters);
+                          }}
+                          className={cn(
+                            'border-white/10 transition-all flex-shrink-0 h-8 text-xs sm:text-sm',
+                            typeFilters.includes(type.value)
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                          )}
+                        >
+                          <div className={cn("w-2 h-2 rounded-full mr-1.5", type.color)} />
+                          <span className="hidden sm:inline">{type.label}</span>
+                          <span className="sm:hidden">{type.label.slice(0, 4)}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                {viewMode === 'calendar' ? (
+                  // New FullCalendar View - Responsive for all devices
+                  <FullCalendarView
+                    events={filteredEvents}
+                    onSelectEvent={openEditDialog}
+                    onSelectSlot={(start, end) => {
+                      setFormData({
+                        ...formData,
+                        startDate: start.toISOString().split('T')[0],
+                        startTime: start.toTimeString().substring(0, 5),
+                        endDate: end.toISOString().split('T')[0],
+                        endTime: end.toTimeString().substring(0, 5),
+                      });
+                      setIsCreateOpen(true);
+                    }}
+                    onEventDrop={(event, start, end) => {
+                      handleEventDrop({ event, start, end });
+                    }}
+                  />
+                ) : (
+                  <DataTable
+                    columns={columns}
+                    data={filteredEvents}
+                    searchKey="title"
+                    searchPlaceholder="Search events..."
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Edit Dialog */}
+        <MobileDialog 
+          open={isEditOpen} 
+          onOpenChange={setIsEditOpen}
+          title="Edit Schedule Event"
+          description="Update event details"
+          size="md"
+          showCloseButton={false}
+          footer={
+            <div className="flex gap-2">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsEditOpen(false)}
+                disabled={isSubmitting}
+                className={cn(
+                  "border-white/10",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                form="edit-event-form"
+                disabled={isSubmitting}
+                className={cn(
+                  "bg-blue-600 hover:bg-blue-700",
+                  isMobile && "flex-1 h-12 text-base"
+                )}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Event'
+                )}
+              </Button>
+            </div>
+          }
+        >
+          <form id="edit-event-form" onSubmit={(e) => { e.preventDefault(); handleEdit(); }}>
+            <div className="flex-1 overflow-y-auto px-1">
+              <div className="grid gap-4 py-4 pr-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Event Title</Label>
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Event Type</Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value) => setFormData({ ...formData, type: value })}
+                  >
+                    <SelectTrigger className="bg-white/5 border-white/10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CALL">Call</SelectItem>
+                      <SelectItem value="MEETING">Meeting</SelectItem>
+                      <SelectItem value="SITE_VISIT">Site Visit</SelectItem>
+                      <SelectItem value="WORK">Work</SelectItem>
+                      <SelectItem value="EMAIL_FOLLOWUP">Email Followup</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <Input
+                      type="time"
+                      value={formData.startTime}
+                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <Input
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <Input
+                      type="time"
+                      value={formData.endTime}
+                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                      className="bg-white/5 border-white/10 text-white"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Location</Label>
+                  <Input
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger className="bg-white/5 border-white/10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PENDING">Pending Approval</SelectItem>
+                      <SelectItem value="REQUESTED">Requested</SelectItem>
+                      <SelectItem value="PLANNED">Planned</SelectItem>
+                      <SelectItem value="DONE">Done</SelectItem>
+                      <SelectItem value="CANCELED">Canceled</SelectItem>
+                      <SelectItem value="RESCHEDULE_NEEDED">Reschedule Needed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Attendees (comma-separated)</Label>
+                <Input
+                  value={formData.attendees}
+                  onChange={(e) => setFormData({ ...formData, attendees: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+              </div>
+            </div>
+          </form>
+        </MobileDialog>
+
+        {/* Delete Confirmation */}
+        <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+          <AlertDialogContent className="bg-gray-900 text-white border-white/10">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Event</AlertDialogTitle>
+              <AlertDialogDescription className="text-white/60">
+                Are you sure you want to delete &quot;{selectedEvent?.title}&quot;? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-white/10 text-white hover:bg-white/20">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+      </div>
+    </PageShell>
+  );
+}

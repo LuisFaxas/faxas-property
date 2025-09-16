@@ -1,0 +1,27 @@
+# Replace 'yourdomain.com' with your actual domain
+
+control.yourdomain.com {
+    reverse_proxy app:3000
+    
+    header {
+        # Security headers
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        Content-Security-Policy "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:;"
+    }
+    
+    # Enable compression
+    encode gzip
+}
+
+n8n.yourdomain.com {
+    reverse_proxy n8n:5678
+    
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        X-XSS-Protection "1; mode=block"
+    }
+}

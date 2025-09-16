@@ -92,9 +92,7 @@
       "Bash(PORT=3005 npm start)",
       "Bash(git fetch:*)",
       "Bash(git merge:*)",
-      "Bash(echo \"SELECT id, name, status FROM \"\"Project\"\";\")",
-      "Bash(git cherry-pick:*)",
-      "Bash(git config:*)"
+      "Bash(echo \"SELECT id, name, status FROM \"\"Project\"\";\")"
     ],
     "deny": [],
     "ask": [],
