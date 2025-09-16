@@ -393,7 +393,19 @@ export function useCreateContact() {
 export function useRfps(projectId: string, query?: any, enabled: boolean = true) {
   return useQuery({
     queryKey: ['rfps', projectId, query],
-    queryFn: () => apiClient.get(`/projects/${projectId}/rfps`, { params: query }),
+    queryFn: async () => {
+      // RFP routes are at /api/projects, not /api/v1/projects
+      const response = await fetch(`/api/projects/${projectId}/rfps?${new URLSearchParams(query || {})}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch RFPs: ${response.statusText}`);
+      }
+      return response.json();
+    },
     enabled: !!projectId && enabled
   });
 }
@@ -401,7 +413,19 @@ export function useRfps(projectId: string, query?: any, enabled: boolean = true)
 export function useRfp(projectId: string, rfpId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ['rfp', projectId, rfpId],
-    queryFn: () => apiClient.get(`/projects/${projectId}/rfps/${rfpId}`),
+    queryFn: async () => {
+      // RFP routes are at /api/projects, not /api/v1/projects
+      const response = await fetch(`/api/projects/${projectId}/rfps/${rfpId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch RFP: ${response.statusText}`);
+      }
+      return response.json();
+    },
     enabled: !!projectId && !!rfpId && enabled
   });
 }
