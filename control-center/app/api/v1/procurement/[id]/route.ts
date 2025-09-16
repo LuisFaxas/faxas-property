@@ -46,8 +46,8 @@ export async function GET(
     const procurement = await prisma.procurement.findUnique({
       where: { id },
       include: {
-        project: true,
-        supplier: {
+        Project: true,
+        Contact: {
           select: {
             id: true,
             name: true,
@@ -167,8 +167,8 @@ export async function PUT(
         updatedAt: new Date()
       },
       include: {
-        project: true,
-        supplier: true,
+        Project: true,
+        Contact: true,
         BudgetItem: true
       }
     });
@@ -191,6 +191,7 @@ export async function PUT(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: 'UPDATE',
         entity: 'PROCUREMENT',
@@ -239,6 +240,7 @@ export async function DELETE(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: 'DELETE',
         entity: 'PROCUREMENT',
@@ -338,8 +340,8 @@ export async function PATCH(
       where: { id },
       data: updateData,
       include: {
-        project: true,
-        supplier: true,
+        Project: true,
+        Contact: true,
         BudgetItem: true
       }
     });
@@ -387,6 +389,7 @@ export async function PATCH(
     // Log activity
     await prisma.auditLog.create({
       data: {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: authUser.uid,
         action: 'STATUS_UPDATE',
         entity: 'PROCUREMENT',

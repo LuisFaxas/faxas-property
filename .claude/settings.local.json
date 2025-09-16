@@ -104,7 +104,8 @@
       "Bash(do if ! grep -q 'id: `audit_' \"$file\")",
       "Bash(then echo \"$file\")",
       "Bash(fi)",
-      "Bash(npm ci:*)"
+      "Bash(npm ci:*)",
+      "Bash(sed:*)"
     ],
     "deny": [],
     "ask": [],
