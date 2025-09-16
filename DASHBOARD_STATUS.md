@@ -1,6 +1,6 @@
 # Dashboard Status Tracker
 
-## Overall Progress: **Dashboard V1 Phase 2 Complete - Ready for Phase 3 Polish**
+## Overall Progress: **Dashboard V1 Phase 2 COMPLETE with API Fixes - Ready for Phase 3 Polish**
 
 ### Current Branch: `feature/dashboard-v2` (but focusing on V1)
 ### Feature Flag: `NEXT_PUBLIC_DASHBOARD_V2=false` (V1 Active)
@@ -195,5 +195,26 @@ All 10 widgets tested and verified:
 4. **A11y audit**: Full Lighthouse scan and WCAG validation
 5. **Test coverage**: Fix NODE_ENV assignment in test files
 
+## Phase 2 Final Fixes - January 16, 2025
+
+### RFP API Authentication & Schema Fixes ✅
+1. **Authentication Issue**: Fixed `useRfps` hook to properly include Firebase auth token
+   - Changed from raw fetch to axios with manual token injection
+   - RFP routes are at `/api/projects/*` not `/api/v1/projects/*`
+
+2. **Prisma Schema Issue**: Removed non-existent `attachments` field from RFP queries
+   - Cleaned up both GET and POST route includes
+   - Fixed response formatting to not reference attachments
+
+3. **Next.js 15 Params Issue**: Fixed async params access in dynamic routes
+   - Changed `ctx.params.projectId` to `await ctx.params` then `params.projectId`
+   - Applied to both GET and POST methods
+
+### Build Status ✅
+- **TypeScript**: Only test file errors (pre-existing)
+- **ESLint**: No errors in new Phase 2 widget code
+- **Runtime**: All widgets loading data correctly
+- **API Routes**: All authenticated and functioning
+
 ---
-*Last Updated: 2025-01-15T22:30:00Z*
+*Last Updated: 2025-01-16T03:11:00Z*
