@@ -111,7 +111,7 @@ function AcceptInviteContent() {
       } else {
         setError(data.message || 'Failed to activate portal access');
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setSubmitting(false);

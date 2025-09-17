@@ -913,7 +913,12 @@ export default function AdminBudgetPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {Object.entries(summary.data.disciplineBreakdown).map(([discipline, data]: [string, any]) => (
+                    {Object.entries(summary.data.disciplineBreakdown as Record<string, {
+                      budget: number;
+                      committed: number;
+                      paid: number;
+                      items: number;
+                    }>).map(([discipline, data]) => (
                       <div key={discipline} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">{discipline}</span>
@@ -977,7 +982,16 @@ export default function AdminBudgetPage() {
               <CardContent>
                 {summary?.data?.topOverBudgetItems && summary.data.topOverBudgetItems.length > 0 ? (
                   <div className="space-y-4">
-                    {summary.data.topOverBudgetItems.map((item: any) => (
+                    {summary.data.topOverBudgetItems.map((item: {
+                      id: string;
+                      item: string;
+                      discipline: string;
+                      category: string;
+                      estTotal: number;
+                      paidToDate: number;
+                      variance: number;
+                      variancePercent: number;
+                    }) => (
                       <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
                           <p className="font-medium">{item.item}</p>

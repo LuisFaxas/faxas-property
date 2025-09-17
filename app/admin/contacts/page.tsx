@@ -59,6 +59,23 @@ import { z } from 'zod';
 import { ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
 import type { Contact } from '@prisma/client';
+
+// Extended Contact type with additional fields from API
+// Also maps null values to undefined for component compatibility
+type ExtendedContact = Omit<Contact, 'company' | 'specialty' | 'notes'> & {
+  company?: string;
+  specialty?: string;
+  notes?: string;
+  portalStatus?: string;
+  status?: string;
+  category?: string;
+  tasks?: unknown[];
+  emails?: string[];
+  phones?: string[];
+  _count?: {
+    assignedTasks: number;
+  };
+};
 import { 
   Plus, 
   MoreHorizontal, 
@@ -145,7 +162,7 @@ export default function AdminContactsPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isAssignTaskOpen, setIsAssignTaskOpen] = useState(false);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = useState<ExtendedContact | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card'); // Default to card view for mobile
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -283,7 +300,7 @@ export default function AdminContactsPage() {
       accessorKey: 'tasks',
       header: 'Related Tasks',
       cell: ({ row }) => {
-        const tasks = (row.original as any).tasks || [];
+        const tasks = (row.original as ExtendedContact).tasks || [];
         return (
           <span className="text-sm">
             {tasks.length > 0 ? `${tasks.length} tasks` : 'No tasks'}
@@ -326,17 +343,17 @@ export default function AdminContactsPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleEdit(contact)}>
+              <DropdownMenuItem onClick={() => handleEdit(contact as ExtendedContact)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleInvite(contact)}>
+              <DropdownMenuItem onClick={() => handleInvite(contact as ExtendedContact)}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Invite as Contractor
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
-                onClick={() => handleDelete(contact)}
+                onClick={() => handleDelete(contact as ExtendedContact)}
                 className="text-red-500"
               >
                 <Trash className="mr-2 h-4 w-4" />
@@ -398,7 +415,7 @@ export default function AdminContactsPage() {
     }
   };
 
-  const handleEdit = (contact: Contact) => {
+  const handleEdit = (contact: ExtendedContact) => {
     setSelectedContact(contact);
     form.reset({
       name: contact.name,
@@ -440,7 +457,7 @@ export default function AdminContactsPage() {
     }
   };
 
-  const handleDelete = (contact: Contact) => {
+  const handleDelete = (contact: ExtendedContact) => {
     setSelectedContact(contact);
     setIsDeleteOpen(true);
   };
@@ -480,7 +497,7 @@ export default function AdminContactsPage() {
     }
   };
 
-  const handleInvite = async (contact: Contact) => {
+  const handleInvite = async (contact: ExtendedContact) => {
     try {
       await apiClient.post(`/contacts/${contact.id}/invite`, {
         expiryDays: 7,
@@ -503,16 +520,24 @@ export default function AdminContactsPage() {
     }
   };
   
-  // Get contacts array
-  const contacts: Contact[] = Array.isArray(contactsData?.data) ? contactsData.data : Array.isArray(contactsData) ? contactsData : [];
-  
+  // Get contacts array and normalize null values to undefined
+  const contacts: ExtendedContact[] = useMemo(() => {
+    const rawContacts = Array.isArray(contactsData?.data) ? contactsData.data : Array.isArray(contactsData) ? contactsData : [];
+    return rawContacts.map((contact: any) => ({
+      ...contact,
+      company: contact.company ?? undefined,
+      specialty: contact.specialty ?? undefined,
+      notes: contact.notes ?? undefined,
+    })) as ExtendedContact[];
+  }, [contactsData]);
+
   // Filter contacts based on active filters and search
   const filteredContacts = useMemo(() => {
-    let filtered: Contact[] = contacts;
+    let filtered: ExtendedContact[] = contacts;
     
     // Search filter
     if (searchQuery) {
-      filtered = filtered.filter((c: Contact) => {
+      filtered = filtered.filter((c) => {
         const searchLower = searchQuery.toLowerCase();
         return (
           c.name?.toLowerCase().includes(searchLower) ||
@@ -525,22 +550,22 @@ export default function AdminContactsPage() {
     
     // Active filters
     if (activeFilters.includes('portal')) {
-      filtered = filtered.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'ACTIVE');
+      filtered = filtered.filter((c) => c.portalStatus === 'ACTIVE');
     }
     if (activeFilters.includes('pending')) {
-      filtered = filtered.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'INVITED');
+      filtered = filtered.filter((c) => c.portalStatus === 'INVITED');
     }
     if (activeFilters.includes('no-portal')) {
-      filtered = filtered.filter((c: Contact & {portalStatus?: string}) => !c.portalStatus || c.portalStatus === 'NONE');
+      filtered = filtered.filter((c) => !c.portalStatus || c.portalStatus === 'NONE');
     }
     if (activeFilters.includes('has-tasks')) {
-      filtered = filtered.filter((c: Contact & {_count?: {assignedTasks: number}}) => (c._count?.assignedTasks || 0) > 0);
+      filtered = filtered.filter((c) => (c._count?.assignedTasks || 0) > 0);
     }
     
     return filtered;
   }, [contacts, activeFilters, searchQuery]);
 
-  const handleAssignTask = (contact: Contact) => {
+  const handleAssignTask = (contact: ExtendedContact) => {
     setSelectedContact(contact);
     setIsAssignTaskOpen(true);
   };
@@ -553,7 +578,7 @@ export default function AdminContactsPage() {
     );
   };
 
-  const handleContactTap = (contact: Contact) => {
+  const handleContactTap = (contact: ExtendedContact) => {
     if (isMobile) {
       setSelectedContact(contact);
       setIsDetailOpen(true);
@@ -720,28 +745,28 @@ export default function AdminContactsPage() {
               },
               {
                 title: 'Portal Access',
-                value: `${contacts.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'ACTIVE').length}/${contacts.length}`,
+                value: `${contacts.filter((c) => c.portalStatus === 'ACTIVE').length}/${contacts.length}`,
                 subtitle: 'Have access',
                 icon: Unlock,
                 iconColor: 'text-green-400',
               },
               {
                 title: 'Pending Invites',
-                value: contacts.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'INVITED').length,
+                value: contacts.filter((c) => c.portalStatus === 'INVITED').length,
                 subtitle: 'Awaiting response',
                 icon: Clock,
                 iconColor: 'text-yellow-400',
               },
               {
                 title: 'Active',
-                value: contacts.filter((c: Contact & {status?: string}) => c.status === 'ACTIVE').length,
+                value: contacts.filter((c) => c.status === 'ACTIVE').length,
                 subtitle: 'Active contacts',
                 icon: UserCheck,
                 iconColor: 'text-green-400',
               },
               {
                 title: 'Has Tasks',
-                value: contacts.filter((c: Contact & {_count?: {assignedTasks: number}}) => (c._count?.assignedTasks || 0) > 0).length,
+                value: contacts.filter((c) => (c._count?.assignedTasks || 0) > 0).length,
                 subtitle: 'Assigned tasks',
                 icon: ClipboardList,
                 iconColor: 'text-blue-400',
@@ -1021,7 +1046,7 @@ export default function AdminContactsPage() {
           ) : (
             // Mobile List View - Compact list format
             <div className="space-y-1">
-              {filteredContacts.map((contact: Contact & {portalStatus?: string; status?: string; category?: string}) => (
+              {filteredContacts.map((contact) => (
                 <div
                   key={contact.id}
                   onClick={() => handleContactTap(contact)}
@@ -1061,12 +1086,12 @@ export default function AdminContactsPage() {
             "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
             isLandscape && "grid-cols-2"
           )}>
-            {filteredContacts.map((contact: Contact) => (
+            {filteredContacts.map((contact) => (
               <ContactCard
                 key={contact.id}
                 contact={contact as any}
                 onInvite={handleInvite as any}
-                onAssignTask={handleAssignTask}
+                onAssignTask={handleAssignTask as any}
                 onEdit={handleEdit as any}
                 onDelete={handleDelete as any}
               />
@@ -1076,7 +1101,7 @@ export default function AdminContactsPage() {
           <div className="glass-card p-6">
             <DataTable
               columns={columns}
-              data={filteredContacts}
+              data={filteredContacts as any}
               searchKey="name"
               searchPlaceholder="Search contacts..."
             />
@@ -1406,21 +1431,21 @@ export default function AdminContactsPage() {
             onFiltersChange={setActiveFilters}
             onExportCSV={handleExport}
             filterCounts={{
-              portal: contacts.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'ACTIVE').length,
-              pending: contacts.filter((c: Contact & {portalStatus?: string}) => c.portalStatus === 'INVITED').length,
-              noPortal: contacts.filter((c: Contact & {portalStatus?: string}) => !c.portalStatus || c.portalStatus === 'NONE').length,
-              hasTasks: contacts.filter((c: Contact & {_count?: {assignedTasks: number}}) => (c._count?.assignedTasks || 0) > 0).length,
-              active: contacts.filter((c: Contact & {status?: string}) => c.status === 'ACTIVE').length,
-              inactive: contacts.filter((c: Contact & {status?: string}) => c.status === 'INACTIVE').length,
-              potential: contacts.filter((c: Contact & {status?: string}) => c.status === 'POTENTIAL').length,
-              blacklisted: contacts.filter((c: Contact & {status?: string}) => c.status === 'BLACKLISTED').length,
-              followUp: contacts.filter((c: Contact & {status?: string}) => c.status === 'FOLLOW_UP').length,
-              subcontractor: contacts.filter((c: Contact & {category?: string}) => c.category === 'SUBCONTRACTOR').length,
-              supplier: contacts.filter((c: Contact & {category?: string}) => c.category === 'SUPPLIER').length,
-              consultant: contacts.filter((c: Contact & {category?: string}) => c.category === 'CONSULTANT').length,
-              inspector: contacts.filter((c: Contact & {category?: string}) => c.category === 'INSPECTOR').length,
-              client: contacts.filter((c: Contact & {category?: string}) => c.category === 'CLIENT').length,
-              other: contacts.filter((c: Contact & {category?: string}) => c.category === 'OTHER').length,
+              portal: contacts.filter((c) => c.portalStatus === 'ACTIVE').length,
+              pending: contacts.filter((c) => c.portalStatus === 'INVITED').length,
+              noPortal: contacts.filter((c) => !c.portalStatus || c.portalStatus === 'NONE').length,
+              hasTasks: contacts.filter((c) => (c._count?.assignedTasks || 0) > 0).length,
+              active: contacts.filter((c) => c.status === 'ACTIVE').length,
+              inactive: contacts.filter((c) => c.status === 'INACTIVE').length,
+              potential: contacts.filter((c) => c.status === 'POTENTIAL').length,
+              blacklisted: contacts.filter((c) => c.status === 'BLACKLISTED').length,
+              followUp: contacts.filter((c) => c.status === 'FOLLOW_UP').length,
+              subcontractor: contacts.filter((c) => c.category === 'SUBCONTRACTOR').length,
+              supplier: contacts.filter((c) => c.category === 'SUPPLIER').length,
+              consultant: contacts.filter((c) => c.category === 'CONSULTANT').length,
+              inspector: contacts.filter((c) => c.category === 'INSPECTOR').length,
+              client: contacts.filter((c) => c.category === 'CLIENT').length,
+              other: contacts.filter((c) => c.category === 'OTHER').length,
             }}
           />
         )}

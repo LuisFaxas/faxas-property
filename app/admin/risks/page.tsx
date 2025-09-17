@@ -46,6 +46,18 @@ import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { Risk } from '@prisma/client';
 
+// Extended Risk type with additional fields from API
+type ExtendedRisk = Risk & {
+  title?: string;
+  severity?: string;
+  impact?: string;
+  owner?: string;
+  dueDate?: Date | string;
+  contingency?: string;
+  cost?: number;
+  affectedAreas?: string[];
+};
+
 // Mock data for now - will be replaced with API calls
 /* const mockRisks = [
   {
@@ -170,11 +182,11 @@ export default function AdminRisksPage() {
   const metrics = useMemo(() => {
     const totalRisks = risks.length;
     const activeRisks = risks.filter(r => r.status === 'ACTIVE').length;
-    const criticalRisks = risks.filter(r => (r as any).severity === 'CRITICAL').length;
+    const criticalRisks = risks.filter(r => (r as ExtendedRisk).severity === 'CRITICAL').length;
     const mitigatedRisks = risks.filter(r => r.status === 'MITIGATED').length;
     const totalExposure = risks
       .filter(r => r.status === 'ACTIVE')
-      .reduce((sum, r) => sum + ((r as any).cost || 0), 0);
+      .reduce((sum, r) => sum + ((r as ExtendedRisk).cost || 0), 0);
     
     const risksByCategory = risks.reduce((acc, risk) => {
       acc[risk.category] = (acc[risk.category] || 0) + 1;
@@ -274,21 +286,21 @@ export default function AdminRisksPage() {
     });
   };
 
-  const openEditDialog = (risk: Risk) => {
+  const openEditDialog = (risk: ExtendedRisk) => {
     setSelectedRisk(risk);
     setFormData({
-      title: (risk as any).title || '',
+      title: risk.title || '',
       description: risk.description,
       category: risk.category,
       probability: String(risk.probability),
-      impact: (risk as any).impact || '',
+      impact: risk.impact || '',
       status: risk.status,
-      owner: (risk as any).owner || '',
-      dueDate: (risk as any).dueDate ? format((risk as any).dueDate, 'yyyy-MM-dd') : '',
+      owner: risk.owner || '',
+      dueDate: risk.dueDate ? format(new Date(risk.dueDate), 'yyyy-MM-dd') : '',
       mitigation: risk.mitigation || '',
-      contingency: (risk as any).contingency || '',
-      cost: (risk as any).cost ? String((risk as any).cost) : '0',
-      affectedAreas: (risk as any).affectedAreas ? (risk as any).affectedAreas.join(', ') : ''
+      contingency: risk.contingency || '',
+      cost: risk.cost ? String(risk.cost) : '0',
+      affectedAreas: risk.affectedAreas ? risk.affectedAreas.join(', ') : ''
     });
     setIsEditOpen(true);
   };
@@ -299,7 +311,7 @@ export default function AdminRisksPage() {
       case 'active':
         return risks.filter(r => r.status === 'ACTIVE');
       case 'critical':
-        return risks.filter(r => (r as any).severity === 'CRITICAL');
+        return risks.filter(r => (r as ExtendedRisk).severity === 'CRITICAL');
       case 'mitigated':
         return risks.filter(r => r.status === 'MITIGATED');
       case 'monitoring':
@@ -765,7 +777,7 @@ export default function AdminRisksPage() {
                   {['LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'].map(impact => {
                     const count = risks.filter(r =>
                       String(r.probability) === prob.toUpperCase().replace(' ', '_') &&
-                      (r as any).impact === impact
+                      (r as ExtendedRisk).impact === impact
                     ).length;
                     const severity = calculateSeverity(prob.toUpperCase().replace(' ', '_'), impact);
                     return (
@@ -1008,7 +1020,7 @@ export default function AdminRisksPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Risk Assessment</AlertDialogTitle>
               <AlertDialogDescription className="text-white/60">
-                Are you sure you want to delete &quot;{(selectedRisk as any)?.title || 'this risk'}&quot;? This action cannot be undone.
+                Are you sure you want to delete &quot;{(selectedRisk as ExtendedRisk)?.title || 'this risk'}&quot;? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
