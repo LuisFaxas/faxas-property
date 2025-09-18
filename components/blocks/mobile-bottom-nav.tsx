@@ -4,14 +4,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { 
-  Home, 
+import {
+  Home,
   ClipboardList,
-  Calendar, 
+  Calendar,
+  FileText,
   Grid3x3,
   Plus
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
+import { MoreHorizontal } from 'lucide-react'
 
 interface NavItem {
   href: string
@@ -29,7 +31,7 @@ interface MobileBottomNavProps {
 const primaryNavItems: NavItem[] = [
   { href: '/admin', label: 'Home', icon: Home },
   { href: '/admin/tasks', label: 'Tasks', icon: ClipboardList },
-  { href: '/admin/schedule', label: 'Schedule', icon: Calendar },
+  { href: '/admin/bidding', label: 'Bidding', icon: FileText },
 ]
 
 export function MobileBottomNav({ 
@@ -42,12 +44,12 @@ export function MobileBottomNav({
   
   // Check if we're in contractor section
   const isContractor = pathname.startsWith('/contractor')
-  
-  // Adjust nav items based on user section
+
+  // Use appropriate nav items based on user section
   const navItems = isContractor ? [
     { href: '/contractor', label: 'Home', icon: Home },
     { href: '/contractor/my-tasks', label: 'Tasks', icon: ClipboardList },
-    { href: '/contractor/my-schedule', label: 'Schedule', icon: Calendar },
+    { href: '/contractor/bids', label: 'Bids', icon: FileText },
   ] : primaryNavItems
 
   return (
@@ -56,9 +58,9 @@ export function MobileBottomNav({
         {/* First two nav items */}
         {navItems.slice(0, 2).map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href || 
+          const isActive = pathname === item.href ||
             (item.href !== '/admin' && item.href !== '/contractor' && pathname.startsWith(item.href + '/'))
-          
+
           return (
             <Link
               key={item.href}
@@ -75,7 +77,7 @@ export function MobileBottomNav({
             </Link>
           )
         })}
-        
+
         {/* Center FAB */}
         <div className="relative">
           <Button
@@ -87,13 +89,14 @@ export function MobileBottomNav({
             <FabIcon className="h-6 w-6 text-white" />
           </Button>
         </div>
-        
-        {/* Last nav item */}
-        {navItems.slice(2, 3).map((item) => {
+
+        {/* Third nav item */}
+        {navItems[2] && (() => {
+          const item = navItems[2]
           const Icon = item.icon
-          const isActive = pathname === item.href || 
-            (pathname.startsWith(item.href + '/'))
-          
+          const isActive = pathname === item.href ||
+            (item.href !== '/admin' && item.href !== '/contractor' && pathname.startsWith(item.href + '/'))
+
           return (
             <Link
               key={item.href}
@@ -109,8 +112,8 @@ export function MobileBottomNav({
               <span className="text-[10px] font-medium">{item.label}</span>
             </Link>
           )
-        })}
-        
+        })()}
+
         {/* More button */}
         <button
           onClick={onMoreClick}
@@ -120,7 +123,7 @@ export function MobileBottomNav({
             "text-white/70"
           )}
         >
-          <Grid3x3 className="h-5 w-5" />
+          <MoreHorizontal className="h-5 w-5" />
           <span className="text-[10px] font-medium">More</span>
         </button>
       </div>

@@ -8,6 +8,7 @@ import { WelcomeWidget } from '@/components/dashboard/widgets/WelcomeWidget';
 import { ProjectOverviewWidget } from '@/components/dashboard/widgets/ProjectOverviewWidget';
 import { BudgetHealthWidget } from '@/components/dashboard/widgets/BudgetHealthWidget';
 import { TaskKPIsWidget } from '@/components/dashboard/widgets/TaskKPIsWidget';
+import { BiddingStatsWidget } from '@/components/dashboard/widgets/BiddingStatsWidget';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { Plus } from 'lucide-react';
 
@@ -55,11 +56,8 @@ export default function AdminDashboard() {
 
           {/* Activity Zone - 2 medium cards */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-6">
-            {/* Today's Schedule */}
-            <Widget className="lg:col-span-2">
-              <h2 className="text-lg font-semibold text-white mb-3">Today&apos;s Schedule</h2>
-              <p className="text-white/60">Schedule events will go here</p>
-            </Widget>
+            {/* Bidding Stats */}
+            <BiddingStatsWidget />
 
             {/* Priority Tasks */}
             <Widget className="lg:col-span-2">

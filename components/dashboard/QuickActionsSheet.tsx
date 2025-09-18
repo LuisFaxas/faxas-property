@@ -15,6 +15,8 @@ import {
   Calendar,
   UserPlus,
   Upload,
+  FileText,
+  DollarSign,
 } from 'lucide-react';
 
 interface QuickActionsSheetProps {
@@ -32,6 +34,18 @@ export function QuickActionsSheet({ open, onOpenChange }: QuickActionsSheetProps
       icon: Plus,
       href: '/admin/tasks/new',
       description: 'Create a new task',
+    },
+    {
+      label: 'Create RFP',
+      icon: FileText,
+      href: '/admin/bidding/new',
+      description: 'Request for Proposal',
+    },
+    {
+      label: 'Add Budget Item',
+      icon: DollarSign,
+      href: '/admin/budget',
+      description: 'Add to project budget',
     },
     {
       label: 'Schedule Event',

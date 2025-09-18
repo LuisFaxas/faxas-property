@@ -52,6 +52,7 @@ interface PageShellProps {
 const adminNavItems = [
   { href: '/admin', label: 'Dashboard', icon: Home },
   { href: '/admin/tasks', label: 'Tasks', icon: ClipboardList },
+  { href: '/admin/bidding', label: 'Bidding', icon: FileText },
   { href: '/admin/schedule', label: 'Schedule', icon: Calendar },
   { href: '/admin/contacts', label: 'Contacts', icon: Users },
   { href: '/admin/budget', label: 'Budget', icon: DollarSign },

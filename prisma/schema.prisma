@@ -15,6 +15,7 @@ model User {
   contact            Contact?
   tasks              Task[]           @relation("AssignedTasks")
   projectMemberships ProjectMember[]
+  vendorAccess       VendorUser[]
 }
 
 model Project {
@@ -60,6 +61,8 @@ model Project {
   members       ProjectMember[]
   rfps          Rfp[]
   vendors       Vendor[]
+  workPackages  WorkPackage[]
+  commitments   Commitment[]
 }
 
 model Contact {
@@ -190,6 +193,7 @@ model BudgetItem {
   variance        Decimal       @default(0) @db.Decimal(6, 4)
   project         Project       @relation(fields: [projectId], references: [id])
   procurements    Procurement[]
+  workPackages    WorkPackage[]
 
   @@index([projectId, discipline, status])
 }
@@ -367,31 +371,37 @@ model Rfp {
   createdBy     String
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
-  
+
   project       Project          @relation(fields: [projectId], references: [id])
   items         RfpItem[]
   invitations   BidInvitation[]
   bids          Bid[]
   award         Award?
-  
+  commitments   Commitment[]
+
   @@index([projectId, status])
   @@unique([projectId, title])
 }
 
 model RfpItem {
-  id          String     @id @default(cuid())
-  rfpId       String
-  specCode    String
-  description String
-  qty         Decimal    @db.Decimal(12, 2)
-  uom         UnitOfMeasure
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
-  rfp         Rfp        @relation(fields: [rfpId], references: [id], onDelete: Cascade)
-  bidItems    BidItem[]
-  
+  id             String         @id @default(cuid())
+  rfpId          String
+  workPackageId  String?        // Link to work package
+  specCode       String
+  description    String
+  qty            Decimal        @db.Decimal(12, 2)
+  uom            UnitOfMeasure
+  isAlternate    Boolean        @default(false)
+  alternateGroup String?        // Group alternates together
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  rfp            Rfp            @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  workPackage    WorkPackage?   @relation(fields: [workPackageId], references: [id])
+  bidItems       BidItem[]
+
   @@index([rfpId])
+  @@index([workPackageId])
 }
 
 model Vendor {
@@ -403,64 +413,74 @@ model Vendor {
   status      VendorStatus    @default(ACTIVE)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
-  
+
   project     Project         @relation(fields: [projectId], references: [id])
   invitations BidInvitation[]
   bids        Bid[]
-  
+  users       VendorUser[]
+  commitments Commitment[]
+
   @@unique([projectId, email])
   @@index([projectId, status])
 }
 
 model BidInvitation {
-  id          String     @id @default(cuid())
+  id          String           @id @default(cuid())
   rfpId       String
   vendorId    String
-  token       String?    @unique
-  expiresAt   DateTime?
-  status      String     @default("DRAFT") // Placeholder for now
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
-  rfp         Rfp        @relation(fields: [rfpId], references: [id], onDelete: Cascade)
-  vendor      Vendor     @relation(fields: [vendorId], references: [id])
-  
+  token       String           @unique @default(cuid())
+  expiresAt   DateTime
+  status      InvitationStatus @default(SENT)
+  viewedAt    DateTime?
+  respondedAt DateTime?
+  emailSentAt DateTime?
+  reminderSentAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  rfp         Rfp              @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  vendor      Vendor           @relation(fields: [vendorId], references: [id])
+
   @@unique([rfpId, vendorId])
   @@index([token])
+  @@index([expiresAt])
 }
 
 model Bid {
-  id          String     @id @default(cuid())
+  id          String          @id @default(cuid())
   rfpId       String
   vendorId    String
   submittedAt DateTime?
-  status      BidStatus  @default(DRAFT)
+  status      BidStatus       @default(DRAFT)
   notes       String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
-  rfp         Rfp        @relation(fields: [rfpId], references: [id], onDelete: Cascade)
-  vendor      Vendor     @relation(fields: [vendorId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  rfp         Rfp             @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  vendor      Vendor          @relation(fields: [vendorId], references: [id])
   items       BidItem[]
+  adjustments BidAdjustment[]
   award       Award?
-  
+  commitment  Commitment?
+
   @@unique([rfpId, vendorId])
   @@index([rfpId, vendorId, status])
 }
 
 model BidItem {
-  id          String     @id @default(cuid())
+  id          String         @id @default(cuid())
   bidId       String
   rfpItemId   String
-  unitPrice   Decimal    @db.Decimal(12, 2)
-  totalPrice  Decimal    @db.Decimal(12, 2)
+  uom         UnitOfMeasure  // Unit of measure for this bid item
+  unitPrice   Decimal        @db.Decimal(18, 4)
+  totalPrice  Decimal        @db.Decimal(18, 2)
   notes       String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
-  bid         Bid        @relation(fields: [bidId], references: [id], onDelete: Cascade)
-  rfpItem     RfpItem    @relation(fields: [rfpItemId], references: [id])
-  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  bid         Bid            @relation(fields: [bidId], references: [id], onDelete: Cascade)
+  rfpItem     RfpItem        @relation(fields: [rfpItemId], references: [id])
+
   @@unique([bidId, rfpItemId])
   @@index([bidId])
 }
@@ -485,18 +505,19 @@ model Attachment {
 }
 
 model Award {
-  id                String     @id @default(cuid())
-  rfpId             String     @unique
-  winningBidId      String?    @unique
+  id                String       @id @default(cuid())
+  rfpId             String       @unique
+  winningBidId      String?      @unique
   awardedBy         String?
   awardedAt         DateTime?
-  totalAwardAmount  Decimal?   @db.Decimal(12, 2)
+  totalAwardAmount  Decimal?     @db.Decimal(18, 2)
   memo              String?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  
-  rfp               Rfp        @relation(fields: [rfpId], references: [id])
-  winningBid        Bid?       @relation(fields: [winningBidId], references: [id])
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  rfp               Rfp          @relation(fields: [rfpId], references: [id])
+  winningBid        Bid?         @relation(fields: [winningBidId], references: [id])
+  commitments       Commitment[]
 }
 
 model TaskDependency {
@@ -702,6 +723,147 @@ model ChangeOrderTaskLink {
   @@index([taskId])
 }
 
+// ============ NEW BIDDING SYSTEM MODELS ============
+
+model WorkPackage {
+  id               String          @id @default(cuid())
+  projectId        String
+  code             String          // e.g., "03-CONC-001"
+  name             String
+  discipline       String
+  csiDivision      String?         // CSI MasterFormat division
+  baseBudgetItemId String?
+  isAlternate      Boolean         @default(false)
+  parentPackageId  String?
+  sequenceOrder    Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  project          Project         @relation(fields: [projectId], references: [id])
+  baseBudgetItem   BudgetItem?     @relation(fields: [baseBudgetItemId], references: [id])
+  parentPackage    WorkPackage?    @relation("PackageAlternates", fields: [parentPackageId], references: [id])
+  alternates       WorkPackage[]   @relation("PackageAlternates")
+  rfpItems         RfpItem[]
+  commitments      Commitment[]
+
+  @@unique([projectId, code])
+  @@index([projectId, discipline])
+  @@index([projectId, csiDivision])
+}
+
+model Commitment {
+  id               String                  @id @default(cuid())
+  projectId        String
+  type             CommitmentType          // CONTRACT, PO, CHANGE_ORDER
+  status           CommitmentStatus        // DRAFT, APPROVED, ACTIVE, COMPLETED, CANCELLED
+  contractNumber   String?
+  poNumber         String?
+  vendorId         String
+  originalAmount   Decimal                 @db.Decimal(18,2)
+  currentAmount    Decimal                 @db.Decimal(18,2) // After change orders
+  paidToDate       Decimal                 @db.Decimal(18,2) @default(0)
+  retentionPercent Decimal?                @db.Decimal(5,2)
+  retentionHeld    Decimal?                @db.Decimal(18,2) @default(0)
+  workPackageId    String
+  rfpId            String?
+  bidId            String?                 @unique
+  awardId          String?
+  approvedAt       DateTime?
+  approvedBy       String?
+  idempotencyKey   String
+  notes            String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  project          Project                 @relation(fields: [projectId], references: [id])
+  vendor           Vendor                  @relation(fields: [vendorId], references: [id])
+  workPackage      WorkPackage             @relation(fields: [workPackageId], references: [id])
+  rfp              Rfp?                    @relation(fields: [rfpId], references: [id])
+  bid              Bid?                    @relation(fields: [bidId], references: [id])
+  award            Award?                  @relation(fields: [awardId], references: [id])
+  changeOrders     CommitmentChangeOrder[]
+  payments         PaymentApplication[]
+
+  @@unique([projectId, idempotencyKey])
+  @@unique([projectId, contractNumber])
+  @@unique([poNumber])
+  @@index([projectId, status])
+  @@index([vendorId])
+}
+
+model BidAdjustment {
+  id            String          @id @default(cuid())
+  bidId         String
+  type          AdjustmentType  // ADD, DEDUCT, ALTERNATE, ALLOWANCE, PLUG
+  category      String          // SCOPE_ALIGNMENT, NORMALIZATION, CLARIFICATION
+  label         String
+  description   String?
+  amount        Decimal         @db.Decimal(18,2)
+  isAccepted    Boolean         @default(true)
+  sequenceOrder Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  bid           Bid             @relation(fields: [bidId], references: [id], onDelete: Cascade)
+
+  @@index([bidId, type])
+}
+
+model VendorUser {
+  id        String      @id @default(cuid())
+  vendorId  String
+  userId    String
+  role      VendorRole  // OWNER, MANAGER, ESTIMATOR, VIEWER
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  vendor    Vendor      @relation(fields: [vendorId], references: [id])
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@unique([vendorId, userId])
+  @@index([userId])
+}
+
+model CommitmentChangeOrder {
+  id           String      @id @default(cuid())
+  commitmentId String
+  coNumber     String
+  description  String
+  amount       Decimal     @db.Decimal(18,2)
+  status       String      // PENDING, APPROVED, REJECTED
+  approvedAt   DateTime?
+  approvedBy   String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  commitment   Commitment  @relation(fields: [commitmentId], references: [id])
+
+  @@unique([commitmentId, coNumber])
+}
+
+model PaymentApplication {
+  id              String      @id @default(cuid())
+  commitmentId    String
+  paymentNumber   Int
+  periodStart     DateTime
+  periodEnd       DateTime
+  workCompleted   Decimal     @db.Decimal(18,2)
+  materialsStored Decimal     @db.Decimal(18,2) @default(0)
+  retentionAmount Decimal     @db.Decimal(18,2) @default(0)
+  netPayment      Decimal     @db.Decimal(18,2)
+  status          String      // DRAFT, SUBMITTED, APPROVED, PAID
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  commitment      Commitment  @relation(fields: [commitmentId], references: [id])
+
+  @@unique([commitmentId, paymentNumber])
+}
+
 enum Role {
   ADMIN
   STAFF
@@ -841,4 +1003,46 @@ enum UnitOfMeasure {
   DAY   // Day
   LS    // Lump Sum
   LOT   // Lot
+}
+
+// ============ NEW BIDDING SYSTEM ENUMS ============
+
+enum CommitmentType {
+  CONTRACT
+  PO
+  CHANGE_ORDER
+}
+
+enum CommitmentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum AdjustmentType {
+  ADD
+  DEDUCT
+  ALTERNATE
+  ALLOWANCE
+  PLUG
+  NORMALIZATION
+}
+
+enum VendorRole {
+  OWNER
+  MANAGER
+  ESTIMATOR
+  VIEWER
+}
+
+enum InvitationStatus {
+  SENT
+  VIEWED
+  RESPONDED
+  EXPIRED
+  CANCELLED
 }

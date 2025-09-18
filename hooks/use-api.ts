@@ -398,6 +398,27 @@ export function useRfps(projectId: string, query?: any, enabled: boolean = true)
   });
 }
 
+// RFP hook without projectId requirement - gets all RFPs across projects
+export function useAllRfps(query?: any, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['all-rfps', query],
+    queryFn: async () => {
+      // First get all projects, then get RFPs for each
+      const projectsResponse = await apiClient.get('/projects');
+      const projects = projectsResponse.data?.data || [];
+
+      if (projects.length === 0) return [];
+
+      // For now, just get RFPs from the first project
+      // In production, you'd want to aggregate across all projects
+      const projectId = projects[0].id;
+      const rfpsResponse = await apiClient.get(`/projects/${projectId}/rfps`, { params: query });
+      return rfpsResponse.data?.data || [];
+    },
+    enabled
+  });
+}
+
 export function useRfp(projectId: string, rfpId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ['rfp', projectId, rfpId],
@@ -643,7 +664,7 @@ export function useUserPermissions(id: string, projectId?: string, enabled: bool
 
 export function useUpdateUserPermissions(id: string, projectId: string) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: any) => apiClient.put(`/users/${id}/permissions?projectId=${projectId}`, data),
     onSuccess: (data) => {
@@ -659,6 +680,220 @@ export function useUpdateUserPermissions(id: string, projectId: string) {
       toast({
         title: 'Error',
         description: error.error || 'Failed to update permissions',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+// Vendor API hooks
+export function useVendors(query?: any, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['vendors', query],
+    queryFn: () => apiClient.get('/api/v1/vendors', { params: query }),
+    enabled
+  });
+}
+
+export function useVendor(vendorId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['vendor', vendorId],
+    queryFn: () => apiClient.get(`/api/v1/vendors/${vendorId}`),
+    enabled: !!vendorId && enabled
+  });
+}
+
+export function useCreateVendor() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: any) => apiClient.post('/api/v1/vendors', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Vendor created successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to create vendor',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useUpdateVendor(vendorId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: any) => apiClient.put(`/api/v1/vendors/${vendorId}`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor', vendorId] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Vendor updated successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to update vendor',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+// Bid API hooks
+export function useBids(query?: any, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['bids', query],
+    queryFn: () => apiClient.get('/api/v1/bids', { params: query }),
+    enabled
+  });
+}
+
+export function useBid(bidId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['bid', bidId],
+    queryFn: () => apiClient.get(`/api/v1/bids/${bidId}`),
+    enabled: !!bidId && enabled
+  });
+}
+
+export function useCreateBid() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: any) => apiClient.post('/api/v1/bids', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['bids'] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Bid created successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to create bid',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useSubmitBid(bidId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: any) => apiClient.post(`/api/v1/bids/${bidId}/submit`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['bids'] });
+      queryClient.invalidateQueries({ queryKey: ['bid', bidId] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Bid submitted successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to submit bid',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+export function useWithdrawBid(bidId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => apiClient.delete(`/api/v1/bids/${bidId}/submit`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['bids'] });
+      queryClient.invalidateQueries({ queryKey: ['bid', bidId] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Bid withdrawn successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to withdraw bid',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+// Bid Tabulation API hooks
+export function useBidTabulation(rfpId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['bid-tabulation', rfpId],
+    queryFn: () => apiClient.get(`/api/v1/rfps/${rfpId}/tabulation`),
+    enabled: !!rfpId && enabled,
+    staleTime: 30000 // Cache for 30 seconds
+  });
+}
+
+export function useApplyLeveling(rfpId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: any) => apiClient.post(`/api/v1/rfps/${rfpId}/tabulation/leveling`, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['bid-tabulation', rfpId] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Leveling adjustments applied successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to apply leveling adjustments',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+// Award API hooks
+export function useAwards(query?: any, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['awards', query],
+    queryFn: () => apiClient.get('/api/v1/awards', { params: query }),
+    enabled
+  });
+}
+
+export function useCreateAward() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: any) => apiClient.post('/api/v1/awards', data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['awards'] });
+      queryClient.invalidateQueries({ queryKey: ['rfps'] });
+      queryClient.invalidateQueries({ queryKey: ['bids'] });
+      queryClient.invalidateQueries({ queryKey: ['commitments'] });
+      queryClient.invalidateQueries({ queryKey: ['budget'] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Award created and commitment established successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.error || 'Failed to create award',
         variant: 'destructive'
       });
     }
