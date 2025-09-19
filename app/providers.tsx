@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState, useEffect } from 'react';
 import { AuthProvider } from '@/app/contexts/AuthContext';
 import { ProjectProvider } from '@/app/contexts/ProjectContext';
+import { PreferencesProvider } from '@/app/contexts/PreferencesContext';
 import { ToastListener } from '@/components/providers/toast-listener';
 import { UserInitializer } from '@/components/providers/user-initializer';
 
@@ -37,10 +38,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <UserInitializer>
-          <ProjectProvider>
-            {children}
-            <ToastListener />
-          </ProjectProvider>
+          <PreferencesProvider>
+            <ProjectProvider>
+              {children}
+              <ToastListener />
+            </ProjectProvider>
+          </PreferencesProvider>
         </UserInitializer>
       </AuthProvider>
       <ReactQueryDevtools initialIsOpen={false} />

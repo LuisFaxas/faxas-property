@@ -4,13 +4,23 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { useNavigationItems } from '@/app/contexts/PreferencesContext'
+import { useAuth } from '@/app/contexts/AuthContext'
 import {
   Home,
   ClipboardList,
   Calendar,
   FileText,
   Grid3x3,
-  Plus
+  Plus,
+  Users,
+  DollarSign,
+  ShoppingCart,
+  FileBox,
+  AlertTriangle,
+  Upload,
+  CreditCard,
+  FolderOpen
 } from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 import { MoreHorizontal } from 'lucide-react'
@@ -28,29 +38,116 @@ interface MobileBottomNavProps {
   onMoreClick?: () => void
 }
 
-const primaryNavItems: NavItem[] = [
-  { href: '/admin', label: 'Home', icon: Home },
-  { href: '/admin/tasks', label: 'Tasks', icon: ClipboardList },
-  { href: '/admin/bidding', label: 'Bidding', icon: FileText },
-]
+// Navigation item mapping
+const navItemMapping: Record<string, { href: string; label: string; icon: LucideIcon; adminHref?: string; contractorHref?: string }> = {
+  home: {
+    href: '/admin',
+    adminHref: '/admin',
+    contractorHref: '/contractor',
+    label: 'Home',
+    icon: Home
+  },
+  tasks: {
+    href: '/admin/tasks',
+    label: 'Tasks',
+    icon: ClipboardList
+  },
+  'my-tasks': {
+    href: '/contractor/my-tasks',
+    label: 'My Tasks',
+    icon: ClipboardList
+  },
+  bidding: {
+    href: '/admin/bidding',
+    label: 'Bidding',
+    icon: FileText
+  },
+  bids: {
+    href: '/contractor/bids',
+    label: 'Bids',
+    icon: FileText
+  },
+  schedule: {
+    href: '/admin/schedule',
+    label: 'Schedule',
+    icon: Calendar
+  },
+  'my-schedule': {
+    href: '/contractor/my-schedule',
+    label: 'Schedule',
+    icon: Calendar
+  },
+  contacts: {
+    href: '/admin/contacts',
+    label: 'Contacts',
+    icon: Users
+  },
+  budget: {
+    href: '/admin/budget',
+    label: 'Budget',
+    icon: DollarSign
+  },
+  procurement: {
+    href: '/admin/procurement',
+    label: 'Procurement',
+    icon: ShoppingCart
+  },
+  plans: {
+    href: '/admin/plans',
+    adminHref: '/admin/plans',
+    contractorHref: '/contractor/plans',
+    label: 'Plans',
+    icon: FileBox
+  },
+  risks: {
+    href: '/admin/risks',
+    label: 'Risks',
+    icon: AlertTriangle
+  },
+  uploads: {
+    href: '/contractor/uploads',
+    label: 'Uploads',
+    icon: Upload
+  },
+  invoices: {
+    href: '/contractor/invoices',
+    label: 'Invoices',
+    icon: CreditCard
+  }
+}
 
-export function MobileBottomNav({ 
+export function MobileBottomNav({
   onFabClick,
   fabIcon: FabIcon = Plus,
   fabLabel = "Add",
   onMoreClick
 }: MobileBottomNavProps) {
   const pathname = usePathname()
-  
+  const { userRole } = useAuth()
+  const { items: navItemIds } = useNavigationItems()
+
   // Check if we're in contractor section
   const isContractor = pathname.startsWith('/contractor')
 
-  // Use appropriate nav items based on user section
-  const navItems = isContractor ? [
-    { href: '/contractor', label: 'Home', icon: Home },
-    { href: '/contractor/my-tasks', label: 'Tasks', icon: ClipboardList },
-    { href: '/contractor/bids', label: 'Bids', icon: FileText },
-  ] : primaryNavItems
+  // Build nav items from preferences
+  const navItems = navItemIds.map(itemId => {
+    const mappedItem = navItemMapping[itemId]
+    if (!mappedItem) return null
+
+    // Use appropriate href based on section
+    let href = mappedItem.href
+    if (isContractor && mappedItem.contractorHref) {
+      href = mappedItem.contractorHref
+    } else if (!isContractor && mappedItem.adminHref) {
+      href = mappedItem.adminHref
+    }
+
+    return {
+      href,
+      label: mappedItem.label,
+      icon: mappedItem.icon
+    }
+  }).filter(Boolean) as NavItem[]
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/10">
