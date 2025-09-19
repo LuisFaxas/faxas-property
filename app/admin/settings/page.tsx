@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
