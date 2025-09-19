@@ -25,7 +25,8 @@
       "Bash(npx dotenv -e .env.local -- prisma migrate dev:*)",
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(ls:*)",
-      "Bash(del nul)"
+      "Bash(del nul)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
