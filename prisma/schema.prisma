@@ -16,6 +16,7 @@ model User {
   tasks              Task[]           @relation("AssignedTasks")
   projectMemberships ProjectMember[]
   vendorAccess       VendorUser[]
+  preferences        UserPreferences?
 }
 
 model Project {
@@ -1045,4 +1046,109 @@ enum InvitationStatus {
   RESPONDED
   EXPIRED
   CANCELLED
+}
+
+// ============ USER PREFERENCES SYSTEM ============
+
+model UserPreferences {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Navigation & Interface
+  mobileNavItems    Json      @default("[\"home\", \"tasks\", \"schedule\"]") // Which 3 items to show
+  navItemOrder      Int[]     @default([0, 1, 2]) // Order of navigation items
+  quickActions      Json      @default("[]") // FAB menu customization
+  dashboardWidgets  Json      @default("[]") // Dashboard widget configuration
+  favoritePages     String[]  @default([]) // Quick access pages
+
+  // Appearance & Theme
+  theme             String    @default("dark") // dark/light/auto
+  themeCustom       Json?     // Custom theme colors
+  density           String    @default("comfortable") // compact/comfortable/spacious
+  fontSize          String    @default("medium") // small/medium/large/xl
+  highContrast      Boolean   @default(false)
+  reduceMotion      Boolean   @default(false)
+  colorBlindMode    String?   // protanopia/deuteranopia/tritanopia
+
+  // Display Preferences
+  showCompleted     Boolean   @default(false)
+  defaultView       String    @default("card") // card/list/table
+  itemsPerPage      Int       @default(20)
+  defaultProjectId  String?   // Default project to load
+  language          String    @default("en")
+  timezone          String    @default("America/New_York")
+  dateFormat        String    @default("MM/DD/YYYY")
+  timeFormat        String    @default("12h") // 12h/24h
+
+  // Notifications
+  emailNotifications    Boolean  @default(true)
+  pushNotifications     Boolean  @default(false)
+  smsNotifications      Boolean  @default(false)
+  notificationSettings  Json     @default("{}") // Granular per-module settings
+  digestFrequency       String   @default("daily") // never/daily/weekly
+  quietHours            Json?    // {start: "22:00", end: "08:00"}
+
+  // Privacy & Security
+  profileVisibility     String   @default("team") // public/team/private
+  activityStatus        Boolean  @default(true)
+  twoFactorMethod       String?  // sms/app/email
+  trustedDevices        Json     @default("[]") // Device fingerprints
+  sessionTimeout        Int      @default(10080) // Minutes (1 week default)
+
+  // Mobile-specific
+  swipeActions          Boolean  @default(true)
+  hapticFeedback        Boolean  @default(true)
+  biometricAuth         Boolean  @default(false)
+  offlineMode           Boolean  @default(true)
+  dataSaver             Boolean  @default(false)
+
+  // Integrations
+  connectedServices     Json     @default("[]") // OAuth connections
+  apiKeys               Json     @default("[]") // Personal API keys (encrypted)
+  webhooks              Json     @default("[]") // Webhook configurations
+  calendarSync          Json?    // Calendar integration settings
+
+  // Advanced
+  debugMode             Boolean  @default(false)
+  betaFeatures          Boolean  @default(false)
+  featureFlags          Json?    // Override feature flags
+  customShortcuts       Json?    // Keyboard shortcuts
+
+  // Metadata
+  onboardingCompleted   Boolean  @default(false)
+  tourCompleted         Json     @default("{}")
+  lastSettingsUpdate    DateTime @updatedAt
+  createdAt             DateTime @default(now())
+
+  @@index([userId])
+}
+
+model SettingsChangeLog {
+  id            String   @id @default(cuid())
+  userId        String
+  setting       String   // Which setting was changed
+  oldValue      Json?    // Previous value
+  newValue      Json     // New value
+  ipAddress     String?  // For security tracking
+  userAgent     String?  // Device info
+  timestamp     DateTime @default(now())
+
+  @@index([userId, timestamp])
+}
+
+model SettingsPreset {
+  id            String   @id @default(cuid())
+  name          String   // Preset name
+  description   String?  // Description
+  type          String   // system/team/personal
+  settings      Json     // Preset configuration
+  isDefault     Boolean  @default(false)
+  isPublic      Boolean  @default(false)
+  createdBy     String?  // User who created it
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([name, type])
+  @@index([type, isPublic])
 }

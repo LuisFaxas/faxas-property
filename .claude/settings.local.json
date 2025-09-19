@@ -26,7 +26,10 @@
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(ls:*)",
       "Bash(del nul)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(tail:*)",
+      "Bash(npx dotenv -e .env.local -- prisma db push:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []
