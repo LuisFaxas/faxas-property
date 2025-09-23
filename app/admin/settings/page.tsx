@@ -5,6 +5,8 @@ import { PageShell } from '@/components/blocks/page-shell';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { usePreferencesContext } from '@/app/contexts/PreferencesContext';
+import { RearrangeableNavigation } from '@/components/blocks/rearrangeable-navigation';
+import { navItemMapping, getAvailableNavItems, type NavItemId } from '@/components/blocks/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -72,129 +74,44 @@ import {
   CreditCard
 } from 'lucide-react';
 
-// Navigation item icons mapping
-const navIconMap: Record<string, any> = {
-  home: Home,
-  tasks: ClipboardList,
-  'my-tasks': ClipboardList,
-  bidding: FileText,
-  bids: FileText,
-  schedule: Calendar,
-  'my-schedule': Calendar,
-  contacts: Users,
-  budget: DollarSign,
-  procurement: ShoppingCart,
-  plans: FileBox,
-  risks: AlertTriangle,
-  uploads: Upload,
-  invoices: CreditCard
-};
-
 // Enhanced Navigation Customizer Component
 const NavigationCustomizer = () => {
-  const { preferences, updateNavigation, loading } = usePreferencesContext();
+  const { preferences, updateNavigation, resetNavigation } = usePreferencesContext();
   const { userRole } = useAuth();
-  const [selectedItems, setSelectedItems] = useState<string[]>(
-    preferences?.mobileNavItems || ['home', 'tasks', 'schedule']
-  );
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const isContractor = userRole === 'CONTRACTOR';
   const [isSaving, setIsSaving] = useState(false);
 
-  // Available items based on user role with Lucide icons
-  const availableItems = {
-    ADMIN: [
-      { id: 'home', label: 'Home', icon: Home },
-      { id: 'tasks', label: 'Tasks', icon: ClipboardList },
-      { id: 'bidding', label: 'Bidding', icon: FileText },
-      { id: 'schedule', label: 'Schedule', icon: Calendar },
-      { id: 'contacts', label: 'Contacts', icon: Users },
-      { id: 'budget', label: 'Budget', icon: DollarSign },
-      { id: 'procurement', label: 'Procurement', icon: ShoppingCart },
-      { id: 'plans', label: 'Plans', icon: FileBox },
-      { id: 'risks', label: 'Risks', icon: AlertTriangle }
-    ],
-    STAFF: [
-      { id: 'home', label: 'Home', icon: Home },
-      { id: 'tasks', label: 'Tasks', icon: ClipboardList },
-      { id: 'bidding', label: 'Bidding', icon: FileText },
-      { id: 'schedule', label: 'Schedule', icon: Calendar },
-      { id: 'contacts', label: 'Contacts', icon: Users },
-      { id: 'budget', label: 'Budget', icon: DollarSign },
-      { id: 'procurement', label: 'Procurement', icon: ShoppingCart },
-      { id: 'plans', label: 'Plans', icon: FileBox }
-    ],
-    CONTRACTOR: [
-      { id: 'home', label: 'Home', icon: Home },
-      { id: 'my-tasks', label: 'My Tasks', icon: ClipboardList },
-      { id: 'bids', label: 'Bids', icon: FileText },
-      { id: 'my-schedule', label: 'Schedule', icon: Calendar },
-      { id: 'uploads', label: 'Uploads', icon: Upload },
-      { id: 'invoices', label: 'Invoices', icon: CreditCard },
-      { id: 'plans', label: 'Plans', icon: FileBox }
-    ],
-    VIEWER: [
-      { id: 'home', label: 'Home', icon: Home },
-      { id: 'tasks', label: 'Tasks', icon: ClipboardList },
-      { id: 'schedule', label: 'Schedule', icon: Calendar },
-      { id: 'contacts', label: 'Contacts', icon: Users },
-      { id: 'plans', label: 'Plans', icon: FileBox }
-    ]
-  };
+  // Get current navigation items
+  const currentNavItems = (preferences?.mobileNavItems || ['home', 'tasks', 'schedule']) as NavItemId[];
 
-  const items = availableItems[userRole as keyof typeof availableItems] || availableItems.VIEWER;
-
-  useEffect(() => {
-    if (preferences?.mobileNavItems) {
-      setSelectedItems(preferences.mobileNavItems);
+  // Get available items based on role
+  const availableNavIds = getAvailableNavItems(userRole || 'VIEWER');
+  const availableItems = availableNavIds.map(id => {
+    const item = navItemMapping[id];
+    // Determine correct href based on role
+    let href = item.href || '';
+    if (isContractor && item.contractorHref) {
+      href = item.contractorHref;
+    } else if (!isContractor && item.adminHref) {
+      href = item.adminHref;
     }
-  }, [preferences?.mobileNavItems]);
+    return {
+      id,
+      label: item.label,
+      icon: item.icon,
+      href
+    };
+  });
 
-  const toggleItem = (itemId: string) => {
-    if (selectedItems.includes(itemId)) {
-      if (selectedItems.length > 1) {
-        setSelectedItems(selectedItems.filter(id => id !== itemId));
-      } else {
-        toast({
-          title: 'Minimum items required',
-          description: 'You must have at least one navigation item selected',
-          variant: 'destructive'
-        });
-      }
-    } else {
-      if (selectedItems.length < 3) {
-        setSelectedItems([...selectedItems, itemId]);
-      } else {
-        toast({
-          title: 'Maximum items reached',
-          description: 'You can only select 3 navigation items',
-          variant: 'destructive'
-        });
-      }
-    }
-  };
-
-  const handleSave = async () => {
-    if (selectedItems.length !== 3) {
-      toast({
-        title: 'Invalid selection',
-        description: 'Please select exactly 3 navigation items',
-        variant: 'destructive'
-      });
-      return;
-    }
+  const handleSaveFromCustomizer = async (items: NavItemId[]) => {
 
     setIsSaving(true);
     try {
-      await updateNavigation(selectedItems);
-      toast({
-        title: 'Navigation updated',
-        description: 'Your navigation preferences have been saved',
-      });
+      await updateNavigation(items);
+      setIsCustomizing(false);
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to save navigation preferences',
-        variant: 'destructive'
-      });
+      console.error('Failed to save navigation:', error);
     } finally {
       setIsSaving(false);
     }
@@ -211,102 +128,63 @@ const NavigationCustomizer = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Preview */}
-      <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-        <Label className="text-sm text-muted-foreground mb-3 block">Preview</Label>
-        <div className="flex items-center justify-around">
-          {selectedItems.map((itemId) => {
-            const item = items.find(i => i.id === itemId);
-            if (!item) return null;
-            const Icon = item.icon;
-            return (
-              <div key={itemId} className="flex flex-col items-center gap-1">
-                <div className="p-2 rounded-lg bg-white/10">
-                  <Icon className="h-5 w-5 text-accent" />
-                </div>
-                <span className="text-[10px] text-muted-foreground">{item.label}</span>
-              </div>
-            );
-          })}
-          {selectedItems.length < 3 && Array(3 - selectedItems.length).fill(0).map((_, i) => (
-            <div key={`empty-${i}`} className="flex flex-col items-center gap-1 opacity-30">
-              <div className="p-2 rounded-lg border-2 border-dashed border-white/20">
-                <div className="h-5 w-5" />
-              </div>
-              <span className="text-[10px] text-muted-foreground">Empty</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Selection */}
-      <div className="space-y-3">
+    <Card className="glass-card">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <Label>Select Navigation Items</Label>
-          <span className="text-sm text-muted-foreground">
-            {selectedItems.length}/3 selected
-          </span>
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Navigation2 className="h-5 w-5 text-accent" />
+              Mobile Navigation
+            </CardTitle>
+            <CardDescription>
+              Quick access to your most used features
+            </CardDescription>
+          </div>
+          <Button
+            onClick={() => setIsCustomizing(true)}
+            variant="outline"
+            className="gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Customize
+          </Button>
         </div>
+      </CardHeader>
+      <CardContent>
+        {isCustomizing ? (
+          <div className="-mx-6 -mb-6">
+            <RearrangeableNavigation
+              currentItems={currentNavItems}
+              availableItems={availableItems}
+              onSave={handleSaveFromCustomizer}
+              onCancel={() => setIsCustomizing(false)}
+              onReset={resetNavigation}
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              {currentNavItems.map((itemId) => {
+                const item = navItemMapping[itemId];
+                if (!item) return null;
+                const Icon = item.icon;
 
-        <div className="grid gap-2">
-          {items.map((item) => {
-            const isSelected = selectedItems.includes(item.id);
-            const isDisabled = !isSelected && selectedItems.length >= 3;
-            const Icon = item.icon;
+                return (
+                  <div key={itemId} className="flex items-center gap-2 px-3 py-2 glass rounded-lg">
+                    <Icon className="h-4 w-4 text-accent" />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              These items appear in your mobile bottom navigation for quick access.
+            </p>
+          </div>
+        )}
+      </CardContent>
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => !isDisabled && toggleItem(item.id)}
-                disabled={isDisabled}
-                className={cn(
-                  "flex items-center justify-between p-4 rounded-lg border transition-all",
-                  "hover:scale-[1.02] active:scale-[0.98]",
-                  isSelected
-                    ? "bg-accent/20 border-accent shadow-lg shadow-accent/20"
-                    : isDisabled
-                    ? "opacity-40 cursor-not-allowed bg-white/5 border-white/10"
-                    : "bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "p-2 rounded-lg transition-colors",
-                    isSelected ? "bg-accent/20" : "bg-white/10"
-                  )}>
-                    <Icon className={cn(
-                      "h-5 w-5 transition-colors",
-                      isSelected ? "text-accent" : "text-white/70"
-                    )} />
-                  </div>
-                  <div className="text-left">
-                    <span className="font-medium block">{item.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {isSelected ? 'Selected' : isDisabled ? 'Maximum reached' : 'Click to select'}
-                    </span>
-                  </div>
-                </div>
-                {isSelected && (
-                  <div className="p-1 rounded-full bg-accent">
-                    <Check className="h-4 w-4 text-white" />
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Save Button */}
-      <Button
-        onClick={handleSave}
-        disabled={selectedItems.length !== 3 || isSaving}
-        className="w-full bg-accent hover:bg-accent/90"
-      >
-        {isSaving ? 'Saving...' : 'Save Navigation'}
-      </Button>
-    </div>
+    </Card>
   );
 };
 

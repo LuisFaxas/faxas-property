@@ -3,6 +3,9 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { usePreferences, useUpdatePreferences, UserPreferences, getSmartDefaults } from '@/hooks/use-preferences';
+import { useQueryClient } from '@tanstack/react-query';
+import { type NavItemId } from '@/components/blocks/page-shell';
+import { toast } from '@/hooks/use-toast';
 
 interface PreferencesContextType {
   preferences: UserPreferences | null;
@@ -16,7 +19,8 @@ interface PreferencesContextType {
   resetPreferences: () => void;
 
   // Navigation specific
-  updateNavigation: (items: string[], order?: number[]) => void;
+  updateNavigation: (items: NavItemId[], order?: number[]) => Promise<void>;
+  resetNavigation: () => Promise<void>;
 
   // Theme operations
   switchTheme: (theme: 'light' | 'dark' | 'auto') => void;
@@ -30,6 +34,7 @@ const PreferencesContext = createContext<PreferencesContextType | undefined>(und
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
   const { user, userRole } = useAuth();
+  const queryClient = useQueryClient();
   const { data: preferences, isLoading, error } = usePreferences();
   const updateMutation = useUpdatePreferences();
 
@@ -74,28 +79,74 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   // Batch update preferences
   const updatePreferences = useCallback(async (updates: Partial<UserPreferences>) => {
     // Optimistic update
+    const previousPreferences = localPreferences;
     setLocalPreferences(prev => prev ? { ...prev, ...updates } : null);
     setPendingUpdates(updates);
 
     try {
       await updateMutation.mutateAsync(updates);
+      // Invalidate the preferences query to ensure fresh data
+      await queryClient.invalidateQueries({ queryKey: ['user-preferences'] });
       setPendingUpdates({});
     } catch (error) {
       // Revert optimistic update on error
-      setLocalPreferences(preferences);
+      setLocalPreferences(previousPreferences);
       setPendingUpdates({});
       throw error;
     }
-  }, [updateMutation, preferences]);
+  }, [updateMutation, queryClient]);
 
   // Update navigation
-  const updateNavigation = useCallback((items: string[], order?: number[]) => {
+  const updateNavigation = useCallback(async (items: NavItemId[], order?: number[]) => {
+    // Validate exactly 3 items
+    if (items.length !== 3) {
+      toast({
+        title: 'Invalid selection',
+        description: 'Please select exactly 3 navigation items',
+        variant: 'destructive',
+      });
+      throw new Error('Must select exactly 3 navigation items');
+    }
+
     const updates = {
       mobileNavItems: items,
       navItemOrder: order || [0, 1, 2]
     };
-    updatePreferences(updates);
+
+    // Optimistic update
+    const previousPreferences = localPreferences;
+    setLocalPreferences(prev => prev ? { ...prev, ...updates } : null);
+
+    // Update localStorage immediately for other components
+    localStorage.setItem('userNavItems', JSON.stringify(items));
+
+    try {
+      await updatePreferences(updates);
+      toast({
+        title: 'Navigation updated',
+        description: 'Your navigation preferences have been saved',
+      });
+    } catch (error) {
+      // Revert on error
+      setLocalPreferences(previousPreferences);
+      localStorage.setItem('userNavItems', JSON.stringify(previousPreferences?.mobileNavItems || []));
+      toast({
+        title: 'Failed to update',
+        description: 'Could not save navigation preferences',
+        variant: 'destructive',
+      });
+      throw error;
+    }
   }, [updatePreferences]);
+
+  // Reset navigation to defaults
+  const resetNavigation = useCallback(async () => {
+    const defaults = getSmartDefaults(userRole || 'VIEWER');
+    await updateNavigation(
+      defaults.mobileNavItems as NavItemId[],
+      defaults.navItemOrder as number[]
+    );
+  }, [userRole, updateNavigation]);
 
   // Switch theme
   const switchTheme = useCallback((theme: 'light' | 'dark' | 'auto') => {
@@ -115,7 +166,9 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     const defaults = getSmartDefaults(userRole || 'VIEWER');
     setLocalPreferences(defaults as UserPreferences);
     updateMutation.mutate(defaults);
-  }, [userRole, updateMutation]);
+    // Invalidate cache
+    queryClient.invalidateQueries({ queryKey: ['user-preferences'] });
+  }, [userRole, updateMutation, queryClient]);
 
   // Clear pending updates
   const clearPendingUpdates = useCallback(() => {
@@ -131,6 +184,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     updatePreferences,
     resetPreferences,
     updateNavigation,
+    resetNavigation,
     switchTheme,
     pendingUpdates,
     clearPendingUpdates,
@@ -161,16 +215,18 @@ export function useTheme() {
 }
 
 export function useNavigationItems() {
-  const { preferences, updateNavigation } = usePreferencesContext();
+  const { preferences, updateNavigation, resetNavigation } = usePreferencesContext();
   const { userRole } = useAuth();
 
   // Get defaults based on role
   const defaults = getSmartDefaults(userRole || 'VIEWER');
+  const items = (preferences?.mobileNavItems || defaults.mobileNavItems || ['home', 'tasks', 'schedule']) as NavItemId[];
 
   return {
-    items: preferences?.mobileNavItems || defaults.mobileNavItems || ['home', 'tasks', 'schedule'],
+    items,
     order: preferences?.navItemOrder || [0, 1, 2],
     updateNavigation,
+    resetNavigation,
   };
 }
 

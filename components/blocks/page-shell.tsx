@@ -13,15 +13,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { 
-  Home, 
-  Users, 
-  Calendar, 
-  DollarSign, 
-  FileText, 
-  Package, 
+import {
+  Home,
+  Users,
+  Calendar,
+  DollarSign,
+  FileText,
+  Package,
   AlertTriangle,
   ClipboardList,
+  ShoppingCart,
+  FileBox,
+  Upload,
+  CreditCard,
   LogOut,
   Settings,
   ChevronLeft,
@@ -31,7 +35,7 @@ import {
   LucideIcon,
   GripVertical
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { ProjectSwitcher } from '@/components/blocks/project-switcher'
@@ -52,6 +56,42 @@ interface PageShellProps {
   onFabClick?: () => void
 }
 
+// Centralized navigation item mapping - single source of truth
+export const navItemMapping = {
+  home: { id: 'home', adminHref: '/admin', contractorHref: '/contractor', label: 'Dashboard', icon: Home },
+  tasks: { id: 'tasks', href: '/admin/tasks', label: 'Tasks', icon: ClipboardList },
+  'my-tasks': { id: 'my-tasks', href: '/contractor/my-tasks', label: 'My Tasks', icon: ClipboardList },
+  bidding: { id: 'bidding', href: '/admin/bidding', label: 'Bidding', icon: FileText },
+  bids: { id: 'bids', href: '/contractor/bids', label: 'Bids', icon: FileText },
+  schedule: { id: 'schedule', href: '/admin/schedule', label: 'Schedule', icon: Calendar },
+  'my-schedule': { id: 'my-schedule', href: '/contractor/my-schedule', label: 'My Schedule', icon: Calendar },
+  contacts: { id: 'contacts', href: '/admin/contacts', label: 'Contacts', icon: Users },
+  budget: { id: 'budget', href: '/admin/budget', label: 'Budget', icon: DollarSign },
+  procurement: { id: 'procurement', href: '/admin/procurement', label: 'Procurement', icon: ShoppingCart },
+  plans: { id: 'plans', adminHref: '/admin/plans', contractorHref: '/contractor/plans', label: 'Plans', icon: FileBox },
+  risks: { id: 'risks', href: '/admin/risks', label: 'Risks', icon: AlertTriangle },
+  uploads: { id: 'uploads', href: '/contractor/uploads', label: 'Uploads', icon: Upload },
+  invoices: { id: 'invoices', href: '/contractor/invoices', label: 'Invoices', icon: CreditCard },
+  users: { id: 'users', href: '/admin/users', label: 'User Management', icon: Users },
+} as const
+
+export type NavItemId = keyof typeof navItemMapping
+
+// Get available items based on role
+export function getAvailableNavItems(role: string): NavItemId[] {
+  switch (role) {
+    case 'ADMIN':
+    case 'STAFF':
+      return ['home', 'tasks', 'bidding', 'schedule', 'contacts', 'budget', 'procurement', 'plans', 'risks', 'users']
+    case 'CONTRACTOR':
+      return ['home', 'my-tasks', 'bids', 'my-schedule', 'uploads', 'invoices', 'plans']
+    case 'VIEWER':
+    default:
+      return ['home', 'tasks', 'schedule', 'contacts', 'plans']
+  }
+}
+
+// Legacy nav arrays for desktop sidebar
 const adminNavItems = [
   { href: '/admin', label: 'Dashboard', icon: Home },
   { href: '/admin/tasks', label: 'Tasks', icon: ClipboardList },
@@ -59,8 +99,8 @@ const adminNavItems = [
   { href: '/admin/schedule', label: 'Schedule', icon: Calendar },
   { href: '/admin/contacts', label: 'Contacts', icon: Users },
   { href: '/admin/budget', label: 'Budget', icon: DollarSign },
-  { href: '/admin/procurement', label: 'Procurement', icon: Package },
-  { href: '/admin/plans', label: 'Plans', icon: FileText },
+  { href: '/admin/procurement', label: 'Procurement', icon: ShoppingCart },
+  { href: '/admin/plans', label: 'Plans', icon: FileBox },
   { href: '/admin/risks', label: 'Risks', icon: AlertTriangle },
   { href: '/admin/users', label: 'User Management', icon: Users },
 ]
@@ -69,9 +109,9 @@ const contractorNavItems = [
   { href: '/contractor', label: 'Dashboard', icon: Home },
   { href: '/contractor/my-tasks', label: 'My Tasks', icon: ClipboardList },
   { href: '/contractor/my-schedule', label: 'My Schedule', icon: Calendar },
-  { href: '/contractor/uploads', label: 'Uploads', icon: FileText },
-  { href: '/contractor/invoices', label: 'Invoices', icon: DollarSign },
-  { href: '/contractor/plans', label: 'Plans', icon: FileText },
+  { href: '/contractor/uploads', label: 'Uploads', icon: Upload },
+  { href: '/contractor/invoices', label: 'Invoices', icon: CreditCard },
+  { href: '/contractor/plans', label: 'Plans', icon: FileBox },
 ]
 
 export function PageShell({ 
@@ -97,6 +137,8 @@ export function PageShell({
   const { preferences, updateNavigation } = usePreferencesContext()
   const { items: navItemIds } = useNavigationItems()
 
+  const isContractor = pathname.startsWith('/contractor')
+
   // Auto-collapse sidebar when entering landscape
   useEffect(() => {
     if (isLandscape) {
@@ -111,6 +153,35 @@ export function PageShell({
 
   const navItems = userRole === 'ADMIN' || userRole === 'STAFF' ? adminNavItems : contractorNavItems
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase()
+
+  // Compute available navigation items for this user
+  const availableNavIds = useMemo(() => getAvailableNavItems(userRole), [userRole])
+
+  // Create a Set of bottom nav items for efficient lookup
+  const bottomNavSet = useMemo(() => new Set(navItemIds || []), [navItemIds])
+
+  // Compute "More" menu items - those NOT in bottom nav
+  const moreMenuItems = useMemo(() => {
+    return availableNavIds
+      .filter(id => !bottomNavSet.has(id))
+      .map(id => {
+        const item = navItemMapping[id]
+        // Determine correct href based on current section
+        let href = item.href || ''
+        if (isContractor && item.contractorHref) {
+          href = item.contractorHref
+        } else if (!isContractor && item.adminHref) {
+          href = item.adminHref
+        }
+        return {
+          id,
+          href,
+          label: item.label,
+          icon: item.icon
+        }
+      })
+      .filter(item => item.href) // Remove items without valid href
+  }, [availableNavIds, bottomNavSet, isContractor])
 
   const handleLogout = async () => {
     try {
@@ -313,27 +384,21 @@ export function PageShell({
       >
         {isRearranging ? (
           <RearrangeableNavigation
-            currentItems={navItemIds || (userRole === 'ADMIN' || userRole === 'STAFF'
-              ? ['home', 'tasks', 'schedule', 'contacts', 'budget', 'procurement', 'plans', 'risks', 'users']
-              : ['home', 'my-tasks', 'my-schedule', 'uploads', 'invoices', 'plans'])}
-            availableItems={navItems.map((item) => {
-              // Map the href to proper navigation item IDs
-              const pathSegment = item.href.split('/').pop() || '';
-              let id = pathSegment;
-
-              // Handle special cases for contractor routes
-              if (item.href === '/contractor') id = 'home';
-              else if (item.href === '/contractor/my-tasks') id = 'my-tasks';
-              else if (item.href === '/contractor/my-schedule') id = 'my-schedule';
-              else if (item.href === '/admin') id = 'home';
-              else if (item.href === '/admin/users') id = 'users';
-
+            currentItems={navItemIds || []}
+            availableItems={availableNavIds.map(id => {
+              const item = navItemMapping[id]
+              let href = item.href || ''
+              if (isContractor && item.contractorHref) {
+                href = item.contractorHref
+              } else if (!isContractor && item.adminHref) {
+                href = item.adminHref
+              }
               return {
                 id,
                 label: item.label,
                 icon: item.icon,
-                href: item.href
-              };
+                href
+              }
             })}
             onSave={(items) => {
               updateNavigation(items)
@@ -358,14 +423,14 @@ export function PageShell({
               </Button>
             </div>
             <nav className="space-y-1 p-4">
-              {/* Show remaining nav items that aren't in bottom nav */}
-              {navItems.slice(3).map((item) => {
+              {/* Show items NOT in bottom nav */}
+              {moreMenuItems.map((item) => {
                 const Icon = item.icon
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
 
                 return (
                   <Link
-                    key={item.href}
+                    key={item.id}
                     href={item.href}
                     onClick={() => setBottomSheetOpen(false)}
                     className={cn(
