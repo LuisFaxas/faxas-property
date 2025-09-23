@@ -2,6 +2,36 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Always Load These Files First
+When starting any new conversation or task, ALWAYS read these 3 files first:
+1. `@PROJECT_GUARDRAILS.md` - Critical constraints and patterns
+2. `@WORK_PROTOCOL.md` - 6-step editing protocol
+3. `@SOURCE_OF_TRUTH_GENERATOR_PROMPT.md` - For SOT updates
+
+## Evidence Rule
+Any behavioral claim must cite file path + symbol; unknowns → TODO(path); do not guess.
+
+## Source of Truth
+The comprehensive Source of Truth documentation is in `/SOURCE_OF_TRUTH.md` with detailed sections in `/docs/`. Reference these when needed for specific technical details.
+
+### Anchors from SOT
+- **Design**: Dark-only, glass morphism, 48px touch targets, shadcn/ui primitives (`/docs/07-design-system.md`)
+- **Auth/RBAC**: Firebase claims, server-side role+module checks, refresh ≈ 50 min (`/docs/04-auth-security.md`)
+- **Project scoping**: x-project-id required; cross-project access denied (`/docs/02-api-inventory.md`)
+- **Task invariant**: assignedToId XOR assignedContactId; enforce at API + DB (`/docs/01-data-schema.md`)
+- **State**: Use SOT Query Keys Registry + Mutation→Invalidation Matrix verbatim (`/docs/05-state-management.md`)
+- **Security**: Signed URLs; x-webhook-secret; never print secrets (`/docs/04-auth-security.md`)
+- **Ops verify**: Run npm run lint, npm run typecheck, and build if appropriate (`/docs/06-operations.md`)
+
+## Editing Protocol (Summary)
+Follow the 6-step protocol from `WORK_PROTOCOL.md`:
+1. **READ** - List exact files you will open
+2. **PLAN** - Propose tiny batch (≤3 files)
+3. **DIFF** - Show unified diff preview
+4. **APPLY** - Write changes after approval
+5. **VERIFY** - Run lint/typecheck and paste results
+6. **LOG** - Update `/docs/WORKLOG_<AREA>.md`
+
 ## Project Overview
 
 This is a construction management system for the Miami Duplex Remodel project built with Next.js 15 App Router, TypeScript, Prisma ORM, Firebase Auth, and PostgreSQL. The system features dual dashboards for Admin/Staff and Contractors with role-based access control.
@@ -13,6 +43,7 @@ This is a construction management system for the Miami Duplex Remodel project bu
 npm run dev                  # Start dev server (port 3000)
 npm run build               # Production build
 npm run lint                # Run ESLint checks
+npm run typecheck           # Run TypeScript type checking
 ```
 
 ### Database Operations
@@ -23,17 +54,33 @@ npx prisma migrate dev      # Create and apply migrations (development)
 npx prisma migrate deploy   # Apply migrations (production)
 npx prisma studio           # Open Prisma Studio GUI at port 5555
 npm run db:seed            # Seed database with initial data
+npm run db:backup          # Backup database using scripts/backup-database.ts
+npm run db:restore         # Restore database using scripts/restore-database.ts
 ```
 
 ### Testing & Debugging
 ```bash
-npm run db:studio          # Visual database browser
-npx prisma db pull         # Test database connection
+npm run test                    # Run all tests
+npm run test:security          # Run security tests with coverage
+npm run test:security:watch    # Run security tests in watch mode
+npm run test:security:ci       # Run security tests for CI environment
+npm run db:studio              # Visual database browser
+npx prisma db pull             # Test database connection
 ```
 
 ### Admin Operations
 ```bash
 npm run create-admin       # Create admin user (requires ts-node)
+```
+
+### Additional Scripts
+```bash
+tsx scripts/backup-database.ts        # Backup database
+tsx scripts/restore-database.ts       # Restore database
+tsx scripts/ensure-project-members.ts # Ensure project members
+tsx scripts/setup-module-access.mjs   # Setup module access
+tsx scripts/verify-access.mjs         # Verify access permissions
+tsx scripts/seed-tasks-contacts.ts    # Seed tasks and contacts data
 ```
 
 ## High-Level Architecture
@@ -61,14 +108,20 @@ The application uses Next.js 15 App Router with three main route groups:
 - `AuthContext` (`app/contexts/AuthContext.tsx`) manages auth state globally
 - API routes verify auth via `requireAuth()` helper in `lib/api/auth-check.ts`
 - Role verification happens at both client and server levels
+- Token refresh happens every 50 minutes automatically
+- Session management with validation and refresh logic
 
 ### Data Architecture
 - **PostgreSQL Database** via Prisma ORM
-- **Key Models**: User, Project, Task, Contact, Schedule, BudgetItem, ProcurementItem
-- **Relationships**: 
-  - Tasks can be assigned to Users OR Contacts (dual assignment system)
+- **Key Models**: User, Project, Task, Contact, ScheduleEvent, BudgetItem, Procurement, Invoice, Decision, Risk, Meeting, PlanFile, Rfp, Vendor, WorkPackage, Commitment, UserPreferences
+- **Relationships**:
+  - Tasks can be assigned to Users OR Contacts (dual assignment system via `assignedToId` or `assignedContactId`)
   - Contacts can have portal access (linked to User model)
   - Projects contain all other entities (tasks, schedules, budgets, etc.)
+  - UserPreferences for settings management
+  - UserModuleAccess for granular permissions per project
+  - ProjectMember for project-specific role assignments
+  - VendorUser for vendor portal access
 
 ### API Structure (`/api/v1/*`)
 All API routes follow RESTful patterns with consistent response formats:
@@ -76,6 +129,8 @@ All API routes follow RESTful patterns with consistent response formats:
 - Error: `{ success: false, error: string, code?: string }`
 - Auth verification via Firebase Admin SDK
 - Request validation using Zod schemas in `lib/validations/`
+- Correlation IDs for request tracking
+- Winston logger for comprehensive logging
 
 ### Component Organization
 - `components/ui/` - shadcn/ui base components (Button, Dialog, etc.)
@@ -88,6 +143,7 @@ All API routes follow RESTful patterns with consistent response formats:
 - **Client State**: React hooks and Context API
 - **Custom Hooks**: `hooks/use-api.ts` contains reusable API hooks
 - **Optimistic Updates**: Enabled for better UX in forms
+- **Query Invalidation**: Automatic cache management on mutations
 
 ### Styling System
 - Tailwind CSS with custom graphite theme colors
@@ -95,16 +151,21 @@ All API routes follow RESTful patterns with consistent response formats:
 - Dark mode only (no light theme)
 - Responsive breakpoints: mobile-first approach
 - Custom CSS utilities in `app/globals.css`
+- Tailwind Animate for transitions
 
 ## Key Files to Understand
 
 1. **`prisma/schema.prisma`** - Complete database schema
-2. **`app/contexts/AuthContext.tsx`** - Global auth state management  
-3. **`lib/api/auth-check.ts`** - Server-side auth verification
-4. **`lib/firebase.ts`** & **`lib/firebase-admin.ts`** - Firebase configuration
-5. **`hooks/use-api.ts`** - Reusable API hooks for data fetching
-6. **`app/admin/layout.tsx`** - Admin dashboard layout wrapper
-7. **`.env.local`** - Environment variables (Firebase keys, DATABASE_URL)
+2. **`app/contexts/AuthContext.tsx`** - Global auth state management
+3. **`lib/api/auth-check.ts`** - Server-side auth verification with session management
+4. **`lib/api/response.ts`** - Standard API response helpers
+5. **`lib/api/session.ts`** - Session validation and refresh logic
+6. **`lib/firebaseClient.ts`** & **`lib/firebaseAdmin.ts`** - Firebase configuration
+7. **`hooks/use-api.ts`** - Reusable API hooks for data fetching
+8. **`app/admin/layout.tsx`** - Admin dashboard layout wrapper
+9. **`middleware.ts`** - Request middleware for auth and routing
+10. **`lib/validations/*.ts`** - Zod schemas for request validation
+11. **`.env.local`** - Environment variables (Firebase keys, DATABASE_URL)
 
 ## Mobile-First Considerations
 
@@ -147,6 +208,13 @@ const form = useForm<FormValues>({
 });
 ```
 
+### Query Invalidation Pattern
+```typescript
+// After mutation, invalidate related queries
+queryClient.invalidateQueries({ queryKey: ['tasks'] });
+queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
+```
+
 ## Important Notes
 
 - Always run `npx prisma generate` after modifying `schema.prisma`
@@ -155,3 +223,20 @@ const form = useForm<FormValues>({
 - Portal invitation flow: Contacts → Send Invite → Accept at `/accept-invite` → Creates User account
 - File uploads use Firebase Storage with signed URLs for security
 - Webhook endpoints require `x-webhook-secret` header matching env variable
+- Session management includes automatic refresh logic
+- All logs are written to `logs/` directory with daily rotation
+- API routes use Zod validation schemas from `lib/validations/` directory
+- RFP (Request for Proposal) system includes bidding and vendor management
+- Module-based access control allows granular permissions per contractor per project
+
+## API Validation Schemas
+
+The following Zod schemas are available in `lib/validations/`:
+- `budget.ts` - Budget item validation
+- `contact.ts` - Contact creation and updates
+- `plans.ts` - Plan file management
+- `procurement.ts` - Procurement item validation
+- `rfp.ts` - RFP and bidding validation
+- `schedule.ts` - Schedule event validation
+- `task.ts` - Task creation and updates
+- `user.ts` - User management validation
