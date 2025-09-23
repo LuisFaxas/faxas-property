@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { PageShell } from '@/components/blocks/page-shell';
 import { Widget } from '@/components/dashboard/Widget';
 import { QuickActionsSheet } from '@/components/dashboard/QuickActionsSheet';
 import { WelcomeWidget } from '@/components/dashboard/widgets/WelcomeWidget';
@@ -10,7 +9,6 @@ import { BudgetHealthWidget } from '@/components/dashboard/widgets/BudgetHealthW
 import { TaskKPIsWidget } from '@/components/dashboard/widgets/TaskKPIsWidget';
 import { BiddingStatsWidget } from '@/components/dashboard/widgets/BiddingStatsWidget';
 import { useAuth } from '@/app/contexts/AuthContext';
-import { Plus } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user, userRole } = useAuth();
@@ -18,16 +16,8 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <PageShell 
-        userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'} 
-        userName={user?.displayName || 'User'} 
-        userEmail={user?.email || ''}
-        onFabClick={() => setQuickActionsOpen(true)}
-        fabIcon={Plus}
-        fabLabel="Quick Actions"
-      >
-        {/* Main content with safe area padding for mobile */}
-        <div className="p-4 md:p-6 pb-[calc(env(safe-area-inset-bottom)+88px)] space-y-4 md:space-y-6">
+      {/* Main content with safe area padding for mobile */}
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           {/* Hero Zone - Welcome and Budget Health */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-6">
             {/* Welcome Widget - Hero Card */}
@@ -88,8 +78,7 @@ export default function AdminDashboard() {
               <p className="text-white/60 text-sm">Today&apos;s forecast</p>
             </Widget>
           </div>
-        </div>
-      </PageShell>
+      </div>
 
       {/* Quick Actions Sheet */}
       <QuickActionsSheet 

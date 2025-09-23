@@ -83,8 +83,9 @@ export function usePreferences(enabled: boolean = true) {
   return useQuery({
     queryKey: ['preferences', user?.uid],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/users/preferences');
-      return response.data?.data as UserPreferences;
+      const response = await apiClient.get('/users/preferences');
+      // apiClient already returns the data directly from response.data.data
+      return (response || null) as UserPreferences;
     },
     enabled: enabled && !!user,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
@@ -99,8 +100,9 @@ export function useUpdatePreferences() {
 
   return useMutation({
     mutationFn: async (updates: Partial<UserPreferences>) => {
-      const response = await apiClient.patch('/api/v1/users/preferences', updates);
-      return response.data?.data;
+      const response = await apiClient.patch('/users/preferences', updates);
+      // apiClient already returns the data directly
+      return response;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['preferences', user?.uid] });
@@ -135,8 +137,9 @@ export function useResetPreferences() {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await apiClient.delete('/api/v1/users/preferences');
-      return response.data?.data;
+      const response = await apiClient.delete('/users/preferences');
+      // apiClient already returns the data directly
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['preferences', user?.uid] });
@@ -168,8 +171,9 @@ export function useNavigationConfig(enabled: boolean = true) {
   return useQuery({
     queryKey: ['navigation-config', user?.uid],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/users/preferences/navigation');
-      return response.data?.data as NavigationConfig;
+      const response = await apiClient.get('/users/preferences/navigation');
+      // apiClient already returns the data directly
+      return (response || null) as NavigationConfig;
     },
     enabled: enabled && !!user,
     staleTime: 5 * 60 * 1000,
@@ -182,8 +186,9 @@ export function useUpdateNavigation() {
 
   return useMutation({
     mutationFn: async (config: { mobileNavItems: string[]; navItemOrder?: number[] }) => {
-      const response = await apiClient.post('/api/v1/users/preferences/navigation', config);
-      return response.data?.data;
+      const response = await apiClient.post('/users/preferences/navigation', config);
+      // apiClient already returns the data directly
+      return response;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['preferences', user?.uid] });

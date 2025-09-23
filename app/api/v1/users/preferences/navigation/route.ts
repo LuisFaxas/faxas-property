@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { successResponse, errorResponse } from '@/lib/api/helpers';
+import { successResponse, errorResponse } from '@/lib/api/response';
 import { requireAuth } from '@/lib/api/auth-check';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';

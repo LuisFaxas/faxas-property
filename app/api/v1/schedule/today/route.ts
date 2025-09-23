@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import prisma from '@/lib/prisma';
 import { requireAuth } from '@/lib/api/auth-check';
 import { successResponse, errorResponse } from '@/lib/api/response';
 import { sanitizeScheduleEvent } from '@/lib/api/schedule-helpers';

@@ -28,7 +28,8 @@ import {
   ChevronRight,
   Menu,
   Plus,
-  LucideIcon
+  LucideIcon,
+  GripVertical
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/app/contexts/AuthContext'
@@ -37,6 +38,8 @@ import { ProjectSwitcher } from '@/components/blocks/project-switcher'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { MobileBottomNav } from '@/components/blocks/mobile-bottom-nav'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
+import { RearrangeableNavigation } from '@/components/blocks/rearrangeable-navigation'
+import { usePreferencesContext, useNavigationItems } from '@/app/contexts/PreferencesContext'
 
 interface PageShellProps {
   children: React.ReactNode
@@ -90,7 +93,10 @@ export function PageShell({
   const [sidebarHovered, setSidebarHovered] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
-  
+  const [isRearranging, setIsRearranging] = useState(false)
+  const { preferences, updateNavigation } = usePreferencesContext()
+  const { items: navItemIds } = useNavigationItems()
+
   // Auto-collapse sidebar when entering landscape
   useEffect(() => {
     if (isLandscape) {
@@ -299,33 +305,84 @@ export function PageShell({
       {/* Bottom Sheet for More Items */}
       <BottomSheet
         open={bottomSheetOpen}
-        onOpenChange={setBottomSheetOpen}
-        title="More Options"
+        onOpenChange={(open) => {
+          setBottomSheetOpen(open)
+          if (!open) setIsRearranging(false)
+        }}
+        title={isRearranging ? "" : "More Options"}
       >
-        <nav className="space-y-1">
-          {/* Show remaining nav items that aren't in bottom nav */}
-          {navItems.slice(3).map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setBottomSheetOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg transition-colors px-3 py-3",
-                  "hover:bg-white/10",
-                  isActive && "bg-accent-500/20 text-accent-500",
-                  !isActive && "text-white/70 hover:text-white"
-                )}
+        {isRearranging ? (
+          <RearrangeableNavigation
+            currentItems={navItemIds || (userRole === 'ADMIN' || userRole === 'STAFF'
+              ? ['home', 'tasks', 'schedule', 'contacts', 'budget', 'procurement', 'plans', 'risks', 'users']
+              : ['home', 'my-tasks', 'my-schedule', 'uploads', 'invoices', 'plans'])}
+            availableItems={navItems.map((item) => {
+              // Map the href to proper navigation item IDs
+              const pathSegment = item.href.split('/').pop() || '';
+              let id = pathSegment;
+
+              // Handle special cases for contractor routes
+              if (item.href === '/contractor') id = 'home';
+              else if (item.href === '/contractor/my-tasks') id = 'my-tasks';
+              else if (item.href === '/contractor/my-schedule') id = 'my-schedule';
+              else if (item.href === '/admin') id = 'home';
+              else if (item.href === '/admin/users') id = 'users';
+
+              return {
+                id,
+                label: item.label,
+                icon: item.icon,
+                href: item.href
+              };
+            })}
+            onSave={(items) => {
+              updateNavigation(items)
+              setIsRearranging(false)
+              setBottomSheetOpen(false)
+            }}
+            onCancel={() => setIsRearranging(false)}
+          />
+        ) : (
+          <div>
+            {/* Header with Rearrange button */}
+            <div className="flex items-center justify-between px-4 pb-3 border-b border-white/10">
+              <h3 className="text-lg font-semibold">More Options</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsRearranging(true)}
+                className="text-accent hover:bg-accent/20"
               >
-                <Icon className="h-5 w-5" />
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
-        </nav>
+                <GripVertical className="h-4 w-4 mr-2" />
+                Rearrange
+              </Button>
+            </div>
+            <nav className="space-y-1 p-4">
+              {/* Show remaining nav items that aren't in bottom nav */}
+              {navItems.slice(3).map((item) => {
+                const Icon = item.icon
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setBottomSheetOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg transition-colors px-3 py-3",
+                      "hover:bg-white/10",
+                      isActive && "bg-accent-500/20 text-accent-500",
+                      !isActive && "text-white/70 hover:text-white"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
+        )}
       </BottomSheet>
 
       {/* Main Content */}
@@ -353,7 +410,7 @@ export function PageShell({
         <main
           id="page-content"
           className={cn(
-            "pt-20 md:pt-4 lg:pt-6 space-y-6 md:space-y-8",
+            "pt-16 md:pt-4 lg:pt-6 space-y-6 md:space-y-8",
             isLandscape && "pt-12",
             isMobile && !isLandscape && "pb-[60px]" // Account for bottom nav height
           )}
