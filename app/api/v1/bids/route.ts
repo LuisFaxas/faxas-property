@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, requireRole } from '@/lib/api/auth-check';
-import { successResponse, errorResponse } from '@/lib/api/response-utils';
+import { successResponse, errorResponse } from '@/lib/api/response';
 import { z } from 'zod';
 import { Prisma, BidStatus } from '@prisma/client';
 import { createNotificationService } from '@/lib/services/notification.service';

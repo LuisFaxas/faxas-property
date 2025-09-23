@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PageShell } from '@/components/blocks/PageShell';
+import { PageShell } from '@/components/blocks/page-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { LoadingState } from '@/components/ui/loading-state';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
+import apiClient from '@/lib/api-client';
 import {
   Table,
   TableBody,
@@ -32,19 +32,24 @@ import {
 } from '@/components/ui/table';
 
 interface PageProps {
-  params: { rfpId: string };
+  params: Promise<{ rfpId: string }>;
 }
 
-export default function BidComparisonPage({ params }: PageProps) {
+export default async function BidComparisonPage({ params }: PageProps) {
+  const { rfpId } = await params;
+  return <BidComparisonContent rfpId={rfpId} />;
+}
+
+function BidComparisonContent({ rfpId }: { rfpId: string }) {
   const router = useRouter();
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [showDiscrepancies, setShowDiscrepancies] = useState(false);
 
   // Fetch bid tabulation data
   const { data: tabulation, isLoading } = useQuery({
-    queryKey: ['bid-tabulation', params.rfpId],
+    queryKey: ['bid-tabulation', rfpId],
     queryFn: async () => {
-      const response = await apiClient.get(`/api/v1/rfps/${params.rfpId}/tabulation`);
+      const response = await apiClient.get(`/api/v1/rfps/${rfpId}/tabulation`);
       return response.data.data;
     }
   });
@@ -53,14 +58,14 @@ export default function BidComparisonPage({ params }: PageProps) {
   const handleExport = async () => {
     try {
       const response = await apiClient.get(
-        `/api/v1/rfps/${params.rfpId}/tabulation/export`,
+        `/api/v1/rfps/${rfpId}/tabulation/export`,
         { responseType: 'blob' }
       );
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `bid-comparison-${params.rfpId}.csv`);
+      link.setAttribute('download', `bid-comparison-${rfpId}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -75,26 +80,28 @@ export default function BidComparisonPage({ params }: PageProps) {
   const { rfp, vendors, items, totals, adjustedTotals, rankings, scopeGaps, lowestBidder } = tabulation;
 
   return (
-    <PageShell
-      title={
+    <PageShell pageTitle={`Bid Comparison: ${rfp?.title || ''}`}>
+      {/* Header with navigation */}
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push(`/admin/bidding/${params.rfpId}`)}
+            onClick={() => router.push(`/admin/bidding/${rfpId}`)}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <span>Bid Comparison: {rfp.title}</span>
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Bid Comparison</h1>
+            <p className="text-sm text-white/60">Comparing {vendors?.length || 0} bids · {items?.length || 0} items</p>
+          </div>
         </div>
-      }
-      description={`Comparing ${vendors.length} bids · ${items.length} items`}
-      action={{
-        label: 'Export CSV',
-        onClick: handleExport,
-        icon: Download
-      }}
-    >
+        <Button onClick={handleExport} variant="outline">
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Lowest Bidder Card */}
@@ -123,13 +130,13 @@ export default function BidComparisonPage({ params }: PageProps) {
               <div className="flex-1">
                 <p className="text-sm text-white/60">Bid Range</p>
                 <p className="font-semibold text-white">
-                  ${Math.min(...Object.values(adjustedTotals)).toLocaleString()}
+                  ${Math.min(...Object.values(adjustedTotals || {}).map(v => Number(v) || 0)).toLocaleString()}
                   {' - '}
-                  ${Math.max(...Object.values(adjustedTotals)).toLocaleString()}
+                  ${Math.max(...Object.values(adjustedTotals || {}).map(v => Number(v) || 0)).toLocaleString()}
                 </p>
                 <p className="text-sm text-white/60">
-                  Spread: ${(Math.max(...Object.values(adjustedTotals)) -
-                           Math.min(...Object.values(adjustedTotals))).toLocaleString()}
+                  Spread: ${(Math.max(...Object.values(adjustedTotals || {}).map(v => Number(v) || 0)) -
+                           Math.min(...Object.values(adjustedTotals || {}).map(v => Number(v) || 0))).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -204,7 +211,7 @@ export default function BidComparisonPage({ params }: PageProps) {
           {lowestBidder && (
             <Button
               className="w-full mt-4"
-              onClick={() => router.push(`/admin/bidding/${params.rfpId}/award?vendorId=${lowestBidder.vendorId}`)}
+              onClick={() => router.push(`/admin/bidding/${rfpId}/award?vendorId=${lowestBidder.vendorId}`)}
             >
               <Award className="h-4 w-4 mr-2" />
               Proceed to Award

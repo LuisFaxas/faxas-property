@@ -102,6 +102,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import apiClient from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import { InviteToRfpDialog } from '@/components/contacts/invite-to-rfp-dialog';
 
 // Form schema
 const contactFormSchema = z.object({
@@ -169,6 +170,8 @@ export default function AdminContactsPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [isInviteToRfpOpen, setIsInviteToRfpOpen] = useState(false);
   
   // Get default project ID
   const [projectId, setProjectId] = useState<string>('');
@@ -840,6 +843,7 @@ export default function AdminContactsPage() {
 
         {/* Desktop Header */}
         {!isMobile && (
+          <>
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white">Contacts Management</h1>
@@ -855,13 +859,44 @@ export default function AdminContactsPage() {
                 <Download className="h-4 w-4 mr-0 sm:mr-2" />
                 <span className="hidden sm:inline">Export CSV</span>
               </Button>
-              <Button 
+              <Button
                 className="bg-accent-500 hover:bg-accent-600"
                 size="sm"
                 onClick={() => setIsCreateOpen(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Contact
+              </Button>
+            </div>
+          </div>
+          </>
+        )}
+
+        {/* Selection Actions Bar */}
+        {!isMobile && selectedContactIds.length > 0 && (
+          <div className="bg-blue-600/10 border border-blue-600/30 rounded-lg p-3 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
+              <span className="text-sm text-blue-400">
+                {selectedContactIds.length} contact{selectedContactIds.length !== 1 ? 's' : ''} selected
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedContactIds([])}
+                className="text-white/60 hover:text-white"
+              >
+                Clear Selection
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setIsInviteToRfpOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Invite to RFP
               </Button>
             </div>
           </div>
@@ -1471,6 +1506,17 @@ export default function AdminContactsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Invite to RFP Dialog */}
+        <InviteToRfpDialog
+          open={isInviteToRfpOpen}
+          onOpenChange={setIsInviteToRfpOpen}
+          contactIds={selectedContactIds}
+          onSuccess={() => {
+            setSelectedContactIds([]);
+            refetch();
+          }}
+        />
 
         {/* Assign Task Dialog */}
         {selectedContact && (

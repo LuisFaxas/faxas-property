@@ -2,30 +2,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, requireRole } from '@/lib/api/auth-check';
-import { successResponse, errorResponse } from '@/lib/api/response-utils';
+import { successResponse, errorResponse } from '@/lib/api/response';
+import { updateBidSchema } from '@/lib/validations/bids';
 import { z } from 'zod';
-import { Decimal } from 'decimal.js';
-
-const updateBidSchema = z.object({
-  notes: z.string().optional(),
-  attachments: z.array(z.object({
-    name: z.string(),
-    url: z.string().url(),
-    type: z.string()
-  })).optional()
-});
+import { Decimal } from '@prisma/client/runtime/library';
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     bidId: string;
-  };
+  }>;
 }
 
 // GET /api/v1/bids/[bidId]
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const authUser = await requireAuth();
-    const { bidId } = params;
+    const { bidId } = await params;
 
     const bid = await prisma.bid.findUnique({
       where: { id: bidId },
@@ -101,7 +93,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const authUser = await requireAuth();
-    const { bidId } = params;
+    const { bidId } = await params;
     const body = await request.json();
 
     // Validate input
@@ -181,11 +173,83 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
+// PATCH /api/v1/bids/[bidId] - Update bid amount and notes
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  try {
+    // Auth check - per docs/04-auth-security.md
+    const authUser = await requireRole(['ADMIN', 'STAFF']);
+    const { bidId } = await params;
+
+    // Get project ID from header - per docs/02-api-inventory.md
+    const projectId = request.headers.get('x-project-id');
+    if (!projectId) {
+      return errorResponse({ message: 'Project ID required' }, 400);
+    }
+
+    const body = await request.json();
+    const validatedData = updateBidSchema.parse(body);
+
+    // Get existing bid
+    const bid = await prisma.bid.findUnique({
+      where: { id: bidId },
+      include: {
+        rfp: true,
+        vendor: true
+      }
+    });
+
+    if (!bid) {
+      return errorResponse({ message: 'Bid not found' }, 404);
+    }
+
+    // Verify bid belongs to project
+    if (bid.rfp.projectId !== projectId) {
+      return errorResponse({ message: 'Bid not found in project' }, 404);
+    }
+
+    // Update bid
+    const updatedBid = await prisma.bid.update({
+      where: { id: bidId },
+      data: {
+        totalAmount: validatedData.totalAmount !== undefined
+          ? new Decimal(validatedData.totalAmount)
+          : undefined,
+        notes: validatedData.notes,
+        status: validatedData.status,
+        updatedAt: new Date()
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        rfp: {
+          select: {
+            id: true,
+            title: true
+          }
+        },
+        attachments: true
+      }
+    });
+
+    return successResponse(updatedBid, 'Bid updated successfully');
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return errorResponse({ message: 'Validation error', details: error.issues }, 400);
+    }
+    return errorResponse(error);
+  }
+}
+
 // DELETE /api/v1/bids/[bidId]
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const authUser = await requireAuth();
-    const { bidId } = params;
+    const { bidId } = await params;
 
     // Get existing bid
     const bid = await prisma.bid.findUnique({

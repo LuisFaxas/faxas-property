@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api/auth-check';
-import { successResponse, errorResponse } from '@/lib/api/response-utils';
+import { successResponse, errorResponse } from '@/lib/api/response';
 import { z } from 'zod';
 import { createNotificationService } from '@/lib/services/notification.service';
 
@@ -18,16 +18,16 @@ const addUserSchema = z.object({
 });
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     vendorId: string;
-  };
+  }>;
 }
 
 // GET /api/v1/vendors/[vendorId]/users
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
-    const { vendorId } = params;
+    const { vendorId } = await params;
 
     const vendorUsers = await prisma.vendorUser.findMany({
       where: { vendorId },

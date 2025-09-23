@@ -287,11 +287,16 @@ export class ResendNotificationService implements NotificationService {
     // Initialize Resend if API key is available
     if (process.env.RESEND_API_KEY) {
       // Dynamic import to avoid build errors if not installed
-      import('resend').then(({ Resend }) => {
-        this.resend = new Resend(process.env.RESEND_API_KEY);
-      }).catch(() => {
-        console.log('Resend package not installed, using console logging for emails');
-      });
+      try {
+        // @ts-ignore - Optional dependency
+        import('resend').then(({ Resend }) => {
+          this.resend = new Resend(process.env.RESEND_API_KEY);
+        }).catch(() => {
+          console.log('Resend package not installed, using console logging for emails');
+        });
+      } catch (error) {
+        console.log('Resend package not available, using console logging for emails');
+      }
     }
   }
 

@@ -90,6 +90,8 @@ model Contact {
   user           User?         @relation(fields: [userId], references: [id])
   procurements   Procurement[]
   assignedTasks  Task[]        @relation("ContactTasks")
+  vendors        Vendor[]      @relation("ContactVendor")
+  bidInvitations BidInvitation[]
 
   @@index([projectId, portalStatus])
   @@index([inviteToken])
@@ -406,20 +408,22 @@ model RfpItem {
 }
 
 model Vendor {
-  id          String          @id @default(cuid())
-  projectId   String
-  name        String
-  email       String
-  phone       String?
-  status      VendorStatus    @default(ACTIVE)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id               String          @id @default(cuid())
+  projectId        String
+  name             String
+  email            String
+  phone            String?
+  primaryContactId String?         // Link to Contact who this vendor represents
+  status           VendorStatus    @default(ACTIVE)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  project     Project         @relation(fields: [projectId], references: [id])
-  invitations BidInvitation[]
-  bids        Bid[]
-  users       VendorUser[]
-  commitments Commitment[]
+  project          Project         @relation(fields: [projectId], references: [id])
+  primaryContact   Contact?        @relation("ContactVendor", fields: [primaryContactId], references: [id])
+  invitations      BidInvitation[]
+  bids             Bid[]
+  users            VendorUser[]
+  commitments      Commitment[]
 
   @@unique([projectId, email])
   @@index([projectId, status])
@@ -429,6 +433,7 @@ model BidInvitation {
   id          String           @id @default(cuid())
   rfpId       String
   vendorId    String
+  contactId   String?          // Track which contact was invited
   token       String           @unique @default(cuid())
   expiresAt   DateTime
   status      InvitationStatus @default(SENT)
@@ -441,6 +446,7 @@ model BidInvitation {
 
   rfp         Rfp              @relation(fields: [rfpId], references: [id], onDelete: Cascade)
   vendor      Vendor           @relation(fields: [vendorId], references: [id])
+  contact     Contact?         @relation(fields: [contactId], references: [id])
 
   @@unique([rfpId, vendorId])
   @@index([token])
@@ -452,6 +458,7 @@ model Bid {
   rfpId       String
   vendorId    String
   submittedAt DateTime?
+  totalAmount Decimal?        @db.Decimal(18, 2)
   status      BidStatus       @default(DRAFT)
   notes       String?
   createdAt   DateTime        @default(now())
@@ -461,6 +468,7 @@ model Bid {
   vendor      Vendor          @relation(fields: [vendorId], references: [id])
   items       BidItem[]
   adjustments BidAdjustment[]
+  attachments BidAttachment[]
   award       Award?
   commitment  Commitment?
 
@@ -483,6 +491,20 @@ model BidItem {
   rfpItem     RfpItem        @relation(fields: [rfpItemId], references: [id])
 
   @@unique([bidId, rfpItemId])
+  @@index([bidId])
+}
+
+model BidAttachment {
+  id          String    @id @default(cuid())
+  bidId       String
+  fileName    String
+  storagePath String    // Firebase Storage path
+  contentType String
+  size        Int       // File size in bytes
+  createdAt   DateTime  @default(now())
+
+  bid         Bid       @relation(fields: [bidId], references: [id], onDelete: Cascade)
+
   @@index([bidId])
 }
 

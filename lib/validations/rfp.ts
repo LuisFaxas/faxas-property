@@ -164,6 +164,17 @@ export function validateMagicNumber(buffer: Buffer, mimeType: string): boolean {
   return true;
 }
 
+// RFP Invite schema
+export const inviteToRfpSchema = z.object({
+  contactIds: z.array(z.string().cuid())
+    .min(1, 'At least one contact is required')
+    .max(50, 'Maximum 50 contacts per invitation'),
+  message: z.string()
+    .max(1000, 'Message must be less than 1000 characters')
+    .optional(),
+  dueAt: z.string().datetime().optional() // Override RFP due date for specific invites
+});
+
 // Helper to sanitize filename
 export function sanitizeFilename(filename: string): string {
   // Remove path traversal attempts
@@ -191,3 +202,4 @@ export type BulkUpsertItemsInput = z.infer<typeof bulkUpsertItemsSchema>;
 export type AttachmentUploadInput = z.infer<typeof attachmentUploadSchema>;
 export type RfpQueryInput = z.infer<typeof rfpQuerySchema>;
 export type CreateVendorInput = z.infer<typeof createVendorSchema>;
+export type InviteToRfpInput = z.infer<typeof inviteToRfpSchema>;

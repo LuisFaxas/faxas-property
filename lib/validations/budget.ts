@@ -35,3 +35,16 @@ export const budgetQuerySchema = z.object({
 export type CreateBudgetItemInput = z.infer<typeof createBudgetItemSchema>;
 export type UpdateBudgetItemInput = z.infer<typeof updateBudgetItemSchema>;
 export type BudgetQuery = z.infer<typeof budgetQuerySchema>;
+
+// Commitment creation schema (for bid award)
+export const createCommitmentFromBidSchema = z.object({
+  bidId: z.string().cuid(),
+  budgetItemId: z.string().cuid().optional(),
+  notes: z.string()
+    .max(1000, 'Notes must be less than 1000 characters')
+    .optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional()
+});
+
+export type CreateCommitmentFromBidInput = z.infer<typeof createCommitmentFromBidSchema>;

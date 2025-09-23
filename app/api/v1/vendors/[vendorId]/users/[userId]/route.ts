@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api/auth-check';
-import { successResponse, errorResponse } from '@/lib/api/response-utils';
+import { successResponse, errorResponse } from '@/lib/api/response';
 import { z } from 'zod';
 
 const updateUserSchema = z.object({
@@ -17,17 +17,17 @@ const updateUserSchema = z.object({
 });
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     vendorId: string;
     userId: string;
-  };
+  }>;
 }
 
 // PUT /api/v1/vendors/[vendorId]/users/[userId]
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF']);
-    const { vendorId, userId } = params;
+    const { vendorId, userId } = await params;
     const body = await request.json();
 
     // Validate input

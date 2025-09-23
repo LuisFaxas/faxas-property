@@ -453,7 +453,8 @@ export function PageShell({
       {/* Main Content */}
       <main className={cn(
         "flex-1 overflow-auto",
-        isLandscape && "ml-14"
+        isLandscape && "ml-14",
+        isMobile && "pt-16" // Account for fixed mobile header
       )}>
         {/* Desktop Header with Project Switcher */}
         <div 
@@ -475,7 +476,7 @@ export function PageShell({
         <main
           id="page-content"
           className={cn(
-            "pt-16 md:pt-4 lg:pt-6 space-y-6 md:space-y-8",
+            "md:pt-4 lg:pt-6 space-y-6 md:space-y-8", // Removed pt-16 as it's handled at container level
             isLandscape && "pt-12",
             isMobile && !isLandscape && "pb-[60px]" // Account for bottom nav height
           )}

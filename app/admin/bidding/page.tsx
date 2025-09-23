@@ -59,15 +59,19 @@ export default function BiddingPage() {
   if (error) return <div>Error loading RFPs</div>;
 
   return (
-    <PageShell
-      title="Bidding & RFPs"
-      description="Manage requests for proposals and vendor bids"
-      action={{
-        label: 'New RFP',
-        onClick: () => router.push('/admin/bidding/new'),
-        icon: Plus
-      }}
-    >
+    <PageShell pageTitle="Bidding & RFPs">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Bidding & RFPs</h1>
+          <p className="text-sm text-white/60">Manage requests for proposals and vendor bids</p>
+        </div>
+        <Button onClick={() => router.push('/admin/bidding/new')}>
+          <Plus className="h-4 w-4 mr-2" />
+          New RFP
+        </Button>
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card className="bg-white/5 border-white/10">

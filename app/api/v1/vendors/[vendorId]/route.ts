@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/api/auth-check';
-import { successResponse, errorResponse } from '@/lib/api/response-utils';
+import { successResponse, errorResponse } from '@/lib/api/response';
 import { z } from 'zod';
 
 // Validation schema for updates
@@ -39,16 +39,16 @@ const updateVendorSchema = z.object({
 });
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     vendorId: string;
-  };
+  }>;
 }
 
 // GET /api/v1/vendors/[vendorId]
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const authUser = await requireRole(['ADMIN', 'STAFF', 'VIEWER', 'CONTRACTOR']);
-    const { vendorId } = params;
+    const { vendorId } = await params;
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },

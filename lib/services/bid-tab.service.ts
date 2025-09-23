@@ -1,5 +1,5 @@
 // lib/services/bid-tab.service.ts
-import { Decimal } from 'decimal.js';
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '@/lib/prisma';
 import type { Bid, BidItem, BidAdjustment, RfpItem, UnitOfMeasure } from '@prisma/client';
 

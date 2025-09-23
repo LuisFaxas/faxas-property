@@ -2,9 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/api/auth-check';
-import { successResponse, errorResponse } from '@/lib/api/response-utils';
+import { successResponse, errorResponse } from '@/lib/api/response';
 import { z } from 'zod';
-import { Decimal } from 'decimal.js';
+import { Decimal } from '@prisma/client/runtime/library';
 import { createNotificationService } from '@/lib/services/notification.service';
 import crypto from 'crypto';
 
@@ -40,16 +40,16 @@ const submitBidSchema = z.object({
 });
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     bidId: string;
-  };
+  }>;
 }
 
 // POST /api/v1/bids/[bidId]/submit
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const authUser = await requireAuth();
-    const { bidId } = params;
+    const { bidId } = await params;
     const body = await request.json();
 
     // Validate input

@@ -678,23 +678,15 @@ export default function AdminTasksPage() {
         isMobile && "p-3 space-y-4"
       )}>
 
-        {/* Desktop Header */}
-        {!isMobile && (
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">Tasks Management</h1>
-              <p className="text-white/60 mt-1 text-sm sm:text-base">Manage and assign project tasks</p>
-            </div>
-            <div className="flex gap-2">
-              {selectedRows.length > 0 && (
-                <Button 
-                  variant="destructive" 
-                  onClick={handleBulkDelete}
-                >
-                  Delete ({selectedRows.length})
-                </Button>
-              )}
-            </div>
+        {/* Desktop Bulk Actions */}
+        {!isMobile && selectedRows.length > 0 && (
+          <div className="flex justify-end">
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+            >
+              Delete ({selectedRows.length})
+            </Button>
           </div>
         )}
         

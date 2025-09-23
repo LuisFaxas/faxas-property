@@ -286,7 +286,7 @@ export function useBudget(query?: any, enabled: boolean = true) {
 
 export function useBudgetSummary(projectId?: string, enabled: boolean = true) {
   return useQuery({
-    queryKey: ['budget', 'summary', projectId],
+    queryKey: ['budget-summary', { projectId }],
     queryFn: () => apiClient.get('/budget/summary', { params: { projectId } }),
     enabled
   });
@@ -400,8 +400,9 @@ export function useRfps(projectId: string, query?: any, enabled: boolean = true)
 
 // RFP hook without projectId requirement - gets all RFPs across projects
 export function useAllRfps(query?: any, enabled: boolean = true) {
+  const projectId = typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null;
   return useQuery({
-    queryKey: ['all-rfps', query],
+    queryKey: ['rfps', { projectId }],
     queryFn: async () => {
       // First get all projects, then get RFPs for each
       const projectsResponse = await apiClient.get('/projects');
@@ -827,6 +828,95 @@ export function useWithdrawBid(bidId: string) {
       toast({
         title: 'Error',
         description: error.error || 'Failed to withdraw bid',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+// Invite to RFP hook
+export function useInviteToRfp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ rfpId, contactIds, message }: { rfpId: string; contactIds: string[]; message?: string }) => {
+      const projectId = typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null;
+      return apiClient.post(`/api/v1/rfps/${rfpId}/invite`,
+        { contactIds, message },
+        { headers: projectId ? { 'x-project-id': projectId } : {} }
+      );
+    },
+    onSuccess: (data) => {
+      const projectId = typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null;
+      queryClient.invalidateQueries({ queryKey: ['rfps', { projectId }] });
+      toast({
+        title: 'Success',
+        description: data.data?.message || 'Invitations sent successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to send invitations',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+// Update bid hook
+export function useUpdateBid() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ bidId, rfpId, data }: { bidId: string; rfpId: string; data: any }) => {
+      const projectId = typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null;
+      return apiClient.patch(`/api/v1/bids/${bidId}`, data,
+        { headers: projectId ? { 'x-project-id': projectId } : {} }
+      );
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['bids', { rfpId: variables.rfpId }] });
+      toast({
+        title: 'Success',
+        description: 'Bid updated successfully'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to update bid',
+        variant: 'destructive'
+      });
+    }
+  });
+}
+
+// Award bid hook
+export function useAwardBid() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ bidId, rfpId, data }: { bidId: string; rfpId: string; data?: any }) => {
+      const projectId = typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null;
+      return apiClient.post(`/api/v1/bids/${bidId}/award`, data || {},
+        { headers: projectId ? { 'x-project-id': projectId } : {} }
+      );
+    },
+    onSuccess: (_, variables) => {
+      const projectId = typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null;
+      queryClient.invalidateQueries({ queryKey: ['bids', { rfpId: variables.rfpId }] });
+      queryClient.invalidateQueries({ queryKey: ['budget', { projectId }] });
+      queryClient.invalidateQueries({ queryKey: ['budget-summary', { projectId }] });
+      toast({
+        title: 'Success',
+        description: 'Bid awarded successfully and budget updated'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to award bid',
         variant: 'destructive'
       });
     }

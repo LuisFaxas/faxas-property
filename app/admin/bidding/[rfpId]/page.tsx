@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PageShell } from '@/components/blocks/PageShell';
+import { PageShell } from '@/components/blocks/page-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,33 +25,39 @@ import {
 import { format } from 'date-fns';
 import { LoadingState } from '@/components/ui/loading-state';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
+import apiClient from '@/lib/api-client';
 
 interface PageProps {
-  params: { rfpId: string };
+  params: Promise<{ rfpId: string }>;
 }
 
-export default function RfpDetailPage({ params }: PageProps) {
+export default async function RfpDetailPage({ params }: PageProps) {
+  const { rfpId } = await params;
+
+  return <RfpDetailContent rfpId={rfpId} />;
+}
+
+function RfpDetailContent({ rfpId }: { rfpId: string }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
 
   // Fetch RFP details
   const { data: rfp, isLoading } = useQuery({
-    queryKey: ['rfp', params.rfpId],
+    queryKey: ['rfp', rfpId],
     queryFn: async () => {
-      const response = await apiClient.get(`/api/v1/rfps/${params.rfpId}`);
+      const response = await apiClient.get(`/api/v1/rfps/${rfpId}`);
       return response.data.data;
     }
   });
 
   // Fetch bids for this RFP
   const { data: bids } = useQuery({
-    queryKey: ['bids', params.rfpId],
+    queryKey: ['bids', rfpId],
     queryFn: async () => {
-      const response = await apiClient.get(`/api/v1/bids?rfpId=${params.rfpId}`);
+      const response = await apiClient.get(`/api/v1/bids?rfpId=${rfpId}`);
       return response.data.data.bids;
     },
-    enabled: !!params.rfpId
+    enabled: !!rfpId
   });
 
   const getStatusColor = (status: string) => {
@@ -74,8 +80,9 @@ export default function RfpDetailPage({ params }: PageProps) {
   const canAward = canCompare && rfp.status !== 'AWARDED';
 
   return (
-    <PageShell
-      title={
+    <PageShell pageTitle={rfp.title}>
+      {/* Header with navigation */}
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -84,21 +91,24 @@ export default function RfpDetailPage({ params }: PageProps) {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <span>{rfp.title}</span>
-          <Badge className={`${getStatusColor(rfp.status)} text-white`}>
-            {rfp.status}
-          </Badge>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold text-white">{rfp.title}</h1>
+              <Badge className={`${getStatusColor(rfp.status)} text-white`}>
+                {rfp.status}
+              </Badge>
+            </div>
+            <p className="text-sm text-white/60">{rfp.description || 'No description provided'}</p>
+          </div>
         </div>
-      }
-      description={rfp.description || 'No description provided'}
-      action={
-        rfp.status === 'DRAFT' ? {
-          label: 'Edit RFP',
-          onClick: () => router.push(`/admin/bidding/${params.rfpId}/edit`),
-          icon: Edit
-        } : undefined
-      }
-    >
+        {rfp.status === 'DRAFT' && (
+          <Button onClick={() => router.push(`/admin/bidding/${rfpId}/edit`)} variant="outline">
+            <Edit className="h-4 w-4 mr-2" />
+            Edit RFP
+          </Button>
+        )}
+      </div>
+
       {/* Quick Actions Bar */}
       <div className="flex flex-wrap gap-2 mb-6">
         {canPublish && (
@@ -114,7 +124,7 @@ export default function RfpDetailPage({ params }: PageProps) {
         {rfp.status === 'PUBLISHED' && (
           <Button
             variant="outline"
-            onClick={() => router.push(`/admin/bidding/${params.rfpId}/invite`)}
+            onClick={() => router.push(`/admin/bidding/${rfpId}/invite`)}
           >
             <Users className="h-4 w-4 mr-2" />
             Invite Vendors
@@ -124,7 +134,7 @@ export default function RfpDetailPage({ params }: PageProps) {
         {canCompare && (
           <Button
             variant="outline"
-            onClick={() => router.push(`/admin/bidding/${params.rfpId}/compare`)}
+            onClick={() => router.push(`/admin/bidding/${rfpId}/compare`)}
           >
             <TrendingUp className="h-4 w-4 mr-2" />
             Compare Bids
@@ -134,7 +144,7 @@ export default function RfpDetailPage({ params }: PageProps) {
         {canAward && (
           <Button
             variant="outline"
-            onClick={() => router.push(`/admin/bidding/${params.rfpId}/award`)}
+            onClick={() => router.push(`/admin/bidding/${rfpId}/award`)}
           >
             <Award className="h-4 w-4 mr-2" />
             Award Contract
@@ -297,7 +307,7 @@ export default function RfpDetailPage({ params }: PageProps) {
                 <p className="text-white/60">No items added yet</p>
                 {rfp.status === 'DRAFT' && (
                   <Button
-                    onClick={() => router.push(`/admin/bidding/${params.rfpId}/edit`)}
+                    onClick={() => router.push(`/admin/bidding/${rfpId}/edit`)}
                     className="mt-4"
                     variant="outline"
                   >
@@ -351,7 +361,7 @@ export default function RfpDetailPage({ params }: PageProps) {
                 <p className="text-white/60">No vendors invited yet</p>
                 {rfp.status === 'PUBLISHED' && (
                   <Button
-                    onClick={() => router.push(`/admin/bidding/${params.rfpId}/invite`)}
+                    onClick={() => router.push(`/admin/bidding/${rfpId}/invite`)}
                     className="mt-4"
                     variant="outline"
                   >

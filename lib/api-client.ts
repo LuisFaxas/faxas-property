@@ -31,7 +31,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// Add auth token to requests
+// Add auth token and project ID to requests
 apiClient.interceptors.request.use(async (config) => {
   try {
     const user = auth.currentUser;
@@ -44,6 +44,12 @@ apiClient.interceptors.request.use(async (config) => {
     } else if (currentToken) {
       // Fallback to stored token if no current user
       config.headers.Authorization = `Bearer ${currentToken}`;
+    }
+
+    // Add project ID if available (from localStorage or context)
+    const projectId = typeof window !== 'undefined' ? localStorage.getItem('currentProjectId') : null;
+    if (projectId) {
+      config.headers['x-project-id'] = projectId;
     }
   } catch (error) {
     console.error('Error getting auth token:', error);
