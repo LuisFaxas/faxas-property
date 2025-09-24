@@ -44,7 +44,9 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
-import type { Risk } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
+type Risk = Prisma.RiskGetPayload<{}>;
 
 // Extended Risk type with additional fields from API
 type ExtendedRisk = Risk & {

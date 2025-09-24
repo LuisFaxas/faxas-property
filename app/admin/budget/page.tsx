@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import type { BudgetItem } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { useMediaQuery } from '@/hooks/use-media-query';
+
+type BudgetItem = Prisma.BudgetItemGetPayload<{}>;
 
 // Extended BudgetItem type with calculated fields
 type BudgetItemWithVariance = BudgetItem & {

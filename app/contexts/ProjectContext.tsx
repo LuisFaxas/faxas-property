@@ -65,17 +65,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       // Try to get from localStorage first
       const savedProjectId = localStorage.getItem('selectedProjectId');
       const savedProject = projects.find((p: Project) => p.id === savedProjectId);
-      
+
       if (savedProject && !savedProject.isArchived) {
         setCurrentProjectId(savedProjectId);
       } else {
-        // Set first non-archived project as default, preferring favorites
-        const favoriteProject = projects.find((p: Project) => p.isFavorite && !p.isArchived);
+        // Always select first active project for consistent behavior
         const activeProject = projects.find((p: Project) => !p.isArchived);
-        const defaultProject = favoriteProject || activeProject || projects[0];
-        
+        const defaultProject = activeProject || projects[0];
+
         if (defaultProject) {
           setCurrentProjectId(defaultProject.id);
+          localStorage.setItem('selectedProjectId', defaultProject.id);
         }
       }
     }

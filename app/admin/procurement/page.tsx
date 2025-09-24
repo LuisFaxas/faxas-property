@@ -69,7 +69,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ColumnDef } from '@tanstack/react-table';
-import type { Procurement as ProcurementItem, Contact, Project, BudgetItem } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
+type ProcurementItem = Prisma.ProcurementGetPayload<{}>;
+type Contact = Prisma.ContactGetPayload<{}>;
+type Project = Prisma.ProjectGetPayload<{}>;
+type BudgetItem = Prisma.BudgetItemGetPayload<{}>;
 import { 
   Plus, 
   MoreHorizontal, 

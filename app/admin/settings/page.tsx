@@ -6,7 +6,7 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { usePreferencesContext } from '@/app/contexts/PreferencesContext';
 import { RearrangeableNavigation } from '@/components/blocks/rearrangeable-navigation';
-import { navItemMapping, getAvailableNavItems, type NavItemId } from '@/components/blocks/page-shell';
+import { navItemMapping, getAvailableNavItems, resolveNavHref, type NavItemId } from '@/components/blocks/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -76,7 +76,7 @@ import {
 
 // Enhanced Navigation Customizer Component
 const NavigationCustomizer = () => {
-  const { preferences, updateNavigation, resetNavigation } = usePreferencesContext();
+  const { preferences, updateNavigation, resetNavigation, loading } = usePreferencesContext();
   const { userRole } = useAuth();
   const [isCustomizing, setIsCustomizing] = useState(false);
   const isContractor = userRole === 'CONTRACTOR';
@@ -89,13 +89,8 @@ const NavigationCustomizer = () => {
   const availableNavIds = getAvailableNavItems(userRole || 'VIEWER');
   const availableItems = availableNavIds.map(id => {
     const item = navItemMapping[id];
-    // Determine correct href based on role
-    let href = item.href || '';
-    if (isContractor && item.contractorHref) {
-      href = item.contractorHref;
-    } else if (!isContractor && item.adminHref) {
-      href = item.adminHref;
-    }
+    // Use the helper function to resolve href
+    const href = resolveNavHref(id, isContractor);
     return {
       id,
       label: item.label,
@@ -807,10 +802,10 @@ export default function SettingsPage() {
 
           {/* Bottom Sheet for Settings Sections */}
           <BottomSheet
-            isOpen={bottomSheetOpen}
-            onClose={() => {
-              setBottomSheetOpen(false);
-              setBottomSheetContent(null);
+            open={bottomSheetOpen}
+            onOpenChange={(open) => {
+              setBottomSheetOpen(open);
+              if (!open) setBottomSheetContent(null);
             }}
             title={settingsSections.find(s => s.id === bottomSheetContent)?.label || 'Settings'}
           >

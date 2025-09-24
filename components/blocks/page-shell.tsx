@@ -91,6 +91,17 @@ export function getAvailableNavItems(role: string): NavItemId[] {
   }
 }
 
+// Helper function to resolve navigation href based on role and item
+export function resolveNavHref(id: string, isContractor: boolean): string {
+  const item = navItemMapping[id as keyof typeof navItemMapping];
+  if (!item) return '/';
+
+  if ('href' in item) return item.href;
+  if (isContractor && 'contractorHref' in item) return item.contractorHref;
+  if (!isContractor && 'adminHref' in item) return item.adminHref;
+  return '/';
+}
+
 // Legacy nav arrays for desktop sidebar
 const adminNavItems = [
   { href: '/admin', label: 'Dashboard', icon: Home },

@@ -47,7 +47,9 @@
       "Bash(tasklist)",
       "Bash(findstr:*)",
       "Bash(netstat:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(npm ci:*)",
+      "Bash(npx typescript:*)"
     ],
     "deny": [],
     "ask": []

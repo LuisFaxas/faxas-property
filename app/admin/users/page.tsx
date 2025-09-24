@@ -44,7 +44,9 @@ import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useProjects } fr
 import { format } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 
-import type { User } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
+type User = Prisma.UserGetPayload<{}>;
 
 // Mock data for users and access
 const mockUsers = [

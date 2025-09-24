@@ -58,7 +58,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
-import type { Contact } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
+type Contact = Prisma.ContactGetPayload<{}>;
 
 // Extended Contact type with additional fields from API
 // Also maps null values to undefined for component compatibility
