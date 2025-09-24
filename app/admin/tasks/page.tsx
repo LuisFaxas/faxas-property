@@ -677,7 +677,6 @@ export default function AdminTasksPage() {
         "p-6 space-y-6",
         isMobile && "p-3 space-y-4"
       )}>
-
         {/* Desktop Bulk Actions */}
         {!isMobile && selectedRows.length > 0 && (
           <div className="flex justify-end">

@@ -864,22 +864,18 @@ export default function AdminSchedulePage() {
         "p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 h-full flex flex-col",
         isMobile && "p-2 space-y-2" // Tighter spacing on mobile
       )}>
-        {/* Header - Hidden on mobile since title is in navbar */}
+        {/* Desktop Action Button */}
         {!isMobile && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-2 sm:mb-4">
-            <div>
-              <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-white">Schedule Management</h1>
-              <p className="text-white/60 text-xs sm:text-sm lg:text-base">Manage project calendar and events</p>
-            </div>
-            <Button 
-              size="sm" 
+          <div className="flex justify-end mb-2 sm:mb-4">
+            <Button
+              size="sm"
               className="sm:size-default w-full sm:w-auto"
               onClick={() => setIsCreateOpen(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Event
             </Button>
-        </div>
+          </div>
         )}
 
         {/* Universal Create Event Dialog - Works for both mobile and desktop */}

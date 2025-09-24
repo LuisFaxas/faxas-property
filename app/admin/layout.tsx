@@ -1,6 +1,5 @@
 "use client"
 
-import { PageShell } from '@/components/blocks/page-shell'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
@@ -31,13 +30,5 @@ export default function AdminLayout({
     return null
   }
 
-  return (
-    <PageShell
-      userRole={userRole}
-      userName={user?.displayName || 'User'}
-      userEmail={user?.email || ''}
-    >
-      {children}
-    </PageShell>
-  )
+  return <>{children}</>
 }

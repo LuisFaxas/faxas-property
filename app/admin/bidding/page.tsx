@@ -60,12 +60,8 @@ export default function BiddingPage() {
 
   return (
     <PageShell pageTitle="Bidding & RFPs">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Bidding & RFPs</h1>
-          <p className="text-sm text-white/60">Manage requests for proposals and vendor bids</p>
-        </div>
+      {/* Action Button */}
+      <div className="flex justify-end mb-6">
         <Button onClick={() => router.push('/admin/bidding/new')}>
           <Plus className="h-4 w-4 mr-2" />
           New RFP

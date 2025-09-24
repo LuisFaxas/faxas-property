@@ -317,23 +317,16 @@ export function PageShell({
       </aside>
 
       {/* Simplified Mobile Header */}
-      <div 
-        data-ui="topbar"
-        className={cn(
-        "md:hidden fixed top-0 left-0 right-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-black/30 border-b border-white/10",
-        isLandscape && "py-0"
-      )}>
-        <div className={cn(
-          "flex items-center justify-between p-4",
-          isLandscape && "p-2"
-        )}>
+      <div
+        data-ui="mobile-topbar"
+        className="md:hidden fixed top-0 left-0 right-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-black/30 border-b border-white/10">
+        <div className="flex items-center justify-between p-4">
           {/* Project Switcher on mobile */}
           <ProjectSwitcher />
           
-          <h2 className={cn(
-            "font-bold text-accent-500 flex-1 text-center",
-            isLandscape ? "text-sm" : "text-lg"
-          )}>{pageTitle || 'Control Center'}</h2>
+          <h2 className="font-bold text-accent-500 flex-1 text-center text-lg">
+            {pageTitle || 'Control Center'}
+          </h2>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -451,14 +444,13 @@ export function PageShell({
       </BottomSheet>
 
       {/* Main Content */}
-      <main className={cn(
+      <div className={cn(
         "flex-1 overflow-auto",
-        isLandscape && "ml-14",
-        isMobile && "pt-16" // Account for fixed mobile header
+        isLandscape && "ml-14"
       )}>
         {/* Desktop Header with Project Switcher */}
-        <div 
-          data-ui="topbar"
+        <div
+          data-ui="desktop-topbar"
           className="hidden md:flex sticky top-0 z-40 items-center justify-between p-4 border-b border-white/10 backdrop-blur supports-[backdrop-filter]:bg-black/30">
           <ProjectSwitcher />
           <div className="flex items-center gap-4">
@@ -476,14 +468,16 @@ export function PageShell({
         <main
           id="page-content"
           className={cn(
-            "md:pt-4 lg:pt-6 space-y-6 md:space-y-8", // Removed pt-16 as it's handled at container level
-            isLandscape && "pt-12",
-            isMobile && !isLandscape && "pb-[60px]" // Account for bottom nav height
+            "space-y-6 md:space-y-8",
+            // TOP padding - pure CSS breakpoints (mobile-first)
+            "pt-16 md:pt-[72px] lg:pt-[72px]",
+            // BOTTOM padding for mobile nav
+            "pb-[60px] md:pb-0"
           )}
         >
           {children}
         </main>
-      </main>
+      </div>
     </div>
   )
 }

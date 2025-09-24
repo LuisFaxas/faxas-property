@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { PageShell } from '@/components/blocks/page-shell';
 import { Widget } from '@/components/dashboard/Widget';
 import { QuickActionsSheet } from '@/components/dashboard/QuickActionsSheet';
 import { WelcomeWidget } from '@/components/dashboard/widgets/WelcomeWidget';
@@ -15,7 +16,12 @@ export default function AdminDashboard() {
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
   return (
-    <>
+    <PageShell
+      pageTitle="Dashboard"
+      userRole={(userRole || 'VIEWER') as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER'}
+      userName={user?.displayName || 'User'}
+      userEmail={user?.email || ''}
+    >
       {/* Main content with safe area padding for mobile */}
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           {/* Hero Zone - Welcome and Budget Health */}
@@ -81,10 +87,10 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Actions Sheet */}
-      <QuickActionsSheet 
-        open={quickActionsOpen} 
-        onOpenChange={setQuickActionsOpen} 
+      <QuickActionsSheet
+        open={quickActionsOpen}
+        onOpenChange={setQuickActionsOpen}
       />
-    </>
+    </PageShell>
   );
 }

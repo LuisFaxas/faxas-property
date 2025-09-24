@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
+  // Initialize with SSR-safe value
+  const [matches, setMatches] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia(query).matches;
+    }
+    // Default to false during SSR
+    return false;
+  });
 
   useEffect(() => {
     const media = window.matchMedia(query);
