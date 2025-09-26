@@ -5,9 +5,9 @@ import { getStorage } from 'firebase-admin/storage';
 let adminApp: App;
 
 function getAdminApp(): App | null {
-  // Skip Firebase Admin in build phase
-  if (process.env.NODE_ENV === 'production' && !global.adminApp) {
-    console.warn('Firebase Admin initialization skipped during build');
+  // Skip Firebase Admin only during Next.js build phase
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    console.warn('Firebase Admin initialization skipped during build phase');
     return null as any;
   }
 
