@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { adminAuthLazy } from '@/lib/firebaseAdminLazy';
 import { applyAccessPreset } from '@/lib/access';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
@@ -15,20 +15,6 @@ const inviteContractorSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    // Skip during build
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
-      return NextResponse.json({ error: 'Build phase' }, { status: 503 });
-    }
-
-    // Check if Firebase Admin is available
-    const auth = adminAuth();
-    if (!auth) {
-      return NextResponse.json(
-        { error: 'Firebase Admin not available' },
-        { status: 503 }
-      );
-    }
-
     // Verify admin role
     const user = await getUserFromRequest(req);
     if (!user || user.role !== 'ADMIN') {
@@ -67,6 +53,9 @@ export async function POST(req: NextRequest) {
 
     let firebaseUser;
     
+    // Get Firebase Admin auth instance
+    const auth = await adminAuthLazy();
+
     // Try to get existing user or create new one
     try {
       firebaseUser = await auth.getUserByEmail(email);

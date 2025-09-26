@@ -4,13 +4,7 @@ import { getStorage } from 'firebase-admin/storage';
 
 let adminApp: App;
 
-function getAdminApp(): App | null {
-  // Skip Firebase Admin only during Next.js build phase
-  if (process.env.NEXT_PHASE === 'phase-production-build') {
-    console.warn('Firebase Admin initialization skipped during build phase');
-    return null as any;
-  }
-
+function getAdminApp(): App {
   if (getApps().length === 0) {
     try {
       let serviceAccount: any;
@@ -56,14 +50,12 @@ function getAdminApp(): App | null {
         }
       }
       else {
-        console.warn('Firebase credentials not found. Admin features will be limited.');
-        return null as any;
+        throw new Error('Firebase credentials not found. Set either FIREBASE_SERVICE_ACCOUNT_BASE64 or individual FIREBASE_* environment variables');
       }
 
       // Validate required fields
       if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
-        console.error('Invalid service account: missing required fields');
-        return null as any;
+        throw new Error('Invalid service account: missing required fields');
       }
 
       adminApp = initializeApp({
@@ -75,8 +67,7 @@ function getAdminApp(): App | null {
       console.log('Firebase Admin initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Firebase Admin:', error);
-      // Don't throw during build - just log and return null
-      return null as any;
+      throw new Error(`Failed to initialize Firebase Admin SDK: ${error}`);
     }
   } else {
     adminApp = getApps()[0];
@@ -85,17 +76,8 @@ function getAdminApp(): App | null {
   return adminApp;
 }
 
-export const adminAuth = () => {
-  const app = getAdminApp();
-  if (!app) return null as any;
-  return getAuth(app);
-};
-
-export const adminStorage = () => {
-  const app = getAdminApp();
-  if (!app) return null as any;
-  return getStorage(app);
-};
+export const adminAuth = () => getAuth(getAdminApp());
+export const adminStorage = () => getStorage(getAdminApp());
 
 export const auth = adminAuth();
 
