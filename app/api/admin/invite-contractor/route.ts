@@ -15,6 +15,20 @@ const inviteContractorSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    // Skip during build
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      return NextResponse.json({ error: 'Build phase' }, { status: 503 });
+    }
+
+    // Check if Firebase Admin is available
+    const auth = adminAuth();
+    if (!auth) {
+      return NextResponse.json(
+        { error: 'Firebase Admin not available' },
+        { status: 503 }
+      );
+    }
+
     // Verify admin role
     const user = await getUserFromRequest(req);
     if (!user || user.role !== 'ADMIN') {
@@ -55,11 +69,11 @@ export async function POST(req: NextRequest) {
     
     // Try to get existing user or create new one
     try {
-      firebaseUser = await adminAuth().getUserByEmail(email);
+      firebaseUser = await auth.getUserByEmail(email);
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         // Create new Firebase user
-        firebaseUser = await adminAuth().createUser({
+        firebaseUser = await auth.createUser({
           email,
           displayName: name,
           emailVerified: false
@@ -70,7 +84,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Set custom claims
-    await adminAuth().setCustomUserClaims(firebaseUser.uid, {
+    await auth.setCustomUserClaims(firebaseUser.uid, {
       role: 'CONTRACTOR'
     });
 
@@ -98,7 +112,7 @@ export async function POST(req: NextRequest) {
     await applyAccessPreset(firebaseUser.uid, projectId, preset);
 
     // Generate password reset link
-    const resetLink = await adminAuth().generatePasswordResetLink(email);
+    const resetLink = await auth.generatePasswordResetLink(email);
 
     // Create audit log
     await prisma.auditLog.create({

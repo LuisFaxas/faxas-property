@@ -85,8 +85,18 @@ function getAdminApp(): App | null {
   return adminApp;
 }
 
-export const adminAuth = () => getAuth(getAdminApp());
-export const adminStorage = () => getStorage(getAdminApp());
+export const adminAuth = () => {
+  const app = getAdminApp();
+  if (!app) return null as any;
+  return getAuth(app);
+};
+
+export const adminStorage = () => {
+  const app = getAdminApp();
+  if (!app) return null as any;
+  return getStorage(app);
+};
+
 export const auth = adminAuth();
 
 export default getAdminApp;
