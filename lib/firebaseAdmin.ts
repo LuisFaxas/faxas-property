@@ -1,3 +1,7 @@
+// Re-export from wrapper for Vercel compatibility
+export { auth, adminAuth, adminStorage } from './firebaseAdminWrapper';
+
+// Keep original implementation below for reference but don't use during build
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';
@@ -76,9 +80,9 @@ function getAdminApp(): App {
   return adminApp;
 }
 
-export const adminAuth = () => getAuth(getAdminApp());
-export const adminStorage = () => getStorage(getAdminApp());
-
-export const auth = adminAuth();
+// These are now exported from the wrapper above
+// export const adminAuth = () => getAuth(getAdminApp());
+// export const adminStorage = () => getStorage(getAdminApp());
+// export const auth = adminAuth();
 
 export default getAdminApp;
