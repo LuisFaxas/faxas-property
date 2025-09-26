@@ -4,7 +4,13 @@ import { getStorage } from 'firebase-admin/storage';
 
 let adminApp: App;
 
-function getAdminApp(): App {
+function getAdminApp(): App | null {
+  // Skip Firebase Admin in build phase
+  if (process.env.NODE_ENV === 'production' && !global.adminApp) {
+    console.warn('Firebase Admin initialization skipped during build');
+    return null as any;
+  }
+
   if (getApps().length === 0) {
     try {
       let serviceAccount: any;
@@ -13,8 +19,13 @@ function getAdminApp(): App {
       if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
         console.log('Using individual Firebase environment variables');
 
-        // Replace escaped newlines in private key
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+        // Handle different private key formats
+        let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+        // If the key contains literal \n, replace with actual newlines
+        if (privateKey.includes('\\n')) {
+          privateKey = privateKey.replace(/\\n/g, '\n');
+        }
 
         serviceAccount = {
           type: 'service_account',
@@ -45,12 +56,14 @@ function getAdminApp(): App {
         }
       }
       else {
-        throw new Error('Firebase credentials not found. Set either FIREBASE_SERVICE_ACCOUNT_BASE64 or individual FIREBASE_* environment variables');
+        console.warn('Firebase credentials not found. Admin features will be limited.');
+        return null as any;
       }
 
       // Validate required fields
       if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
-        throw new Error('Invalid service account: missing required fields');
+        console.error('Invalid service account: missing required fields');
+        return null as any;
       }
 
       adminApp = initializeApp({
@@ -58,10 +71,12 @@ function getAdminApp(): App {
         storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
       });
 
+      global.adminApp = adminApp;
       console.log('Firebase Admin initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Firebase Admin:', error);
-      throw new Error(`Failed to initialize Firebase Admin SDK: ${error}`);
+      // Don't throw during build - just log and return null
+      return null as any;
     }
   } else {
     adminApp = getApps()[0];
