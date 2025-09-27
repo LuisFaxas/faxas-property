@@ -17,7 +17,7 @@ export type AuthenticatedUser = {
 
 export async function requireAuth(request?: NextRequest): Promise<AuthenticatedUser> {
   let authorization: string | null = null;
-  
+
   // Try to get authorization from request first (for testing)
   if (request) {
     authorization = request.headers.get('authorization');
@@ -28,25 +28,39 @@ export async function requireAuth(request?: NextRequest): Promise<AuthenticatedU
       authorization = headersList.get('authorization');
     } catch (error) {
       // In test environment, headers() might not be available
+      console.error('[Auth Check] Failed to get headers:', error);
       throw new ApiError(401, 'No authorization header');
     }
   }
-  
+
   if (!authorization?.startsWith('Bearer ')) {
+    console.error('[Auth Check] Invalid authorization header format');
     throw new ApiError(401, 'Missing or invalid authorization header');
   }
-  
+
   const token = authorization.split('Bearer ')[1];
+
+  if (!token) {
+    console.error('[Auth Check] No token found after Bearer prefix');
+    throw new ApiError(401, 'Invalid authorization format');
+  }
   
   try {
+    console.log('[Auth Check] Validating Firebase token...');
     // Validate Firebase token with refresh check
     const { decodedToken, shouldRefresh } = await validateFirebaseToken(token);
 
     // Critical: Ensure we have a valid decodedToken
     if (!decodedToken || !decodedToken.uid) {
-      console.error('[Auth Check] Token validation failed - decodedToken is null or invalid');
+      console.error('[Auth Check] Token validation failed - decodedToken is null or invalid:', {
+        hasDecodedToken: !!decodedToken,
+        hasUid: !!decodedToken?.uid,
+        tokenLength: token?.length
+      });
       throw new ApiError(401, 'Authentication failed - Firebase Admin may not be properly initialized');
     }
+
+    console.log('[Auth Check] Token validated successfully for uid:', decodedToken.uid);
 
     // Check for session if provided
     const sessionId = request?.headers.get('x-session-id') || undefined;
@@ -123,7 +137,18 @@ export async function requireAuth(request?: NextRequest): Promise<AuthenticatedU
     }
     
     // Log the actual error for debugging
-    console.error('Auth verification error:', error?.code || error?.message || error);
+    console.error('[Auth Check] Auth verification error:', {
+      code: error?.code,
+      message: error?.message,
+      stack: error?.stack,
+      error: error
+    });
+
+    // Provide more specific error message for Firebase Admin issues
+    if (error?.message?.includes('Firebase Admin')) {
+      throw new ApiError(500, 'Firebase Admin initialization error - check server logs');
+    }
+
     throw new ApiError(401, 'Authentication failed - please sign in again');
   }
 }

@@ -157,6 +157,7 @@ export async function validateFirebaseToken(token: string): Promise<{
   shouldRefresh: boolean;
 }> {
   try {
+    console.log('[Session] Starting Firebase token validation...');
     const decodedToken = await auth.verifyIdToken(token, true);
 
     // Critical: Check if decodedToken is null (Firebase Admin not initialized)
@@ -164,6 +165,8 @@ export async function validateFirebaseToken(token: string): Promise<{
       console.error('[Session] Token verification returned null - Firebase Admin may not be initialized');
       throw new ApiError(401, 'Token verification failed - Firebase Admin not initialized properly');
     }
+
+    console.log('[Session] Token verification successful for uid:', decodedToken.uid);
 
     // Check if token is close to expiry (within 5 minutes)
     const now = Math.floor(Date.now() / 1000);
@@ -175,15 +178,26 @@ export async function validateFirebaseToken(token: string): Promise<{
       shouldRefresh
     };
   } catch (error: any) {
+    console.error('[Session] Token validation error:', {
+      code: error?.code,
+      message: error?.message,
+      tokenLength: token?.length
+    });
+
     if (error.code === 'auth/id-token-expired') {
       throw new ApiError(401, 'Token expired. Please refresh your authentication.');
     }
-    
+
     if (error.code === 'auth/id-token-revoked') {
       throw new ApiError(401, 'Token has been revoked. Please sign in again.');
     }
-    
-    throw new ApiError(401, 'Invalid authentication token');
+
+    // Check for Firebase Admin initialization issues
+    if (error?.message?.includes('Firebase Admin')) {
+      throw error; // Re-throw the original error for better debugging
+    }
+
+    throw new ApiError(401, `Invalid authentication token: ${error?.message || 'Unknown error'}`);
   }
 }
 

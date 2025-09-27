@@ -13,19 +13,28 @@ async function initializeAdmin() {
 
   if (getApps().length > 0) {
     adminApp = getApps()[0];
+    console.log('[Firebase Admin] Using existing Firebase Admin app');
     return;
   }
 
   // Critical: Log environment variable availability for debugging
-  console.log('[Firebase Admin] Environment check:', {
+  const envCheck = {
     hasBase64: !!process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
     base64Length: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64?.length || 0,
     hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
     hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
     hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
     nodeEnv: process.env.NODE_ENV,
-    isVercel: !!process.env.VERCEL
-  });
+    isVercel: !!process.env.VERCEL,
+    isProduction: process.env.NODE_ENV === 'production'
+  };
+
+  console.log('[Firebase Admin] Environment check:', envCheck);
+
+  // Log critical warning if in production without credentials
+  if (envCheck.isProduction && !envCheck.hasBase64 && !envCheck.hasProjectId) {
+    console.error('[Firebase Admin] CRITICAL: Running in production without Firebase credentials!');
+  }
 
   try {
     let serviceAccount: any;
@@ -38,14 +47,19 @@ async function initializeAdmin() {
       try {
         const decodedString = Buffer.from(serviceAccountBase64, 'base64').toString('utf-8');
         serviceAccount = JSON.parse(decodedString);
-      } catch (parseError) {
-        console.error('Failed to parse base64 service account:', parseError);
-        throw parseError;
+        console.log('[Firebase Admin] Successfully parsed base64 service account for project:', serviceAccount.project_id);
+      } catch (parseError: any) {
+        console.error('[Firebase Admin] Failed to parse base64 service account:', {
+          error: parseError?.message || parseError,
+          base64Length: serviceAccountBase64.length,
+          firstChars: serviceAccountBase64.substring(0, 50)
+        });
+        throw new Error(`Failed to parse Firebase service account: ${parseError?.message || parseError}`);
       }
     }
     // Try method 2: Individual environment variables (fallback)
     else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-      console.log('Initializing Firebase Admin with individual env vars');
+      console.log('[Firebase Admin] Initializing with individual env vars for project:', process.env.FIREBASE_PROJECT_ID);
 
       let privateKey = process.env.FIREBASE_PRIVATE_KEY;
       if (privateKey.includes('\\n')) {
@@ -75,35 +89,62 @@ async function initializeAdmin() {
 
     // Validate required fields
     if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
+      console.error('[Firebase Admin] Invalid service account - missing fields:', {
+        hasProjectId: !!serviceAccount.project_id,
+        hasPrivateKey: !!serviceAccount.private_key,
+        hasClientEmail: !!serviceAccount.client_email
+      });
       throw new Error('Invalid service account: missing required fields');
     }
+
+    console.log('[Firebase Admin] Service account validated successfully');
 
     adminApp = initializeApp({
       credential: cert(serviceAccount),
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
     });
 
-    console.log('Firebase Admin initialized successfully');
-  } catch (error) {
-    console.error('Failed to initialize Firebase Admin:', error);
-    throw error;
+    console.log('[Firebase Admin] ✅ Firebase Admin SDK initialized successfully for project:', serviceAccount.project_id);
+  } catch (error: any) {
+    console.error('[Firebase Admin] ❌ Failed to initialize Firebase Admin:', {
+      error: error?.message || error,
+      code: error?.code,
+      stack: error?.stack
+    });
+
+    // Re-throw with more context
+    throw new Error(`Firebase Admin initialization failed: ${error?.message || error}`);
   }
 }
 
 export async function getAdminAuth(): Promise<Auth> {
   if (!authInstance) {
+    console.log('[Firebase Admin] Getting Auth instance...');
     await initializeAdmin();
+
+    if (!adminApp) {
+      throw new Error('[Firebase Admin] Admin app not initialized after initializeAdmin()');
+    }
+
     const { getAuth } = await import('firebase-admin/auth');
-    authInstance = getAuth(adminApp!);
+    authInstance = getAuth(adminApp);
+    console.log('[Firebase Admin] Auth instance created successfully');
   }
   return authInstance;
 }
 
 export async function getAdminStorage(): Promise<Storage> {
   if (!storageInstance) {
+    console.log('[Firebase Admin] Getting Storage instance...');
     await initializeAdmin();
+
+    if (!adminApp) {
+      throw new Error('[Firebase Admin] Admin app not initialized after initializeAdmin()');
+    }
+
     const { getStorage } = await import('firebase-admin/storage');
-    storageInstance = getStorage(adminApp!);
+    storageInstance = getStorage(adminApp);
+    console.log('[Firebase Admin] Storage instance created successfully');
   }
   return storageInstance;
 }
