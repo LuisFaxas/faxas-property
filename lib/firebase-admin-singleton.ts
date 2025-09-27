@@ -74,27 +74,40 @@ export async function getFirebaseAdmin() {
   // Method 1: Base64 encoded service account (PREFERRED for Vercel)
   if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
     console.log('[Firebase Admin Singleton] Using base64 credentials');
+    console.log('[Firebase Admin Singleton] Base64 length:', process.env.FIREBASE_SERVICE_ACCOUNT_BASE64.length);
 
     try {
       const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf-8');
+      console.log('[Firebase Admin Singleton] Decoded length:', decoded.length);
+
+      // Check if decoded string is empty
+      if (!decoded || decoded.trim().length === 0) {
+        throw new Error('Base64 decoded to empty string');
+      }
+
       serviceAccount = JSON.parse(decoded);
 
       if (!serviceAccount.project_id) {
         throw new Error('Invalid service account: missing project_id');
       }
 
-      console.log(`[Firebase Admin Singleton] Decoded base64 for project: ${serviceAccount.project_id}`);
+      console.log(`[Firebase Admin Singleton] ✓ Decoded base64 for project: ${serviceAccount.project_id}`);
     } catch (error: any) {
-      console.error('[Firebase Admin Singleton] Failed to parse base64:', error?.message);
-      throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_BASE64: ${error?.message}`);
+      console.error('[Firebase Admin Singleton] Base64 decode/parse failed:', {
+        error: error?.message,
+        stack: error?.stack,
+        base64Length: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64?.length,
+      });
+      // Don't throw here, fall through to try individual vars
+      console.log('[Firebase Admin Singleton] Falling back to individual environment variables...');
     }
   }
   // Method 2: Individual environment variables (FALLBACK)
-  else if (
+  if (!serviceAccount && (
     process.env.FIREBASE_PROJECT_ID &&
     process.env.FIREBASE_CLIENT_EMAIL &&
     process.env.FIREBASE_PRIVATE_KEY
-  ) {
+  )) {
     console.log('[Firebase Admin Singleton] Using individual environment variables');
 
     // Handle private key newlines
@@ -116,21 +129,31 @@ export async function getFirebaseAdmin() {
       client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.FIREBASE_CLIENT_EMAIL)}`,
       universe_domain: 'googleapis.com'
     };
+
+    console.log('[Firebase Admin Singleton] ✓ Constructed service account from individual vars');
   }
-  else {
+
+  // If still no service account, log detailed error
+  if (!serviceAccount) {
     // Log what we have for debugging
-    console.error('[Firebase Admin Singleton] Missing credentials. Environment check:', {
+    const envCheck = {
       hasBase64: !!process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
+      base64Length: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64?.length || 0,
       hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
       hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
       hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      privateKeyLength: process.env.FIREBASE_PRIVATE_KEY?.length || 0,
       nodeEnv: process.env.NODE_ENV,
-      isVercel: !!process.env.VERCEL
-    });
+      isVercel: !!process.env.VERCEL,
+      vercelEnv: process.env.VERCEL_ENV,
+    };
+
+    console.error('[Firebase Admin Singleton] Missing credentials. Environment check:', envCheck);
 
     throw new Error(
       '[Firebase Admin Singleton] Missing Firebase credentials. ' +
-      'Set FIREBASE_SERVICE_ACCOUNT_BASE64 (preferred) or individual FIREBASE_* variables in Vercel.'
+      'Set FIREBASE_SERVICE_ACCOUNT_BASE64 (preferred) or individual FIREBASE_* variables in Vercel. ' +
+      `Environment: ${JSON.stringify(envCheck)}`
     );
   }
 

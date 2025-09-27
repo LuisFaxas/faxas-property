@@ -51,7 +51,9 @@
       "Bash(npm ci:*)",
       "Bash(npx typescript:*)",
       "Bash(npx vercel:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(echo \"$FIREBASE_SERVICE_ACCOUNT_BASE64\")",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []
