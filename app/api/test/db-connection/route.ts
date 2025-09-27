@@ -13,16 +13,16 @@ export async function GET(request: NextRequest) {
       VERCEL_ENV: process.env.VERCEL_ENV,
     },
     databaseConfig: {
-      // Check for Supabase integration variables
+      // Check for Supabase integration variables (REQUIRED)
       hasPostgresPrismaUrl: !!process.env.POSTGRES_PRISMA_URL,
       hasPostgresUrl: !!process.env.POSTGRES_URL,
       hasPostgresNonPooling: !!process.env.POSTGRES_URL_NON_POOLING,
-      // Legacy variables
-      hasDatabaseUrl: !!process.env.DATABASE_URL,
-      hasDirectUrl: !!process.env.DIRECT_URL,
       // Extract just the host/port without credentials
-      databaseHost: (process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL) ?
-        (process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || '').split('@')[1]?.split('/')[0] : 'not-set',
+      databaseHost: process.env.POSTGRES_PRISMA_URL ?
+        process.env.POSTGRES_PRISMA_URL.split('@')[1]?.split('/')[0] : 'not-set',
+      // Check if using correct pooler format
+      usingPooler: process.env.POSTGRES_PRISMA_URL ?
+        process.env.POSTGRES_PRISMA_URL.includes('pooler.supabase.com') : false,
     },
     tests: []
   };
@@ -144,33 +144,36 @@ function getRecommendation(error: any): string {
   const errorMessage = error.message || '';
 
   if (errorMessage.includes("Can't reach database server")) {
-    // Check which variable is being used
-    const dbUrl = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || '';
+    const dbUrl = process.env.POSTGRES_PRISMA_URL || '';
     const hasIntegrationVars = !!process.env.POSTGRES_PRISMA_URL;
 
     if (!hasIntegrationVars) {
-      return '🚨 Supabase-Vercel Integration not detected!\n\n' +
-             'The integration should have set POSTGRES_PRISMA_URL automatically.\n\n' +
+      return '🚨 CRITICAL: Supabase Integration Variables NOT FOUND!\n\n' +
+             'POSTGRES_PRISMA_URL is missing. The Supabase-Vercel integration should set this.\n\n' +
              'ACTION REQUIRED:\n' +
-             '1. Check Vercel Dashboard → Settings → Environment Variables\n' +
-             '2. Verify that POSTGRES_PRISMA_URL and POSTGRES_URL_NON_POOLING are set\n' +
-             '3. If not, reconnect the Supabase integration\n' +
-             '4. Redeploy after variables are confirmed';
+             '1. Go to Vercel Dashboard → Settings → Integrations\n' +
+             '2. Check if Supabase integration is connected\n' +
+             '3. Click on the integration and ensure your project is linked\n' +
+             '4. Click "Sync Environment Variables" if available\n' +
+             '5. Go to Settings → Environment Variables and verify POSTGRES_PRISMA_URL exists\n' +
+             '6. Redeploy after confirming variables are set';
     }
 
     const isOldFormat = dbUrl.includes('db.') && dbUrl.includes('.supabase.co');
-    const isCorrectPort = dbUrl.includes(':6543');
     const hasPooler = dbUrl.includes('pooler.supabase.com');
+    const isCorrectPort = dbUrl.includes(':6543');
     const hasPgBouncer = dbUrl.includes('pgbouncer=true');
 
     if (isOldFormat) {
-      return '🚨 CRITICAL: Old Supabase connection format detected!\n\n' +
-             'The Supabase integration should have updated this automatically.\n\n' +
+      return '🚨 CRITICAL: Old database format in POSTGRES_PRISMA_URL!\n\n' +
+             'Your POSTGRES_PRISMA_URL still uses db.*.supabase.co format.\n\n' +
+             'This means the Supabase integration is not properly configured.\n\n' +
              'ACTION REQUIRED:\n' +
              '1. Go to Vercel Dashboard → Settings → Integrations\n' +
-             '2. Remove and re-add the Supabase integration\n' +
-             '3. Ensure it sets POSTGRES_PRISMA_URL with the new pooler format\n' +
-             '4. Redeploy your application';
+             '2. Remove the Supabase integration completely\n' +
+             '3. Re-add it and make sure to select your projects\n' +
+             '4. The integration should set POSTGRES_PRISMA_URL with pooler.supabase.com\n' +
+             '5. Redeploy after the integration updates the variables';
     }
 
     if (!hasPooler) {
