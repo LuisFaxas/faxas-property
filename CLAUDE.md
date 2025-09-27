@@ -2,40 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Always Load These Files First
-When starting any new conversation or task, ALWAYS read these 3 files first:
-1. `@PROJECT_GUARDRAILS.md` - Critical constraints and patterns
-2. `@WORK_PROTOCOL.md` - 6-step editing protocol
-3. `@SOURCE_OF_TRUTH_GENERATOR_PROMPT.md` - For SOT updates
-
-## Evidence Rule
-Any behavioral claim must cite file path + symbol; unknowns → TODO(path); do not guess.
-
-## Source of Truth
-The comprehensive Source of Truth documentation is in `/SOURCE_OF_TRUTH.md` with detailed sections in `/docs/`. Reference these when needed for specific technical details.
-
-### Anchors from SOT
-- **Design**: Dark-only, glass morphism, 48px touch targets, shadcn/ui primitives (`/docs/07-design-system.md`)
-- **Auth/RBAC**: Firebase claims, server-side role+module checks, refresh ≈ 50 min (`/docs/04-auth-security.md`)
-- **Project scoping**: x-project-id required; cross-project access denied (`/docs/02-api-inventory.md`)
-- **Task invariant**: assignedToId XOR assignedContactId; enforce at API + DB (`/docs/01-data-schema.md`)
-- **State**: Use SOT Query Keys Registry + Mutation→Invalidation Matrix verbatim (`/docs/05-state-management.md`)
-- **Security**: Signed URLs; x-webhook-secret; never print secrets (`/docs/04-auth-security.md`)
-- **Ops verify**: Run npm run lint, npm run typecheck, and build if appropriate (`/docs/06-operations.md`)
-
-## Editing Protocol (Summary)
-Follow the 6-step protocol from `WORK_PROTOCOL.md`:
-1. **READ** - List exact files you will open
-2. **PLAN** - Propose tiny batch (≤3 files)
-3. **DIFF** - Show unified diff preview
-4. **APPLY** - Write changes after approval
-5. **VERIFY** - Run lint/typecheck and paste results
-6. **LOG** - Update `/docs/WORKLOG_<AREA>.md`
-
-## Project Overview
-
-This is a construction management system for the Miami Duplex Remodel project built with Next.js 15 App Router, TypeScript, Prisma ORM, Firebase Auth, and PostgreSQL. The system features dual dashboards for Admin/Staff and Contractors with role-based access control.
-
 ## Critical Commands
 
 ### Development

@@ -55,7 +55,8 @@
       "Bash(echo \"$FIREBASE_SERVICE_ACCOUNT_BASE64\")",
       "Bash(python:*)",
       "WebFetch(domain:supabase.com)",
-      "WebFetch(domain:www.prisma.io)"
+      "WebFetch(domain:www.prisma.io)",
+      "Bash(npx dotenv -e .env.local -- prisma db pull:*)"
     ],
     "deny": [],
     "ask": []
