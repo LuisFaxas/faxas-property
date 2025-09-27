@@ -5,7 +5,7 @@
  */
 
 import { NextRequest } from 'next/server';
-import { auth } from '@/lib/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 import { prisma } from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api/response';
 import { Module } from '@prisma/client';
@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
     const token = authorization.split('Bearer ')[1];
     
     // Verify Firebase token
-    const decodedToken = await auth.verifyIdToken(token);
+    const adminAuth = await getAdminAuth();
+    const decodedToken = await adminAuth.verifyIdToken(token);
     
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({

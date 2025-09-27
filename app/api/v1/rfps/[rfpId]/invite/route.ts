@@ -143,3 +143,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse(error);
   }
 }
+
+// Force Node.js runtime for Firebase Admin
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';

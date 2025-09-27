@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 import { successResponse, errorResponse, ApiError } from '@/lib/api/response';
 import { requireRole } from '@/lib/api/auth-check';
 import { createUserSchema, getUsersQuerySchema } from '@/lib/validations/user';
@@ -124,9 +124,10 @@ export async function POST(request: NextRequest) {
     const data = createUserSchema.parse(body);
     
     // Check if user already exists in Firebase
+    const adminAuth = await getAdminAuth();
     let firebaseUser: any;
     try {
-      firebaseUser = await auth.getUserByEmail(data.email);
+      firebaseUser = await adminAuth.getUserByEmail(data.email);
       throw new ApiError(400, 'User with this email already exists');
     } catch (fbError: any) {
       if (fbError.code !== 'auth/user-not-found') {
@@ -155,18 +156,18 @@ export async function POST(request: NextRequest) {
     
     // Create Firebase user if sending invite
     if (data.sendInvite) {
-      firebaseUser = await auth.createUser({
+      firebaseUser = await adminAuth.createUser({
         email: data.email,
         emailVerified: false
       });
       
       // Set custom claims for role-based access
-      await auth.setCustomUserClaims(firebaseUser.uid, {
+      await adminAuth.setCustomUserClaims(firebaseUser.uid, {
         role: data.role
       });
-      
+
       // Generate email verification link (Firebase handles sending)
-      await auth.generateEmailVerificationLink(data.email);
+      await adminAuth.generateEmailVerificationLink(data.email);
     }
     
     // Create user and related records in transaction
@@ -272,3 +273,7 @@ export async function POST(request: NextRequest) {
     return errorResponse(error);
   }
 }
+
+// Force Node.js runtime for Firebase Admin
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';

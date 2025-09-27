@@ -100,3 +100,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE /api/v1/bids/[bidId]/attachments/[attachmentId] would go here if needed
+
+// Force Node.js runtime for Firebase Admin
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';

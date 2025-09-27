@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 import { log } from '@/lib/logger';
 
 interface HealthCheck {
@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
   const firebaseStart = Date.now();
   try {
     // Check if Firebase is properly initialized by accessing the auth instance
-    const app = auth.app;
-    if (app) {
+    const adminAuth = await getAdminAuth();
+    if (adminAuth) {
       checks.firebase = {
         status: 'pass',
         responseTime: Date.now() - firebaseStart,
@@ -147,3 +147,7 @@ export async function GET(request: NextRequest) {
   
   return NextResponse.json(response, { status: statusCode });
 }
+
+// Force Node.js runtime for Firebase Admin
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';

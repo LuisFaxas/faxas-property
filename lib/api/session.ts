@@ -3,7 +3,7 @@
  * Handles session timeout, refresh tokens, and session validation
  */
 
-import { auth } from '@/lib/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 import { ApiError } from './response';
 import { prisma } from '@/lib/prisma';
 
@@ -158,7 +158,8 @@ export async function validateFirebaseToken(token: string): Promise<{
 }> {
   try {
     console.log('[Session] Starting Firebase token validation...');
-    const decodedToken = await auth.verifyIdToken(token, true);
+    const adminAuth = await getAdminAuth();
+    const decodedToken = await adminAuth.verifyIdToken(token, true);
 
     // Critical: Check if decodedToken is null (Firebase Admin not initialized)
     if (!decodedToken) {

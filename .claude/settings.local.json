@@ -50,7 +50,8 @@
       "Bash(taskkill:*)",
       "Bash(npm ci:*)",
       "Bash(npx typescript:*)",
-      "Bash(npx vercel:*)"
+      "Bash(npx vercel:*)",
+      "Bash(npx tsx:*)"
     ],
     "deny": [],
     "ask": []

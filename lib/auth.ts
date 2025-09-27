@@ -1,4 +1,4 @@
-import { adminAuth } from './firebaseAdmin';
+import { getAdminAuth } from './firebase-admin-singleton';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { Role } from '@prisma/client';
@@ -17,7 +17,8 @@ export async function verifyIdToken(authorizationHeader: string | null): Promise
   const idToken = authorizationHeader.split('Bearer ')[1];
 
   try {
-    const decodedToken: DecodedIdToken = await adminAuth().verifyIdToken(idToken);
+    const adminAuth = await getAdminAuth();
+    const decodedToken: DecodedIdToken = await adminAuth.verifyIdToken(idToken);
     
     const role = decodedToken.role || 'VIEWER';
     

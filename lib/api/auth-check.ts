@@ -1,9 +1,9 @@
 import { headers } from 'next/headers';
-import { auth } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { ApiError } from './response';
 import { NextRequest } from 'next/server';
 import { validateFirebaseToken, createSession, validateSession } from './session';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 import type { User, Role, Module, ProjectMember } from '@prisma/client';
 
 export type AuthenticatedUser = {
@@ -82,7 +82,8 @@ export async function requireAuth(request?: NextRequest): Promise<AuthenticatedU
       // Instead of throwing, try to initialize the user
       try {
         // Get role from Firebase custom claims
-        const firebaseUser = await auth.getUser(decodedToken.uid);
+        const adminAuth = await getAdminAuth();
+        const firebaseUser = await adminAuth.getUser(decodedToken.uid);
         const role = (firebaseUser.customClaims?.role as Role) || 'VIEWER';
         
         // Create user in database

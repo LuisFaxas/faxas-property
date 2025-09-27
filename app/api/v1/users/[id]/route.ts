@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 import { successResponse, errorResponse, ApiError } from '@/lib/api/response';
 import { requireRole, requireAuth } from '@/lib/api/auth-check';
 import { updateUserSchema } from '@/lib/validations/user';
@@ -218,7 +218,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       // 2. Update Firebase custom claims if role changed
       if (data.role) {
         try {
-          await auth.setCustomUserClaims(userId, {
+          const adminAuth = await getAdminAuth();
+          await adminAuth.setCustomUserClaims(userId, {
             role: data.role
           });
         } catch (fbError) {
@@ -354,7 +355,8 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     
     // Disable Firebase user (don't delete to preserve audit trail)
     try {
-      await auth.updateUser(userId, {
+      const adminAuth = await getAdminAuth();
+      await adminAuth.updateUser(userId, {
         disabled: true
       });
     } catch (fbError) {
@@ -371,3 +373,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     return errorResponse(error);
   }
 }
+
+// Force Node.js runtime for Firebase Admin
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';

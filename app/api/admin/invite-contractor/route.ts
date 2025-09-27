@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
-import { adminAuthLazy } from '@/lib/firebaseAdminLazy';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 import { applyAccessPreset } from '@/lib/access';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     let firebaseUser;
     
     // Get Firebase Admin auth instance
-    const auth = await adminAuthLazy();
+    const auth = await getAdminAuth();
 
     // Try to get existing user or create new one
     try {
@@ -142,3 +142,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Force Node.js runtime for Firebase Admin
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';

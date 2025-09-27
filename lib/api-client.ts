@@ -70,7 +70,14 @@ apiClient.interceptors.response.use(
     // Clear retry attempts on successful response
     const requestId = `${response.config.method}-${response.config.url}`;
     retryAttempts.delete(requestId);
-    
+
+    // Check if response is HTML (error page) instead of JSON
+    const contentType = response.headers['content-type'] || '';
+    if (contentType.includes('text/html')) {
+      console.error('[API Client] Received HTML response instead of JSON:', response.config.url);
+      throw new Error('Server returned HTML instead of JSON - likely an authentication error');
+    }
+
     // If the response has a standard API structure with data property, extract it
     if (response.data && typeof response.data === 'object' && 'success' in response.data) {
       // Return just the data array, not the wrapper
@@ -180,11 +187,24 @@ apiClient.interceptors.response.use(
       }
     }
     
+    // Check if error response is HTML instead of JSON
+    if (error.response) {
+      const contentType = error.response.headers['content-type'] || '';
+      if (contentType.includes('text/html')) {
+        console.error('[API Client] Server returned HTML error page:', error.response.status);
+        error.response.data = {
+          success: false,
+          error: `Server error (${error.response.status}) - received HTML instead of JSON`,
+          message: 'Authentication or server configuration issue'
+        };
+      }
+    }
+
     // For other errors, clear retry attempts and reject
     if (requestId) {
       retryAttempts.delete(requestId);
     }
-    
+
     return Promise.reject(error.response?.data || error);
   }
 );

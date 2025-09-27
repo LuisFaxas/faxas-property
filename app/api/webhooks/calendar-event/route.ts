@@ -132,3 +132,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Force Node.js runtime for Firebase Admin
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';

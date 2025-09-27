@@ -1,4 +1,4 @@
-import { adminStorage } from './firebaseAdmin';
+import { getAdminStorage } from './firebase-admin-singleton';
 import { getDownloadURL } from 'firebase-admin/storage';
 
 export async function generateSignedUrl(
@@ -6,7 +6,8 @@ export async function generateSignedUrl(
   expiresInMinutes: number = 60
 ): Promise<string> {
   try {
-    const bucket = adminStorage().bucket();
+    const adminStorage = await getAdminStorage();
+    const bucket = adminStorage.bucket();
     const file = bucket.file(storagePath);
     
     const [url] = await file.getSignedUrl({
@@ -27,7 +28,8 @@ export async function uploadFile(
   contentType: string
 ): Promise<string> {
   try {
-    const bucket = adminStorage().bucket();
+    const adminStorage = await getAdminStorage();
+    const bucket = adminStorage.bucket();
     const file = bucket.file(storagePath);
     
     await file.save(fileBuffer, {
@@ -45,7 +47,8 @@ export async function uploadFile(
 
 export async function deleteFile(storagePath: string): Promise<boolean> {
   try {
-    const bucket = adminStorage().bucket();
+    const adminStorage = await getAdminStorage();
+    const bucket = adminStorage.bucket();
     const file = bucket.file(storagePath);
     
     await file.delete();

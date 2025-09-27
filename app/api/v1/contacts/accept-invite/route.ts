@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api/response';
 import { z } from 'zod';
-import { auth } from '@/lib/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 
 // Schema for accept invite request
 const acceptInviteSchema = z.object({
@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
 
     try {
       // Create Firebase user
-      const userRecord = await auth.createUser({
+      const adminAuth = await getAdminAuth();
+      const userRecord = await adminAuth.createUser({
         email,
         password: data.password,
         displayName: data.displayName || contact.name,
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Set custom claims for role
-      await auth.setCustomUserClaims(userRecord.uid, {
+      await adminAuth.setCustomUserClaims(userRecord.uid, {
         role: 'CONTRACTOR',
         contactId: contact.id,
         projectId: contact.projectId,
@@ -227,3 +228,7 @@ export async function GET(request: NextRequest) {
     return errorResponse(error);
   }
 }
+
+// Force Node.js runtime for Firebase Admin
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';

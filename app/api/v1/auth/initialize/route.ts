@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { auth } from '@/lib/firebaseAdmin';
+import { getAdminAuth } from '@/lib/firebase-admin-singleton';
 import { prisma } from '@/lib/prisma';
 import { successResponse, errorResponse, ApiError } from '@/lib/api/response';
 import { Module, Role } from '@prisma/client';
@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     }
     
     const token = authorization.split('Bearer ')[1];
-    const decodedToken = await auth.verifyIdToken(token);
+    const adminAuth = await getAdminAuth();
+    const decodedToken = await adminAuth.verifyIdToken(token);
     
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -32,7 +33,8 @@ export async function POST(request: NextRequest) {
     }
     
     // Get role from Firebase custom claims or default to VIEWER
-    const customClaims = await auth.getUser(decodedToken.uid).then(u => u.customClaims);
+    const adminAuth2 = await getAdminAuth();
+    const customClaims = await adminAuth2.getUser(decodedToken.uid).then(u => u.customClaims);
     const role = (customClaims?.role as Role) || 'VIEWER';
     
     // Create user and initial setup in a transaction
@@ -134,7 +136,8 @@ export async function GET(request: NextRequest) {
     }
     
     const token = authorization.split('Bearer ')[1];
-    const decodedToken = await auth.verifyIdToken(token);
+    const adminAuth = await getAdminAuth();
+    const decodedToken = await adminAuth.verifyIdToken(token);
     
     const user = await prisma.user.findUnique({
       where: { id: decodedToken.uid },
