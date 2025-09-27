@@ -482,7 +482,7 @@ export default function AdminSettingsPage() {
                 <div>
                   <CardTitle className="text-white">Project Management</CardTitle>
                   <CardDescription>
-                    Manage all your construction projects in one place
+                    Create and manage all your construction projects in one place
                   </CardDescription>
                 </div>
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
