@@ -59,8 +59,8 @@ if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_CONSOLE_LOGS ===
   );
 }
 
-// File transports for production
-if (process.env.NODE_ENV === 'production') {
+// File transports for production (but NOT on Vercel due to read-only filesystem)
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   // Error logs
   transports.push(
     new DailyRotateFile({
@@ -98,6 +98,16 @@ if (process.env.NODE_ENV === 'production') {
   );
 }
 
+// Always use console logging on Vercel in production
+if (process.env.NODE_ENV === 'production' && process.env.VERCEL) {
+  transports.push(
+    new winston.transports.Console({
+      format: consoleFormat,
+      level: process.env.LOG_LEVEL || 'info',
+    })
+  );
+}
+
 // Create the logger instance
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
@@ -110,7 +120,7 @@ const logger = winston.createLogger({
 const securityLogger = winston.createLogger({
   level: 'info',
   format: fileFormat,
-  transports: process.env.NODE_ENV === 'production' ? [
+  transports: process.env.NODE_ENV === 'production' && !process.env.VERCEL ? [
     new DailyRotateFile({
       filename: 'logs/security-%DATE%.log',
       datePattern: 'YYYY-MM-DD',
