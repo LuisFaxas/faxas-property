@@ -6,9 +6,9 @@ const globalForPrisma = globalThis as unknown as {
 
 // Create PrismaClient with explicit datasource URL for Vercel
 function createPrismaClient() {
-  // On Vercel, use the Supabase integration variables
-  if (process.env.VERCEL && process.env.POSTGRES_PRISMA_URL) {
-    console.log('[Prisma] Running on Vercel, using POSTGRES_PRISMA_URL with pooling');
+  // Priority 1: Use Supabase integration variables if available
+  if (process.env.POSTGRES_PRISMA_URL) {
+    console.log('[Prisma] Using POSTGRES_PRISMA_URL from Supabase integration');
     return new PrismaClient({
       datasources: {
         db: {
@@ -18,9 +18,13 @@ function createPrismaClient() {
     });
   }
 
-  // Fallback to DATABASE_URL for local development
+  // Priority 2: Use DATABASE_URL (works for both Vercel and local)
   if (process.env.DATABASE_URL) {
     console.log('[Prisma] Using DATABASE_URL');
+    // Check if it's the old format and warn
+    if (process.env.DATABASE_URL.includes('db.') && process.env.DATABASE_URL.includes('.supabase.co')) {
+      console.warn('[Prisma] WARNING: Using old Supabase connection format. Update to pooler.supabase.com format!');
+    }
     return new PrismaClient({
       datasources: {
         db: {
@@ -31,6 +35,7 @@ function createPrismaClient() {
   }
 
   // Default initialization
+  console.log('[Prisma] Using default initialization');
   return new PrismaClient();
 }
 
