@@ -143,12 +143,77 @@ export async function getUserProjectRole(
  * Get all projects user has access to
  */
 export async function getUserProjects(userId: string): Promise<string[]> {
+  // Get user to check their role
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, email: true }
+  });
+
+  if (!user) {
+    console.log('[Policy] User not found:', userId);
+    return [];
+  }
+
+  console.log('[Policy] Getting projects for user:', user.email, 'with role:', user.role);
+
+  // For ADMIN/STAFF users, ensure Miami Duplex access
+  if (user.role === 'ADMIN' || user.role === 'STAFF') {
+    // First check if Miami Duplex exists
+    let miamiDuplex = await prisma.project.findFirst({
+      where: { name: 'Miami Duplex Remodel' }
+    });
+
+    if (!miamiDuplex) {
+      console.log('[Policy] Creating Miami Duplex project for admin user');
+      miamiDuplex = await prisma.project.create({
+        data: {
+          name: 'Miami Duplex Remodel',
+          status: 'ACTIVE',
+          projectType: 'RENOVATION',
+          description: 'Complete renovation of Miami duplex property',
+          color: '#3B82F6',
+          address: 'Miami, FL',
+          clientName: 'FAXAS Property Management',
+          totalBudget: 500000,
+          contingency: 50000,
+          timezone: 'America/New_York'
+        }
+      });
+      console.log('[Policy] Miami Duplex created with ID:', miamiDuplex.id);
+    }
+
+    // Check if user has membership
+    const membership = await prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: miamiDuplex.id,
+          userId: userId
+        }
+      }
+    });
+
+    if (!membership) {
+      console.log('[Policy] Creating Miami Duplex membership for admin user');
+      await prisma.projectMember.create({
+        data: {
+          projectId: miamiDuplex.id,
+          userId: userId,
+          role: user.role
+        }
+      });
+    }
+  }
+
+  // Now get all memberships
   const memberships = await prisma.projectMember.findMany({
     where: { userId },
     select: { projectId: true }
   });
 
-  return memberships.map(m => m.projectId);
+  const projectIds = memberships.map(m => m.projectId);
+  console.log('[Policy] User has access to', projectIds.length, 'projects:', projectIds);
+
+  return projectIds;
 }
 
 /**

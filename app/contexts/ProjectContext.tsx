@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useProjects } from '@/hooks/use-api';
 import { useAuth } from '@/app/contexts/AuthContext';
+import { auth } from '@/lib/firebaseClient';
 
 interface Project {
   id: string;
@@ -78,8 +79,30 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('selectedProjectId', defaultProject.id);
         }
       }
+    } else if (projects.length === 0 && !isLoading && user) {
+      // No projects found and loading is complete - try to initialize Miami Duplex
+      console.log('[ProjectContext] No projects found, attempting initialization...');
+
+      // Get fresh token and call initialization endpoint
+      auth.currentUser?.getIdToken().then(token => {
+        fetch('/api/v1/projects/initialize', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            console.log('[ProjectContext] Initialization successful, refetching projects...');
+            refetchProjects();
+          }
+        })
+        .catch(err => {
+          console.error('[ProjectContext] Initialization failed:', err);
+        });
+      });
     }
-  }, [projects, currentProjectId]);
+  }, [projects, currentProjectId, isLoading, user, refetchProjects]);
   
   // Save current project to localStorage
   useEffect(() => {
