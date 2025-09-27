@@ -8,17 +8,19 @@ Add these environment variables in your Vercel Dashboard:
 ### 1. Database Connection (Supabase)
 
 ```bash
-# Pooling connection for API routes (port 6543)
-DATABASE_URL=postgresql://postgres:AXvz9QLt9YjAeNgg@db.xaydusadyemjlbhrkaxd.supabase.co:6543/postgres?pgbouncer=true
+# CRITICAL: Use Supabase Pooler endpoint for Vercel (Transaction mode)
+DATABASE_URL=postgresql://postgres.xaydusadyemjlbhrkaxd:AXvz9QLt9YjAeNgg@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
 
 # Direct connection for migrations (port 5432)
 DIRECT_URL=postgresql://postgres:AXvz9QLt9YjAeNgg@db.xaydusadyemjlbhrkaxd.supabase.co:5432/postgres
 ```
 
-**Important:**
-- Use port `6543` for DATABASE_URL (pooling connection)
-- Use port `5432` for DIRECT_URL (direct connection)
-- The pooling connection is required for serverless environments like Vercel
+**CRITICAL - Use the EXACT format above:**
+- **DATABASE_URL must use**: `aws-0-us-east-1.pooler.supabase.com` (NOT db.xaydusadyemjlbhrkaxd.supabase.co)
+- **Username format**: `postgres.xaydusadyemjlbhrkaxd` (with project ref after dot)
+- **Port**: 6543 for pooling
+- **Parameters**: `?pgbouncer=true&connection_limit=1`
+- The pooling connection is REQUIRED for serverless environments like Vercel
 
 ### 2. Firebase Admin SDK
 
