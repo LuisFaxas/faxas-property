@@ -141,18 +141,10 @@ export default function AdminSettingsPage() {
     }
   }, [authLoading, user]);
 
-  // Auto-initialize Miami Duplex if no projects exist
-  useEffect(() => {
-    if (!projectsLoading && projects.length === 0 && userRole === 'ADMIN' && isReady) {
-      console.log('No projects found, auto-initializing Miami Duplex...');
-      initializeMiamiDuplex();
-    }
-  }, [projects, projectsLoading, userRole, isReady]);
-
   // Fetch projects
   const { data: projectsData, isLoading: projectsLoading, refetch: refetchProjects } = useProjects(isReady);
-  
-  // Handle create project
+  const projects = projectsData || [];
+
   // Initialize Miami Duplex if needed
   const initializeMiamiDuplex = async () => {
     try {
@@ -173,6 +165,15 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // Auto-initialize Miami Duplex if no projects exist
+  useEffect(() => {
+    if (!projectsLoading && projects.length === 0 && userRole === 'ADMIN' && isReady) {
+      console.log('No projects found, auto-initializing Miami Duplex...');
+      initializeMiamiDuplex();
+    }
+  }, [projects, projectsLoading, userRole, isReady]);
+
+  // Handle create project
   const handleCreateProject = async () => {
     try {
       const response = await apiClient.post('/projects', {
