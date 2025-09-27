@@ -139,8 +139,9 @@ export function PageShell({
   const router = useRouter()
   const { user, logout, userRole: authUserRole } = useAuth()
   const isMobile = useMediaQuery('(max-width: 768px)')
-  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape)')
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const isDesktop = useMediaQuery('(min-width: 768px)')
+  const isLandscape = useMediaQuery('(max-width: 932px) and (orientation: landscape)') // Keep for mobile landscape detection
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Start collapsed by default
   const [sidebarHovered, setSidebarHovered] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
@@ -150,12 +151,12 @@ export function PageShell({
 
   const isContractor = pathname.startsWith('/contractor')
 
-  // Auto-collapse sidebar when entering landscape
+  // Auto-collapse sidebar on desktop for cleaner initial state
   useEffect(() => {
-    if (isLandscape) {
+    if (isDesktop) {
       setSidebarCollapsed(true)
     }
-  }, [isLandscape])
+  }, [isDesktop])
 
   // Use auth context values if available, otherwise use props
   const userRole = authUserRole as 'ADMIN' | 'STAFF' | 'CONTRACTOR' | 'VIEWER' || propUserRole || 'VIEWER'
@@ -205,42 +206,31 @@ export function PageShell({
   return (
     <div className="flex h-screen bg-graphite-900">
       {/* Sidebar / Navigation Rail */}
-      <aside 
+      <aside
         className={cn(
           "hidden md:flex flex-col glass border-r border-white/10 transition-all duration-300",
-          isLandscape && "fixed left-0 top-0 h-full z-30",
-          sidebarCollapsed ? "w-16" : "w-64",
-          isLandscape && sidebarCollapsed && !sidebarHovered && "w-14",
-          isLandscape && (sidebarHovered || !sidebarCollapsed) && "w-52 shadow-2xl"
+          "fixed left-0 top-0 h-full",
+          sidebarCollapsed && !sidebarHovered ? "w-16" : "w-64",
+          sidebarHovered && "shadow-2xl",
+          // Higher z-index when expanded to appear over header
+          sidebarHovered || !sidebarCollapsed ? "z-50" : "z-30"
         )}
-        onMouseEnter={() => isLandscape && setSidebarHovered(true)}
-        onMouseLeave={() => isLandscape && setSidebarHovered(false)}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
       >
-        <div className={cn(
-          "flex items-center justify-between border-b border-white/10",
-          isLandscape ? "p-2" : "p-4"
-        )}>
-          {(!sidebarCollapsed || sidebarHovered) && !isLandscape && (
-            <h2 className="text-xl font-bold text-accent-500">Control Center</h2>
-          )}
-          {isLandscape && (sidebarHovered || !sidebarCollapsed) && (
-            <h2 className="text-lg font-bold text-accent-500">Menu</h2>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        <div className="flex items-center h-[60px] border-b border-white/10 px-4">
+          {/* Title with smooth fade animation */}
+          <h2
             className={cn(
-              "text-white/70 hover:text-white",
-              isLandscape && sidebarCollapsed && !sidebarHovered && "mx-auto"
+              "text-xl font-bold text-accent-500 whitespace-nowrap transition-opacity duration-300",
+              sidebarCollapsed && !sidebarHovered ? "opacity-0 delay-0" : "opacity-100 delay-150"
             )}
+            style={{
+              transitionDelay: sidebarCollapsed && !sidebarHovered ? '0ms' : '150ms'
+            }}
           >
-            {sidebarCollapsed && !sidebarHovered ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
+            {isContractor ? 'Contractor Portal' : 'Admin Dashboard'}
+          </h2>
         </div>
         
         <nav className="flex-1 p-2 space-y-1">
@@ -255,60 +245,57 @@ export function PageShell({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg transition-colors",
-                  isLandscape ? "px-2 py-1.5" : "px-3 py-2",
-                  isLandscape && sidebarCollapsed && !sidebarHovered && "justify-center",
+                  "flex items-center gap-3 rounded-lg transition-colors px-3 py-2",
+                  sidebarCollapsed && !sidebarHovered && "justify-center",
                   "hover:bg-white/10",
                   isActive && "bg-accent-500/20 text-accent-500",
                   !isActive && "text-white/70 hover:text-white"
                 )}
-                title={(sidebarCollapsed && !sidebarHovered) ? item.label : undefined}
+                title={sidebarCollapsed && !sidebarHovered ? item.label : undefined}
               >
-                <Icon className={cn(
-                  "flex-shrink-0",
-                  isLandscape ? "h-4 w-4" : "h-5 w-5"
-                )} />
-                {(!sidebarCollapsed || sidebarHovered) && (
-                  <span className={cn(
-                    isLandscape && "text-sm"
-                  )}>{item.label}</span>
-                )}
+                <Icon className="flex-shrink-0 h-5 w-5" />
+                <span
+                  className={cn(
+                    "transition-opacity duration-300 whitespace-nowrap",
+                    sidebarCollapsed && !sidebarHovered ? "opacity-0" : "opacity-100 delay-150"
+                  )}
+                  style={{
+                    transitionDelay: sidebarCollapsed && !sidebarHovered ? '0ms' : '150ms'
+                  }}
+                >
+                  {item.label}
+                </span>
               </Link>
             )
           })}
         </nav>
 
-        <div className={cn(
-          "border-t border-white/10",
-          isLandscape ? "p-2" : "p-4"
-        )}>
+        <div className="border-t border-white/10 p-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="ghost" 
                 className={cn(
                   "w-full text-white/70 hover:text-white",
-                  isLandscape && sidebarCollapsed && !sidebarHovered ? "justify-center" : "justify-start"
+                  sidebarCollapsed && !sidebarHovered ? "justify-center" : "justify-start"
                 )}
               >
-                <Avatar className={cn(
-                  isLandscape ? "h-6 w-6" : "h-8 w-8"
-                )}>
+                <Avatar className="h-8 w-8">
                   <AvatarImage src="" />
                   <AvatarFallback className="bg-accent-500/20 text-accent-500">{initials}</AvatarFallback>
                 </Avatar>
-                {(!sidebarCollapsed || sidebarHovered) && (
-                  <div className="ml-3 text-left">
-                    <p className={cn(
-                      "font-medium",
-                      isLandscape ? "text-xs" : "text-sm"
-                    )}>{userName}</p>
-                    <p className={cn(
-                      "text-white/50",
-                      isLandscape ? "text-[10px]" : "text-xs"
-                    )}>{userRole}</p>
-                  </div>
-                )}
+                <div
+                  className={cn(
+                    "ml-3 text-left transition-opacity duration-300 overflow-hidden",
+                    sidebarCollapsed && !sidebarHovered ? "opacity-0 w-0" : "opacity-100 w-auto delay-150"
+                  )}
+                  style={{
+                    transitionDelay: sidebarCollapsed && !sidebarHovered ? '0ms' : '150ms'
+                  }}
+                >
+                  <p className="font-medium text-sm whitespace-nowrap">{userName}</p>
+                  <p className="text-white/50 text-xs whitespace-nowrap">{userRole}</p>
+                </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 glass-card">
@@ -336,18 +323,15 @@ export function PageShell({
           <ProjectSwitcher />
           
           <h2 className="font-bold text-accent-500 flex-1 text-center text-lg">
-            {pageTitle || 'Control Center'}
+            {pageTitle || (isContractor ? 'Contractor Portal' : 'Admin Dashboard')}
           </h2>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
-                <Avatar className={isLandscape ? "h-6 w-6" : "h-8 w-8"}>
+                <Avatar className="h-8 w-8">
                   <AvatarImage src="" />
-                  <AvatarFallback className={cn(
-                    "bg-accent-500/20 text-accent-500",
-                    isLandscape && "text-[10px]"
-                  )}>{initials}</AvatarFallback>
+                  <AvatarFallback className="bg-accent-500/20 text-accent-500">{initials}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -457,7 +441,7 @@ export function PageShell({
       {/* Main Content */}
       <div className={cn(
         "flex-1 overflow-auto",
-        isLandscape && "ml-14"
+        "md:ml-16" // Account for collapsed sidebar width
       )}>
         {/* Desktop Header with Project Switcher */}
         <div
@@ -481,7 +465,7 @@ export function PageShell({
           className={cn(
             "space-y-6 md:space-y-8",
             // TOP padding - pure CSS breakpoints (mobile-first)
-            "pt-16 md:pt-[72px] lg:pt-[72px]",
+            "pt-16 md:pt-4 lg:pt-6",
             // BOTTOM padding for mobile nav
             "pb-[60px] md:pb-0"
           )}

@@ -60,8 +60,9 @@ export default function BiddingPage() {
 
   return (
     <PageShell pageTitle="Bidding & RFPs">
-      {/* Action Button */}
-      <div className="flex justify-end mb-6">
+      <div className="p-4 md:p-6 max-w-7xl mx-auto">
+        {/* Action Button */}
+        <div className="flex justify-end mb-6">
         <Button onClick={() => router.push('/admin/bidding/new')}>
           <Plus className="h-4 w-4 mr-2" />
           New RFP
@@ -252,17 +253,18 @@ export default function BiddingPage() {
             </Card>
           ))
         )}
-      </div>
+        </div>
 
-      {/* Floating Action Button for Mobile */}
-      <div className="fixed bottom-6 right-6 md:hidden">
-        <Button
+        {/* Floating Action Button for Mobile */}
+        <div className="fixed bottom-6 right-6 md:hidden">
+          <Button
           size="lg"
           className="rounded-full h-14 w-14 shadow-lg"
           onClick={() => router.push('/admin/bidding/new')}
         >
-          <Plus className="h-6 w-6" />
-        </Button>
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
       </div>
     </PageShell>
   );
