@@ -22,11 +22,8 @@ class FirebaseAdminAuth {
   }
 
   async verifyIdToken(token: string) {
-    if (typeof window === 'undefined' && !process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 && !process.env.FIREBASE_PROJECT_ID) {
-      // During build, return a mock user
-      console.warn('Firebase Admin not initialized during build');
-      return null;
-    }
+    // Always attempt to verify the token properly
+    // This is critical for production authentication
     const auth = await this.getAuth();
     return auth.verifyIdToken(token);
   }

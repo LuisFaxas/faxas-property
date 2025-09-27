@@ -158,12 +158,18 @@ export async function validateFirebaseToken(token: string): Promise<{
 }> {
   try {
     const decodedToken = await auth.verifyIdToken(token, true);
-    
+
+    // Critical: Check if decodedToken is null (Firebase Admin not initialized)
+    if (!decodedToken) {
+      console.error('[Session] Token verification returned null - Firebase Admin may not be initialized');
+      throw new ApiError(401, 'Token verification failed - Firebase Admin not initialized properly');
+    }
+
     // Check if token is close to expiry (within 5 minutes)
     const now = Math.floor(Date.now() / 1000);
     const timeUntilExpiry = decodedToken.exp - now;
     const shouldRefresh = timeUntilExpiry < 300; // 5 minutes
-    
+
     return {
       decodedToken,
       shouldRefresh

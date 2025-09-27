@@ -41,7 +41,13 @@ export async function requireAuth(request?: NextRequest): Promise<AuthenticatedU
   try {
     // Validate Firebase token with refresh check
     const { decodedToken, shouldRefresh } = await validateFirebaseToken(token);
-    
+
+    // Critical: Ensure we have a valid decodedToken
+    if (!decodedToken || !decodedToken.uid) {
+      console.error('[Auth Check] Token validation failed - decodedToken is null or invalid');
+      throw new ApiError(401, 'Authentication failed - Firebase Admin may not be properly initialized');
+    }
+
     // Check for session if provided
     const sessionId = request?.headers.get('x-session-id') || undefined;
     if (sessionId) {

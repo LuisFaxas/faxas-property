@@ -16,12 +16,23 @@ async function initializeAdmin() {
     return;
   }
 
+  // Critical: Log environment variable availability for debugging
+  console.log('[Firebase Admin] Environment check:', {
+    hasBase64: !!process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
+    base64Length: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64?.length || 0,
+    hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+    hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+    hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+    nodeEnv: process.env.NODE_ENV,
+    isVercel: !!process.env.VERCEL
+  });
+
   try {
     let serviceAccount: any;
 
     // Try method 1: Base64 encoded service account (preferred for Vercel)
     if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
-      console.log('Initializing Firebase Admin with base64 credentials');
+      console.log('[Firebase Admin] Initializing with base64 credentials');
       const serviceAccountBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
 
       try {
@@ -56,7 +67,10 @@ async function initializeAdmin() {
       };
     }
     else {
-      throw new Error('Firebase credentials not found. Set either FIREBASE_SERVICE_ACCOUNT_BASE64 or individual FIREBASE_* environment variables');
+      console.error('[Firebase Admin] CRITICAL: No Firebase credentials found in environment');
+      console.error('[Firebase Admin] Required: FIREBASE_SERVICE_ACCOUNT_BASE64 or individual FIREBASE_* variables');
+      console.error('[Firebase Admin] Available env keys:', Object.keys(process.env).filter(k => k.includes('FIREBASE')));
+      throw new Error('Firebase Admin credentials not available - check Vercel environment variables');
     }
 
     // Validate required fields
