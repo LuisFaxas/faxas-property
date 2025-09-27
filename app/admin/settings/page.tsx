@@ -105,9 +105,10 @@ const PROJECT_COLORS = [
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, userRole } = useAuth();
   const [isReady, setIsReady] = useState(false);
   const [activeTab, setActiveTab] = useState('projects');
+  const [initializationAttempted, setInitializationAttempted] = useState(false);
   
   // Project management states
   const [searchQuery, setSearchQuery] = useState('');
@@ -167,11 +168,12 @@ export default function AdminSettingsPage() {
 
   // Auto-initialize Miami Duplex if no projects exist
   useEffect(() => {
-    if (!projectsLoading && projects.length === 0 && userRole === 'ADMIN' && isReady) {
+    if (!projectsLoading && projects.length === 0 && userRole === 'ADMIN' && isReady && !initializationAttempted) {
       console.log('No projects found, auto-initializing Miami Duplex...');
+      setInitializationAttempted(true);
       initializeMiamiDuplex();
     }
-  }, [projects, projectsLoading, userRole, isReady]);
+  }, [projects, projectsLoading, userRole, isReady, initializationAttempted]);
 
   // Handle create project
   const handleCreateProject = async () => {

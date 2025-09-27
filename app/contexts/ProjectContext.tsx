@@ -42,6 +42,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [initializationAttempted, setInitializationAttempted] = useState(false);
   
   // Wait for auth to be ready
   useEffect(() => {
@@ -79,30 +80,49 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('selectedProjectId', defaultProject.id);
         }
       }
-    } else if (projects.length === 0 && !isLoading && user) {
-      // No projects found and loading is complete - try to initialize Miami Duplex
+    } else if (projects.length === 0 && !isLoading && user && !initializationAttempted) {
+      // No projects found and loading is complete - try to initialize Miami Duplex (only once)
       console.log('[ProjectContext] No projects found, attempting initialization...');
+      setInitializationAttempted(true);
 
       // Get fresh token and call initialization endpoint
       auth.currentUser?.getIdToken().then(token => {
         fetch('/api/v1/projects/initialize', {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         })
-        .then(res => res.json())
+        .then(res => {
+          // Check if response is JSON before parsing
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            return res.json();
+          }
+          // If not JSON, it's likely a redirect to login
+          throw new Error("Non-JSON response - likely authentication issue");
+        })
         .then(data => {
-          if (data.success) {
+          if (data && data.success) {
             console.log('[ProjectContext] Initialization successful, refetching projects...');
             refetchProjects();
+          } else {
+            console.error('[ProjectContext] Initialization failed:', data?.error || 'Unknown error');
           }
         })
         .catch(err => {
-          console.error('[ProjectContext] Initialization failed:', err);
+          console.error('[ProjectContext] Initialization failed:', err.message || err);
+          // Reset flag after 30 seconds to allow retry if user refreshes
+          setTimeout(() => {
+            setInitializationAttempted(false);
+          }, 30000);
         });
+      }).catch(err => {
+        console.error('[ProjectContext] Failed to get auth token:', err);
+        setInitializationAttempted(false);
       });
     }
-  }, [projects, currentProjectId, isLoading, user, refetchProjects]);
+  }, [projects, currentProjectId, isLoading, user, initializationAttempted]);
   
   // Save current project to localStorage
   useEffect(() => {
