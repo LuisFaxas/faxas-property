@@ -6,9 +6,21 @@ const globalForPrisma = globalThis as unknown as {
 
 // Create PrismaClient with explicit datasource URL for Vercel
 function createPrismaClient() {
-  // On Vercel, explicitly use the DATABASE_URL with pooling connection
-  if (process.env.VERCEL && process.env.DATABASE_URL) {
-    console.log('[Prisma] Running on Vercel, using DATABASE_URL with pooling');
+  // On Vercel, use the Supabase integration variables
+  if (process.env.VERCEL && process.env.POSTGRES_PRISMA_URL) {
+    console.log('[Prisma] Running on Vercel, using POSTGRES_PRISMA_URL with pooling');
+    return new PrismaClient({
+      datasources: {
+        db: {
+          url: process.env.POSTGRES_PRISMA_URL
+        }
+      }
+    });
+  }
+
+  // Fallback to DATABASE_URL for local development
+  if (process.env.DATABASE_URL) {
+    console.log('[Prisma] Using DATABASE_URL');
     return new PrismaClient({
       datasources: {
         db: {
@@ -18,7 +30,7 @@ function createPrismaClient() {
     });
   }
 
-  // Default initialization for local development
+  // Default initialization
   return new PrismaClient();
 }
 

@@ -53,7 +53,9 @@
       "Bash(npx vercel:*)",
       "Bash(npx tsx:*)",
       "Bash(echo \"$FIREBASE_SERVICE_ACCOUNT_BASE64\")",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:www.prisma.io)"
     ],
     "deny": [],
     "ask": []

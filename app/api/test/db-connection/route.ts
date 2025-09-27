@@ -13,11 +13,16 @@ export async function GET(request: NextRequest) {
       VERCEL_ENV: process.env.VERCEL_ENV,
     },
     databaseConfig: {
+      // Check for Supabase integration variables
+      hasPostgresPrismaUrl: !!process.env.POSTGRES_PRISMA_URL,
+      hasPostgresUrl: !!process.env.POSTGRES_URL,
+      hasPostgresNonPooling: !!process.env.POSTGRES_URL_NON_POOLING,
+      // Legacy variables
       hasDatabaseUrl: !!process.env.DATABASE_URL,
       hasDirectUrl: !!process.env.DIRECT_URL,
       // Extract just the host/port without credentials
-      databaseHost: process.env.DATABASE_URL ?
-        process.env.DATABASE_URL.split('@')[1]?.split('/')[0] : 'not-set',
+      databaseHost: (process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL) ?
+        (process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || '').split('@')[1]?.split('/')[0] : 'not-set',
     },
     tests: []
   };
@@ -139,25 +144,66 @@ function getRecommendation(error: any): string {
   const errorMessage = error.message || '';
 
   if (errorMessage.includes("Can't reach database server")) {
-    return 'Database server unreachable. For Vercel deployment with Supabase:\n' +
-           '1. Use port 6543 for pooling (not 5432)\n' +
-           '2. Set DATABASE_URL with pooling port: postgresql://...@db.supabase.co:6543/...\n' +
-           '3. Set DIRECT_URL with direct port: postgresql://...@db.supabase.co:5432/...';
+    // Check which variable is being used
+    const dbUrl = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || '';
+    const hasIntegrationVars = !!process.env.POSTGRES_PRISMA_URL;
+
+    if (!hasIntegrationVars) {
+      return '🚨 Supabase-Vercel Integration not detected!\n\n' +
+             'The integration should have set POSTGRES_PRISMA_URL automatically.\n\n' +
+             'ACTION REQUIRED:\n' +
+             '1. Check Vercel Dashboard → Settings → Environment Variables\n' +
+             '2. Verify that POSTGRES_PRISMA_URL and POSTGRES_URL_NON_POOLING are set\n' +
+             '3. If not, reconnect the Supabase integration\n' +
+             '4. Redeploy after variables are confirmed';
+    }
+
+    const isOldFormat = dbUrl.includes('db.') && dbUrl.includes('.supabase.co');
+    const isCorrectPort = dbUrl.includes(':6543');
+    const hasPooler = dbUrl.includes('pooler.supabase.com');
+    const hasPgBouncer = dbUrl.includes('pgbouncer=true');
+
+    if (isOldFormat) {
+      return '🚨 CRITICAL: Old Supabase connection format detected!\n\n' +
+             'The Supabase integration should have updated this automatically.\n\n' +
+             'ACTION REQUIRED:\n' +
+             '1. Go to Vercel Dashboard → Settings → Integrations\n' +
+             '2. Remove and re-add the Supabase integration\n' +
+             '3. Ensure it sets POSTGRES_PRISMA_URL with the new pooler format\n' +
+             '4. Redeploy your application';
+    }
+
+    if (!hasPooler) {
+      return '❌ Missing pooler endpoint. Use aws-0-[REGION].pooler.supabase.com format';
+    }
+
+    if (!isCorrectPort) {
+      return '❌ Wrong port. Use port 6543 for transaction pooling (not 5432)';
+    }
+
+    if (!hasPgBouncer) {
+      return '❌ Missing pgbouncer=true parameter. Add ?pgbouncer=true to DATABASE_URL';
+    }
+
+    return 'Database server unreachable. Check:\n' +
+           '1. IP bans in Supabase Dashboard → Settings → Database → Network Bans\n' +
+           '2. Supabase project is active (not paused)\n' +
+           '3. Connection string format is correct';
   }
 
   if (errorMessage.includes('timeout')) {
-    return 'Connection timeout. Check if Supabase allows connections from Vercel IP addresses.';
+    return 'Connection timeout. Add ?connect_timeout=300&pool_timeout=300 to DATABASE_URL';
   }
 
   if (errorMessage.includes('authentication')) {
-    return 'Authentication failed. Verify database password in DATABASE_URL.';
+    return 'Authentication failed. Check password and ensure no special characters cause issues.';
   }
 
   if (errorMessage.includes('SSL')) {
     return 'SSL connection issue. Add ?sslmode=require to your DATABASE_URL.';
   }
 
-  return 'Unknown database error. Check Vercel logs for more details.';
+  return 'Unknown database error. Check Vercel Function logs for details.';
 }
 
 // Force Node.js runtime
