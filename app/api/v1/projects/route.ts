@@ -31,13 +31,16 @@ export const GET = withAuth(
   async (request: NextRequest, ctx: any, security: SecurityContext) => {
     try {
       const { auth } = security;
-    
+
+    console.log('[Projects API] Fetching projects for user:', auth.user.id, 'with role:', auth.role);
+
     const url = new URL(request.url);
     const includeArchived = url.searchParams.get('includeArchived') === 'true';
     const favoritesOnly = url.searchParams.get('favoritesOnly') === 'true';
     
     // Use policy engine to get user's accessible projects
     const userProjectIds = await Policy.getUserProjects(auth.user.id);
+    console.log('[Projects API] User accessible project IDs:', userProjectIds);
     
     // Build where clause
     const where: any = {
@@ -69,20 +72,87 @@ export const GET = withAuth(
         { createdAt: 'desc' }
       ]
     });
+
+    console.log('[Projects API] Found', projects.length, 'projects for user');
     
-    // If no projects exist, create a default one
+    // If no projects exist for user, ensure Miami Duplex exists and link it
     if (projects.length === 0 && !favoritesOnly) {
-      const defaultProject = await prisma.project.create({
-        data: {
-          name: 'Miami Duplex Remodel',
-          status: 'ACTIVE',
-          projectType: 'RENOVATION',
-          description: 'Complete renovation of Miami duplex property',
-          color: '#3B82F6'
+      console.log('[Projects API] No projects found for user, checking Miami Duplex...');
+
+      // First check if Miami Duplex exists at all
+      let miamiDuplex = await prisma.project.findFirst({
+        where: {
+          name: 'Miami Duplex Remodel'
         }
       });
-      
-      return successResponse([defaultProject]);
+
+      // Create Miami Duplex if it doesn't exist
+      if (!miamiDuplex) {
+        console.log('[Projects API] Creating Miami Duplex project...');
+        miamiDuplex = await prisma.project.create({
+          data: {
+            name: 'Miami Duplex Remodel',
+            status: 'ACTIVE',
+            projectType: 'RENOVATION',
+            description: 'Complete renovation of Miami duplex property',
+            color: '#3B82F6'
+          }
+        });
+        console.log('[Projects API] Miami Duplex created with ID:', miamiDuplex.id);
+      } else {
+        console.log('[Projects API] Miami Duplex exists with ID:', miamiDuplex.id);
+      }
+
+      // For ADMIN/STAFF users, ensure they have membership
+      if (auth.role === 'ADMIN' || auth.role === 'STAFF') {
+        console.log('[Projects API] Admin/Staff user - ensuring project membership...');
+
+        // Check if membership exists
+        const existingMembership = await prisma.projectMember.findUnique({
+          where: {
+            projectId_userId: {
+              projectId: miamiDuplex.id,
+              userId: auth.user.id
+            }
+          }
+        });
+
+        if (!existingMembership) {
+          console.log('[Projects API] Creating project membership for user...');
+          await prisma.projectMember.create({
+            data: {
+              projectId: miamiDuplex.id,
+              userId: auth.user.id,
+              role: auth.role
+            }
+          });
+          console.log('[Projects API] Project membership created');
+        } else {
+          console.log('[Projects API] Project membership already exists');
+        }
+
+        // Return the Miami Duplex project
+        const projectWithCounts = await prisma.project.findUnique({
+          where: { id: miamiDuplex.id },
+          include: {
+            _count: {
+              select: {
+                tasks: true,
+                contacts: true,
+                budgets: true,
+                schedule: true,
+                procurement: true,
+              },
+            },
+          }
+        });
+
+        return successResponse([projectWithCounts]);
+      }
+
+      // For other roles, return empty array
+      console.log('[Projects API] Non-admin user with no projects');
+      return successResponse([]);
     }
     
     // Apply rate limiting based on role
