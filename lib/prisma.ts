@@ -15,10 +15,23 @@ function createPrismaClient() {
 
   // If the required environment variables exist, use them explicitly
   if (process.env.POSTGRES_PRISMA_URL) {
+    // Ensure the URL has pgbouncer=true and statement_cache_size=0
+    let url = process.env.POSTGRES_PRISMA_URL;
+
+    // Add pgbouncer=true if not present
+    if (!url.includes('pgbouncer=true')) {
+      url += url.includes('?') ? '&pgbouncer=true' : '?pgbouncer=true';
+    }
+
+    // Add statement_cache_size=0 to disable prepared statements
+    if (!url.includes('statement_cache_size=')) {
+      url += '&statement_cache_size=0';
+    }
+
     return new PrismaClient({
       datasources: {
         db: {
-          url: process.env.POSTGRES_PRISMA_URL
+          url
         }
       }
     });
