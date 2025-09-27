@@ -141,10 +141,38 @@ export default function AdminSettingsPage() {
     }
   }, [authLoading, user]);
 
+  // Auto-initialize Miami Duplex if no projects exist
+  useEffect(() => {
+    if (!projectsLoading && projects.length === 0 && userRole === 'ADMIN' && isReady) {
+      console.log('No projects found, auto-initializing Miami Duplex...');
+      initializeMiamiDuplex();
+    }
+  }, [projects, projectsLoading, userRole, isReady]);
+
   // Fetch projects
   const { data: projectsData, isLoading: projectsLoading, refetch: refetchProjects } = useProjects(isReady);
   
   // Handle create project
+  // Initialize Miami Duplex if needed
+  const initializeMiamiDuplex = async () => {
+    try {
+      const response = await apiClient.get('/projects/initialize');
+      if (response) {
+        toast({
+          title: 'Success',
+          description: 'Miami Duplex project initialized successfully',
+        });
+        refetchProjects();
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to initialize Miami Duplex',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleCreateProject = async () => {
     try {
       const response = await apiClient.post('/projects', {
@@ -485,8 +513,18 @@ export default function AdminSettingsPage() {
                     Create and manage all your construction projects in one place
                   </CardDescription>
                 </div>
-                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                  <DialogTrigger asChild>
+                <div className="flex gap-2">
+                  {projects.length === 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={initializeMiamiDuplex}
+                      className="border-accent-500 text-accent-500 hover:bg-accent-500 hover:text-white"
+                    >
+                      Initialize Miami Duplex
+                    </Button>
+                  )}
+                  <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                    <DialogTrigger asChild>
                     <Button className="bg-accent-500 hover:bg-accent-600">
                       <Plus className="mr-2 h-4 w-4" />
                       New Project
@@ -685,6 +723,7 @@ export default function AdminSettingsPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
