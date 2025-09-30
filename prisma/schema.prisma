@@ -107,6 +107,7 @@ model Task {
   assignedToId       String?
   relatedContactIds  String[]
   createdAt          DateTime              @default(now())
+  createdBy          String?
   actualHours        Float?
   completedAt        DateTime?
   customFields       Json?

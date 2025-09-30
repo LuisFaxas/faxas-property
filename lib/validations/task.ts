@@ -11,8 +11,10 @@ export const createTaskSchema = z.object({
   description: z.string().optional(),
   status: TaskStatus.default('TODO'),
   priority: TaskPriority.default('MEDIUM'),
-  dueDate: z.string().datetime().optional(),
-  startDate: z.string().datetime().optional(),
+  dueDate: z.string().datetime().or(z.literal('')).optional()
+    .transform(val => val === '' ? undefined : val),
+  startDate: z.string().datetime().or(z.literal('')).optional()
+    .transform(val => val === '' ? undefined : val),
   
   // Assignment and project
   assignedToId: z.string().optional(),
@@ -48,8 +50,10 @@ export const createTaskSchema = z.object({
   // Mobile fields
   offlineCreated: z.boolean().default(false),
   localId: z.string().optional(),
-  thumbnailUrl: z.string().url().optional(),
-  voiceNoteUrl: z.string().url().optional(),
+  thumbnailUrl: z.string().url().or(z.literal('')).optional()
+    .transform(val => val === '' ? undefined : val),
+  voiceNoteUrl: z.string().url().or(z.literal('')).optional()
+    .transform(val => val === '' ? undefined : val),
   quickTemplate: z.string().optional(),
   mobileMetadata: z.record(z.string(), z.unknown()).optional(),
   
@@ -59,12 +63,14 @@ export const createTaskSchema = z.object({
 
 export const updateTaskSchema = createTaskSchema.partial().extend({
   id: z.string(),
-  completedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().or(z.literal('')).optional()
+    .transform(val => val === '' ? undefined : val),
 });
 
 export const updateTaskStatusSchema = z.object({
   status: TaskStatus,
-  completedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().or(z.literal('')).optional()
+    .transform(val => val === '' ? undefined : val),
 });
 
 export const taskQuerySchema = z.object({

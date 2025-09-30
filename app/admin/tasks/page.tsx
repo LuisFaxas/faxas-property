@@ -262,28 +262,26 @@ export default function AdminTasksPage() {
   // Handlers
   const handleCreate = async (values: TaskFormValues) => {
     setIsSubmitting(true);
-    const taskData = {
-      ...values,
-      projectId: projectId || values.projectId,
-      // Clean up empty date string - API expects undefined or valid ISO datetime
-      dueDate: values.dueDate || undefined,
-    };
     try {
-      await createMutation.mutateAsync(taskData);
-      toast({
-        title: 'Success',
-        description: 'Task created successfully',
+      await createMutation.mutateAsync({
+        ...values,
+        projectId: projectId || values.projectId,
       });
+      // Success toast is handled by mutation hook
       setIsCreateOpen(false);
       form.reset();
-      await refetch();
+      // Cache invalidation is automatic via mutation hook
     } catch (error) {
       console.error('Error creating task:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create task',
-        variant: 'destructive',
-      });
+      // Mutation hook already shows toast with proper error message
+      // Only show toast here if mutation hook didn't (shouldn't happen normally)
+      if (!(error as any)?.error && !(error as any)?.message) {
+        toast({
+          title: 'Error',
+          description: 'Failed to create task. Please check all required fields.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -296,7 +294,7 @@ export default function AdminTasksPage() {
 
   const handleConfirmDelete = async () => {
     if (!selectedTask) return;
-    
+
     setIsSubmitting(true);
     deleteMutation.mutate(
       { id: selectedTask.id, projectId },
@@ -304,8 +302,8 @@ export default function AdminTasksPage() {
         onSuccess: () => {
           setIsDeleteOpen(false);
           setSelectedTask(null);
-          refetch();
           setIsSubmitting(false);
+          // Cache invalidation is automatic via mutation hook
         },
         onError: () => {
           setIsSubmitting(false);
@@ -330,30 +328,30 @@ export default function AdminTasksPage() {
   
   const handleUpdate = async (values: TaskFormValues) => {
     if (!selectedTask) return;
-    
+
     setIsSubmitting(true);
     try {
       await updateMutation.mutateAsync({
         id: selectedTask.id,
         ...values,
-        // Clean up empty date string - API expects undefined or valid ISO datetime
-        dueDate: values.dueDate || undefined,
+        projectId,
       });
-      toast({
-        title: 'Success',
-        description: 'Task updated successfully',
-      });
+      // Success toast is handled by mutation hook
       setIsEditOpen(false);
       setSelectedTask(null);
       form.reset();
-      refetch();
+      // Cache invalidation is automatic via mutation hook
     } catch (error) {
       console.error('Error updating task:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update task',
-        variant: 'destructive',
-      });
+      // Mutation hook already shows toast with proper error message
+      // Only show toast here if mutation hook didn't (shouldn't happen normally)
+      if (!(error as any)?.error && !(error as any)?.message) {
+        toast({
+          title: 'Error',
+          description: 'Failed to update task. Please check all required fields.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -362,7 +360,7 @@ export default function AdminTasksPage() {
   const handleStatusUpdate = async (taskId: string, status: string) => {
     try {
       await updateStatusMutation.mutateAsync({ id: taskId, status });
-      refetch();
+      // Cache invalidation is automatic via mutation hook
     } catch (error) {
       console.error('Error updating status:', error);
     }
@@ -382,7 +380,7 @@ export default function AdminTasksPage() {
   
   const handleConfirmBulkDelete = async () => {
     if (selectedRows.length === 0) return;
-    
+
     setIsSubmitting(true);
     try {
       await bulkDeleteMutation.mutateAsync({
@@ -391,7 +389,7 @@ export default function AdminTasksPage() {
       });
       setSelectedRows([]);
       setIsBulkDeleteOpen(false);
-      refetch();
+      // Cache invalidation is automatic via mutation hook
     } catch (error) {
       console.error('Bulk delete error:', error);
     } finally {

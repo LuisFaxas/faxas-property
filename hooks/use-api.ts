@@ -30,7 +30,7 @@ export function useTask(id: string) {
 
 export function useCreateTask() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: any) => apiClient.post('/tasks', data),
     onSuccess: (data, variables) => {
@@ -38,8 +38,8 @@ export function useCreateTask() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       // Also invalidate specific project tasks if projectId is available
       if (variables.projectId) {
-        queryClient.invalidateQueries({ 
-          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }] 
+        queryClient.invalidateQueries({
+          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }]
         });
       }
       toast({
@@ -48,9 +48,14 @@ export function useCreateTask() {
       });
     },
     onError: (error: any) => {
+      // Extract error message from various possible structures
+      const errorMessage = error?.error // API response { error: "message" }
+        || error?.message // Standard Error object
+        || 'Failed to create task';
+
       toast({
         title: 'Error',
-        description: error.error || 'Failed to create task',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -59,7 +64,7 @@ export function useCreateTask() {
 
 export function useUpdateTask() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: ({ id, ...data }: any) => apiClient.put(`/tasks/${id}`, data),
     onSuccess: (data, variables) => {
@@ -67,8 +72,8 @@ export function useUpdateTask() {
       queryClient.invalidateQueries({ queryKey: ['task'] });
       // Also invalidate specific project tasks if projectId is available
       if (variables.projectId) {
-        queryClient.invalidateQueries({ 
-          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }] 
+        queryClient.invalidateQueries({
+          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }]
         });
       }
       toast({
@@ -77,9 +82,14 @@ export function useUpdateTask() {
       });
     },
     onError: (error: any) => {
+      // Extract error message from various possible structures
+      const errorMessage = error?.error
+        || error?.message
+        || 'Failed to update task';
+
       toast({
         title: 'Error',
-        description: error.error || 'Failed to update task',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -88,9 +98,9 @@ export function useUpdateTask() {
 
 export function useUpdateTaskStatus() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, status, completedAt }: any) => 
+    mutationFn: ({ id, status, completedAt }: any) =>
       apiClient.patch(`/tasks/${id}/status`, { status, completedAt }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -101,9 +111,14 @@ export function useUpdateTaskStatus() {
       });
     },
     onError: (error: any) => {
+      // Extract error message from various possible structures
+      const errorMessage = error?.error
+        || error?.message
+        || 'Failed to update task status';
+
       toast({
         title: 'Error',
-        description: error.error || 'Failed to update task status',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -113,7 +128,7 @@ export function useUpdateTaskStatus() {
 // New Task API hooks for enhanced functionality
 export function useBulkUpdateTasks() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: any) => apiClient.patch('/tasks', data),
     onSuccess: (data) => {
@@ -124,9 +139,14 @@ export function useBulkUpdateTasks() {
       });
     },
     onError: (error: any) => {
+      // Extract error message from various possible structures
+      const errorMessage = error?.error
+        || error?.message
+        || 'Failed to update tasks';
+
       toast({
         title: 'Error',
-        description: error.error || 'Failed to update tasks',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -218,16 +238,16 @@ export function useUpdateTaskProgress() {
 
 export function useDeleteTask() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, projectId }: { id: string; projectId?: string }) => 
+    mutationFn: ({ id, projectId }: { id: string; projectId?: string }) =>
       apiClient.delete(`/tasks/${id}`),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       // Also invalidate specific project tasks if projectId is available
       if (variables.projectId) {
-        queryClient.invalidateQueries({ 
-          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }] 
+        queryClient.invalidateQueries({
+          queryKey: ['tasks', { projectId: variables.projectId, limit: 100 }]
         });
       }
       toast({
@@ -236,9 +256,14 @@ export function useDeleteTask() {
       });
     },
     onError: (error: any) => {
+      // Extract error message from various possible structures
+      const errorMessage = error?.error
+        || error?.message
+        || 'Failed to delete task';
+
       toast({
         title: 'Error',
-        description: error.error || 'Failed to delete task',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -266,9 +291,14 @@ export function useBulkDeleteTasks() {
       });
     },
     onError: (error: any) => {
+      // Extract error message from various possible structures
+      const errorMessage = error?.error
+        || error?.message
+        || 'Failed to delete tasks';
+
       toast({
         title: 'Error',
-        description: error.error || 'Failed to delete tasks',
+        description: errorMessage,
         variant: 'destructive'
       });
     }

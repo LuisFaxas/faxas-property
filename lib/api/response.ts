@@ -50,12 +50,12 @@ export function errorResponse(
   if (error instanceof ApiError) {
     // Log security-related errors separately
     if (error.statusCode === 401 || error.statusCode === 403) {
-      log.security.failure('API Access', undefined, error.message, { 
+      log.security.failure('API Access', undefined, error.message, {
         statusCode: error.statusCode,
-        correlationId 
+        correlationId
       });
     }
-    
+
     return NextResponse.json(
       {
         success: false,
@@ -66,7 +66,25 @@ export function errorResponse(
       { status: error.statusCode }
     );
   }
-  
+
+  // Handle Zod validation errors
+  if (error && typeof error === 'object' && 'issues' in error) {
+    const zodError = error as any;
+    const firstIssue = zodError.issues?.[0];
+    const fieldPath = firstIssue?.path?.join('.') || 'input';
+    const message = firstIssue?.message || 'Validation failed';
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: `${fieldPath}: ${message}`,
+        code: 'VALIDATION_ERROR',
+        correlationId
+      },
+      { status: 400 }
+    );
+  }
+
   if (error instanceof Error) {
     return NextResponse.json(
       {
