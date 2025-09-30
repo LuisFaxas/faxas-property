@@ -15,8 +15,15 @@ interface WeatherResponse {
     humidity: number;
     windMph: number;
     precipMmHr: number;
+    precipProbability: number; // NEW: chance of rain percentage
     code: number;
     text: string;
+    isDay?: boolean;
+  };
+  today: {
+    events: number;
+    highF: number; // NEW: today's high temp
+    lowF: number;  // NEW: today's low temp
   };
   workability: {
     score: number;
@@ -27,14 +34,12 @@ interface WeatherResponse {
       endISO: string;
     };
   };
-  today: {
-    events: number;
-  };
   hourly: Array<{
     timeISO: string;
     tempF: number;
     windMph: number;
     precipMmHr: number;
+    precipProbability: number;
     code: number;
   }>;
   daily: Array<{
@@ -42,6 +47,7 @@ interface WeatherResponse {
     maxF: number;
     minF: number;
     precipMm: number;
+    precipProbability: number;
     code: number;
   }>;
 }
@@ -236,9 +242,9 @@ export async function fetchWeather(
   const params = new URLSearchParams({
     latitude: lat.toString(),
     longitude: lng.toString(),
-    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m',
-    hourly: 'temperature_2m,precipitation,weather_code,wind_speed_10m',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum',
+    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day',
+    hourly: 'temperature_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_mean',
     temperature_unit: 'celsius',
     wind_speed_unit: 'kmh',
     precipitation_unit: 'mm',
@@ -284,19 +290,27 @@ export function formatWeatherResponse(
   // Compute workability
   const workability = computeWorkability({ current, hourly });
 
-  // Format hourly (next 8 hours)
+  // Calculate average precipitation probability for next 8 hours
   const currentHour = new Date().getHours();
+  let avgPrecipProb = 0;
   const hourlyFormatted = [];
   if (hourly && hourly.time) {
+    let probSum = 0;
+    let probCount = 0;
     for (let i = currentHour; i < Math.min(currentHour + 8, hourly.time.length); i++) {
+      const prob = hourly.precipitation_probability?.[i] || 0;
+      probSum += prob;
+      probCount++;
       hourlyFormatted.push({
         timeISO: hourly.time[i],
         tempF: celsiusToFahrenheit(hourly.temperature_2m[i]),
         windMph: kmhToMph(hourly.wind_speed_10m[i]),
         precipMmHr: hourly.precipitation[i],
+        precipProbability: prob,
         code: hourly.weather_code[i]
       });
     }
+    avgPrecipProb = probCount > 0 ? Math.round(probSum / probCount) : 0;
   }
 
   // Format daily (next 3 days)
@@ -308,10 +322,15 @@ export function formatWeatherResponse(
         maxF: celsiusToFahrenheit(daily.temperature_2m_max[i]),
         minF: celsiusToFahrenheit(daily.temperature_2m_min[i]),
         precipMm: daily.precipitation_sum[i],
+        precipProbability: daily.precipitation_probability_mean?.[i] || 0,
         code: daily.weather_code[i]
       });
     }
   }
+
+  // Get today's high and low
+  const todayHigh = daily?.temperature_2m_max?.[0] ? celsiusToFahrenheit(daily.temperature_2m_max[0]) : 0;
+  const todayLow = daily?.temperature_2m_min?.[0] ? celsiusToFahrenheit(daily.temperature_2m_min[0]) : 0;
 
   return {
     location: {
@@ -325,8 +344,15 @@ export function formatWeatherResponse(
       humidity: current.relative_humidity_2m,
       windMph: kmhToMph(current.wind_speed_10m),
       precipMmHr: current.precipitation,
+      precipProbability: avgPrecipProb, // Average chance of rain next 8 hours
       code: current.weather_code,
-      text: getWeatherText(current.weather_code)
+      text: getWeatherText(current.weather_code),
+      isDay: current.is_day === 1
+    },
+    today: {
+      events,
+      highF: todayHigh,
+      lowF: todayLow
     },
     workability: {
       score: workability.score,
@@ -336,9 +362,6 @@ export function formatWeatherResponse(
         startISO: workability.bestWindow.start,
         endISO: workability.bestWindow.end
       } : undefined
-    },
-    today: {
-      events
     },
     hourly: hourlyFormatted,
     daily: dailyFormatted

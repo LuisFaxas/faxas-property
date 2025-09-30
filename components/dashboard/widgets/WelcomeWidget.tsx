@@ -2,18 +2,16 @@
 
 import { useMemo } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
-import { useProjects, useTasks, useTodaySchedule } from '@/hooks/use-api';
+import { useProjects } from '@/hooks/use-api';
 import { useWeather } from '@/hooks/use-weather';
 import { Widget } from '@/components/dashboard/Widget';
-import { WeatherIcon, mapWeatherCode, getTemperatureGradient } from '@/lib/weather-icons';
+import { WeatherIcon, mapWMOCode } from '@/lib/weather-icons';
 import {
-  Calendar, MapPin, Loader2, RefreshCw, CheckCircle,
-  Clock, ArrowRight, Activity, Droplets, Wind,
-  Eye, Gauge, ThermometerSun, CloudRain, Info
+  MapPin, Loader2, RefreshCw, Droplets, Wind,
+  CloudRain, Info, Thermometer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -26,9 +24,7 @@ export function WelcomeWidget() {
   const activeProject = projectList.find((p: any) => p.status === 'ACTIVE') || projectList[0];
   const projectId = activeProject?.id;
 
-  // Fetch data with proper guards
-  const { data: tasks } = useTasks({ projectId }, !!projectId);
-  const { data: todaySchedule } = useTodaySchedule(projectId, !!projectId);
+  // Fetch weather data
   const {
     data: weather,
     isLoading: weatherLoading,
@@ -54,28 +50,10 @@ export function WelcomeWidget() {
     });
   }, []);
 
-  // Calculate task completion
-  const taskCompletion = useMemo(() => {
-    if (!tasks || !Array.isArray(tasks)) {
-      return { completed: 0, total: 0, percentage: 0 };
-    }
-
-    const completed = tasks.filter(t => t.status === 'COMPLETED').length;
-    const total = tasks.length;
-    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-    return { completed, total, percentage };
-  }, [tasks]);
-
-  // Get today's schedule
-  const scheduleData = (todaySchedule as any)?.data || todaySchedule;
-  const todayEvents = Array.isArray(scheduleData) ? scheduleData : scheduleData?.items || [];
-  const nextEvent = todayEvents[0];
-
   // Process weather data
   const weatherData = (weather as any)?.data || weather;
-  const weatherCondition = weatherData?.current?.code
-    ? mapWeatherCode(weatherData.current.code, weatherData.current.isDay)
+  const weatherCondition = weatherData?.current?.code !== undefined
+    ? mapWMOCode(weatherData.current.code, weatherData.current.isDay ?? true)
     : 'unknown';
 
   // Get workability style
@@ -85,40 +63,34 @@ export function WelcomeWidget() {
         return {
           badge: 'bg-[#8EE3C8]/20 text-[#8EE3C8] border-[#8EE3C8]/30',
           border: 'border-[#8EE3C8]/30',
-          text: 'text-[#8EE3C8]'
+          text: 'text-[#8EE3C8]',
+          background: 'bg-[#8EE3C8]/5' // Very subtle teal background
         };
       case 'Fair':
         return {
           badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
           border: 'border-amber-500/30',
-          text: 'text-amber-400'
+          text: 'text-amber-400',
+          background: 'bg-amber-500/8' // Subtle amber background
         };
       case 'Poor':
         return {
           badge: 'bg-red-500/20 text-red-400 border-red-500/30',
           border: 'border-red-500/30',
-          text: 'text-red-400'
+          text: 'text-red-400',
+          background: 'bg-red-500/10' // Subtle red background
         };
       default:
         return {
           badge: 'bg-white/10 text-white/60 border-white/20',
           border: 'border-white/20',
-          text: 'text-white/60'
+          text: 'text-white/60',
+          background: 'bg-white/5'
         };
     }
   };
 
   const workabilityStyle = getWorkabilityStyle(weatherData?.workability?.label);
-
-  // Format time for schedule
-  const formatEventTime = (isoString: string) => {
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
 
   // Get project status badge color
   const getStatusColor = (status: string) => {
@@ -166,8 +138,8 @@ export function WelcomeWidget() {
       {activeProject?.address ? (
         <div className={cn(
           'relative overflow-hidden rounded-lg border p-4 transition-all duration-500',
-          'bg-gradient-to-br',
-          weatherData ? getTemperatureGradient(weatherData.current?.tempF) : 'from-white/5 to-white/10',
+          // Background color based on workability conditions
+          workabilityStyle.background,
           workabilityStyle.border
         )}>
           {weatherLoading ? (
@@ -228,6 +200,20 @@ export function WelcomeWidget() {
                 </div>
               </div>
 
+              {/* Workability Message */}
+              <div className={cn('flex items-center gap-2 p-2 rounded-md',
+                weatherData.workability.label === 'Good' ? 'bg-[#8EE3C8]/10' :
+                weatherData.workability.label === 'Fair' ? 'bg-amber-500/10' : 'bg-red-500/10'
+              )}>
+                <Info className={cn('h-4 w-4 flex-shrink-0', workabilityStyle.text)} />
+                <p className={cn('text-xs', workabilityStyle.text)}>
+                  {weatherData.workability.label === 'Good' && 'Safe to work. '}
+                  {weatherData.workability.label === 'Fair' && 'Proceed with caution. '}
+                  {weatherData.workability.label === 'Poor' && 'Not recommended. '}
+                  {weatherData.workability.reasons.length > 0 && weatherData.workability.reasons.join('. ')}
+                </p>
+              </div>
+
               {/* Weather Metrics - Horizontal Bar */}
               <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/10">
                 <div className="flex items-center gap-2">
@@ -249,16 +235,16 @@ export function WelcomeWidget() {
                 <div className="flex items-center gap-2">
                   <CloudRain className="h-4 w-4 text-white/40" />
                   <div>
-                    <p className="text-xs font-medium text-white">{weatherData.current.precipMm || 0}</p>
-                    <p className="text-xs text-white/40">mm</p>
+                    <p className="text-xs font-medium text-white">{weatherData.current.precipProbability}%</p>
+                    <p className="text-xs text-white/40">Rain</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Eye className="h-4 w-4 text-white/40" />
+                  <Thermometer className="h-4 w-4 text-white/40" />
                   <div>
-                    <p className="text-xs font-medium text-white">{weatherData.current.visMiles || 10}</p>
-                    <p className="text-xs text-white/40">mi</p>
+                    <p className="text-xs font-medium text-white">{weatherData.today.highF}° / {weatherData.today.lowF}°</p>
+                    <p className="text-xs text-white/40">High/Low</p>
                   </div>
                 </div>
               </div>
@@ -284,100 +270,6 @@ export function WelcomeWidget() {
           )}
         </div>
       )}
-
-      {/* Project Quick Stats */}
-      <div className="space-y-3 pt-2 border-t border-white/10">
-        {/* Task Progress */}
-        <Link
-          href="/admin/tasks"
-          className="block space-y-2 p-3 rounded-lg hover:bg-white/5 transition-colors"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-white/60" />
-              <span className="text-sm font-medium text-white">Task Progress</span>
-            </div>
-            <span className="text-sm text-white/60">
-              {taskCompletion.completed}/{taskCompletion.total}
-            </span>
-          </div>
-          <Progress
-            value={taskCompletion.percentage}
-            className="h-2"
-          />
-          <p className="text-xs text-white/60">
-            {taskCompletion.percentage}% Complete
-          </p>
-        </Link>
-
-        {/* Today's Schedule */}
-        <div className="p-3 rounded-lg bg-white/5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-white/60" />
-              <span className="text-sm font-medium text-white">Today's Schedule</span>
-            </div>
-            <Link
-              href="/admin/schedule?range=today"
-              className="text-xs text-[#8EE3C8] hover:text-[#8EE3C8]/80"
-            >
-              View all
-              <ArrowRight className="inline h-3 w-3 ml-1" />
-            </Link>
-          </div>
-
-          {nextEvent ? (
-            <div className="space-y-1">
-              <p className="text-sm text-white font-medium truncate">
-                {nextEvent.title}
-              </p>
-              <div className="flex items-center gap-2 text-xs text-white/60">
-                <Clock className="h-3 w-3" />
-                <span>
-                  {formatEventTime(nextEvent.startTime)}
-                  {nextEvent.endTime && ` - ${formatEventTime(nextEvent.endTime)}`}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-white/60">No events scheduled</p>
-          )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex gap-2">
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="flex-1 h-9"
-          >
-            <Link href="/admin/tasks/new">
-              New Task
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="flex-1 h-9"
-          >
-            <Link href="/admin/schedule">
-              Schedule
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="flex-1 h-9"
-          >
-            <Link href="/admin/budget">
-              Budget
-            </Link>
-          </Button>
-        </div>
-      </div>
     </Widget>
   );
 }
