@@ -5,7 +5,6 @@ import { PageShell } from '@/components/blocks/page-shell';
 import { Widget } from '@/components/dashboard/Widget';
 import { QuickActionsSheet } from '@/components/dashboard/QuickActionsSheet';
 import { WelcomeWidget } from '@/components/dashboard/widgets/WelcomeWidget';
-import { ProjectOverviewWidget } from '@/components/dashboard/widgets/ProjectOverviewWidget';
 import { BudgetHealthWidget } from '@/components/dashboard/widgets/BudgetHealthWidget';
 import { TaskKPIsWidget } from '@/components/dashboard/widgets/TaskKPIsWidget';
 import { BiddingStatsWidget } from '@/components/dashboard/widgets/BiddingStatsWidget';
@@ -26,7 +25,7 @@ export default function AdminDashboard() {
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           {/* Hero Zone - Welcome and Budget Health */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-6">
-            {/* Welcome Widget - Hero Card */}
+            {/* Welcome Widget - Comprehensive Hero Card */}
             <div className="lg:col-span-2">
               <WelcomeWidget />
             </div>
@@ -37,18 +36,8 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Row 2 - Project Overview and Task KPIs */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-6">
-            {/* Project Overview without budget */}
-            <div className="lg:col-span-2">
-              <ProjectOverviewWidget showBudget={false} />
-            </div>
-
-            {/* Task KPIs */}
-            <div className="lg:col-span-2">
-              <TaskKPIsWidget />
-            </div>
-          </div>
+          {/* Row 2 - Task KPIs Full Width */}
+          <TaskKPIsWidget />
 
           {/* Activity Zone - 2 medium cards */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-6">

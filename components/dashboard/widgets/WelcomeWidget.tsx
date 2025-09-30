@@ -5,12 +5,15 @@ import { useAuth } from '@/app/contexts/AuthContext';
 import { useProjects, useTasks, useTodaySchedule } from '@/hooks/use-api';
 import { useWeather } from '@/hooks/use-weather';
 import { Widget } from '@/components/dashboard/Widget';
+import { WeatherIcon, mapWeatherCode, getTemperatureGradient } from '@/lib/weather-icons';
 import {
-  Calendar, Clock, AlertCircle, CloudRain, Wind, Droplets,
-  ThermometerSun, CheckCircle, AlertTriangle, XCircle,
-  RefreshCw, MapPin, Loader2
+  Calendar, MapPin, Loader2, RefreshCw, CheckCircle,
+  Clock, ArrowRight, Activity, Droplets, Wind,
+  Eye, Gauge, ThermometerSun, CloudRain, Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -51,81 +54,64 @@ export function WelcomeWidget() {
     });
   }, []);
 
-  // Calculate quick metrics client-side
-  const metrics = useMemo(() => {
+  // Calculate task completion
+  const taskCompletion = useMemo(() => {
     if (!tasks || !Array.isArray(tasks)) {
-      return { dueToday: 0, overdue: 0 };
+      return { completed: 0, total: 0, percentage: 0 };
     }
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const completed = tasks.filter(t => t.status === 'COMPLETED').length;
+    const total = tasks.length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    const dueToday = tasks.filter(t => {
-      if (!t.dueDate) return false;
-      const d = new Date(t.dueDate);
-      const open = t.status !== 'COMPLETED' && t.status !== 'CANCELLED';
-      return open && d >= startOfToday && d <= endOfToday;
-    }).length;
-
-    const overdue = tasks.filter(t => {
-      if (!t.dueDate) return false;
-      const d = new Date(t.dueDate);
-      const open = t.status !== 'COMPLETED' && t.status !== 'CANCELLED';
-      return open && d < startOfToday;
-    }).length;
-
-    return { dueToday, overdue };
+    return { completed, total, percentage };
   }, [tasks]);
 
-  // Count today's events
+  // Get today's schedule
   const scheduleData = (todaySchedule as any)?.data || todaySchedule;
-  const todayEvents = Array.isArray(scheduleData)
-    ? scheduleData.length
-    : scheduleData?.items?.length || 0;
+  const todayEvents = Array.isArray(scheduleData) ? scheduleData : scheduleData?.items || [];
+  const nextEvent = todayEvents[0];
 
-  // Get workability gradient classes
-  const getWorkabilityClasses = (label?: string) => {
+  // Process weather data
+  const weatherData = (weather as any)?.data || weather;
+  const weatherCondition = weatherData?.current?.code
+    ? mapWeatherCode(weatherData.current.code, weatherData.current.isDay)
+    : 'unknown';
+
+  // Get workability style
+  const getWorkabilityStyle = (label?: string) => {
     switch (label) {
       case 'Good':
         return {
-          gradient: 'from-[#0d2420] to-[#102b25]',
-          pill: 'bg-[#8EE3C8]/20 text-[#8EE3C8] border-[#8EE3C8]/30',
-          icon: CheckCircle,
-          accent: 'text-[#8EE3C8]'
+          badge: 'bg-[#8EE3C8]/20 text-[#8EE3C8] border-[#8EE3C8]/30',
+          border: 'border-[#8EE3C8]/30',
+          text: 'text-[#8EE3C8]'
         };
       case 'Fair':
         return {
-          gradient: 'from-[#2b2410] to-[#1f1a0c]',
-          pill: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-          icon: AlertTriangle,
-          accent: 'text-amber-400'
+          badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+          border: 'border-amber-500/30',
+          text: 'text-amber-400'
         };
       case 'Poor':
         return {
-          gradient: 'from-[#2b1919] to-[#1f0e0e]',
-          pill: 'bg-red-500/20 text-red-400 border-red-500/30',
-          icon: XCircle,
-          accent: 'text-red-400'
+          badge: 'bg-red-500/20 text-red-400 border-red-500/30',
+          border: 'border-red-500/30',
+          text: 'text-red-400'
         };
       default:
         return {
-          gradient: 'from-white/5 to-white/10',
-          pill: 'bg-white/10 text-white/60 border-white/20',
-          icon: CloudRain,
-          accent: 'text-white/60'
+          badge: 'bg-white/10 text-white/60 border-white/20',
+          border: 'border-white/20',
+          text: 'text-white/60'
         };
     }
   };
 
-  const weatherData = (weather as any)?.data || weather;
-  const workabilityStyle = getWorkabilityClasses(weatherData?.workability?.label);
-  const WorkabilityIcon = workabilityStyle.icon;
+  const workabilityStyle = getWorkabilityStyle(weatherData?.workability?.label);
 
-  // Format best window time
-  const formatTime = (isoString?: string) => {
-    if (!isoString) return '';
+  // Format time for schedule
+  const formatEventTime = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -134,178 +120,262 @@ export function WelcomeWidget() {
     });
   };
 
+  // Get project status badge color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'bg-[#8EE3C8]/20 text-[#8EE3C8] border-[#8EE3C8]/30';
+      case 'PLANNING': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'ON_HOLD': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'COMPLETED': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      default: return 'bg-white/10 text-white/60 border-white/20';
+    }
+  };
+
   return (
-    <Widget>
-      <div className="space-y-4">
-        {/* Greeting line */}
-        <div>
-          <h2 className="text-xl font-semibold text-white">
-            {greeting}{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
-          </h2>
-          <p className="text-sm text-white/60">
-            {todayDate} • {activeProject ? activeProject.name.substring(0, 30) : 'No active project'}
-            {activeProject?.name.length > 30 && '...'}
-          </p>
+    <Widget className="space-y-4">
+      {/* Header Section */}
+      <div className="space-y-2">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h2 className="text-xl font-semibold text-white">
+              {greeting}{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}
+            </h2>
+            <p className="text-sm text-white/60 mt-0.5">{todayDate}</p>
+          </div>
+          {activeProject && (
+            <Badge className={cn('text-xs', getStatusColor(activeProject.status))}>
+              {activeProject.status}
+            </Badge>
+          )}
         </div>
 
-        {/* Weather Hero Block */}
-        {activeProject?.address ? (
-          <div className={cn(
-            'relative overflow-hidden rounded-lg p-3 md:p-4 bg-gradient-to-br motion-reduce:transition-none transition-all duration-500',
-            workabilityStyle.gradient
-          )}>
-            {weatherLoading ? (
-              // Loading state
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-6 w-6 animate-spin text-white/40" />
-              </div>
-            ) : weatherError ? (
-              // Error state
-              <div className="space-y-2" role="status">
-                <p className="text-sm text-white/60">Weather unavailable</p>
-                <Button
-                  onClick={() => refetchWeather()}
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto p-0 text-xs text-white/60 hover:text-white"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Retry
-                </Button>
-              </div>
-            ) : weatherData ? (
-              // Weather data
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    {/* Large temperature */}
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-3xl md:text-4xl font-bold text-white">
-                        {weatherData.current.tempF}°
-                      </span>
-                      <span className="text-base md:text-lg text-white/60">
-                        {weatherData.current.text}
-                      </span>
-                    </div>
+        {activeProject && (
+          <div className="flex items-start gap-2">
+            <MapPin className="h-4 w-4 text-white/40 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{activeProject.name}</p>
+              {activeProject.address && (
+                <p className="text-xs text-white/60 truncate">{activeProject.address}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
-                    {/* Workability pill */}
-                    <div
-                      className={cn(
-                        'inline-flex items-center gap-1 px-2 py-0.5 mt-1.5 rounded-full border text-xs font-medium',
-                        workabilityStyle.pill
-                      )}
-                      aria-live="polite"
-                    >
-                      <WorkabilityIcon className="h-3 w-3" />
-                      {weatherData.workability.label}
-                    </div>
-                  </div>
-
-                  {/* Micro stats */}
-                  <div className="text-right space-y-0.5 text-[11px] md:text-xs">
-                    <div className="flex items-center gap-1 text-white/60 justify-end">
-                      <ThermometerSun className="h-3 w-3" />
-                      <span>Feels {weatherData.current.apparentF}°</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-white/60 justify-end">
-                      <Wind className="h-3 w-3" />
-                      <span>{weatherData.current.windMph} mph</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-white/60 justify-end">
-                      <Droplets className="h-3 w-3" />
-                      <span>{weatherData.current.humidity}%</span>
-                    </div>
-                  </div>
+      {/* Weather Section - Enhanced */}
+      {activeProject?.address ? (
+        <div className={cn(
+          'relative overflow-hidden rounded-lg border p-4 transition-all duration-500',
+          'bg-gradient-to-br',
+          weatherData ? getTemperatureGradient(weatherData.current?.tempF) : 'from-white/5 to-white/10',
+          workabilityStyle.border
+        )}>
+          {weatherLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-white/40" />
+            </div>
+          ) : weatherError ? (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-white/60">Weather unavailable</p>
+              <Button
+                onClick={() => refetchWeather()}
+                variant="ghost"
+                size="sm"
+                className="h-auto p-1"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : weatherData ? (
+            <div className="space-y-3">
+              {/* Main Weather Display - Compact Layout */}
+              <div className="flex items-center gap-4">
+                {/* Weather Icon - Larger and prominent */}
+                <div className="flex-shrink-0">
+                  <WeatherIcon
+                    condition={weatherCondition}
+                    size="xl"
+                    animated={true}
+                    temperature={weatherData.current.tempF}
+                  />
                 </div>
 
-                {/* Status line */}
-                <div className="text-xs text-white/80">
-                  {weatherData.workability.label === 'Good' ? (
-                    <>
-                      <span className="font-medium">Good to work</span>
-                      {weatherData.workability.bestWindow && (
-                        <> • Best {formatTime(weatherData.workability.bestWindow.startISO)} - {formatTime(weatherData.workability.bestWindow.endISO)}</>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-medium">Caution</span>
-                      {weatherData.workability.reasons.length > 0 && (
-                        <> • {weatherData.workability.reasons.slice(0, 2).join('; ')}</>
-                      )}
-                    </>
+                {/* Temperature & Condition */}
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-5xl font-bold text-white leading-none">
+                      {Math.round(weatherData.current.tempF)}°
+                    </span>
+                    <span className="text-sm text-white/60 mb-1">
+                      Feels {Math.round(weatherData.current.apparentF)}°
+                    </span>
+                  </div>
+                  <p className="text-sm text-white/80 mt-2">
+                    {weatherData.current.text}
+                  </p>
+                </div>
+
+                {/* Workability Badge */}
+                <div className="flex-shrink-0">
+                  <Badge className={cn('text-xs whitespace-nowrap', workabilityStyle.badge)}>
+                    {weatherData.workability.label}
+                  </Badge>
+                  {weatherData.workability.label !== 'Good' && weatherData.workability.reasons?.length > 0 && (
+                    <p className="text-xs text-white/60 mt-1 max-w-[100px] text-right">
+                      {weatherData.workability.reasons[0].split('.')[0]}
+                    </p>
                   )}
                 </div>
               </div>
-            ) : null}
+
+              {/* Weather Metrics - Horizontal Bar */}
+              <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/10">
+                <div className="flex items-center gap-2">
+                  <Wind className="h-4 w-4 text-white/40" />
+                  <div>
+                    <p className="text-xs font-medium text-white">{weatherData.current.windMph}</p>
+                    <p className="text-xs text-white/40">mph</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Droplets className="h-4 w-4 text-white/40" />
+                  <div>
+                    <p className="text-xs font-medium text-white">{weatherData.current.humidity}%</p>
+                    <p className="text-xs text-white/40">Humidity</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <CloudRain className="h-4 w-4 text-white/40" />
+                  <div>
+                    <p className="text-xs font-medium text-white">{weatherData.current.precipMm || 0}</p>
+                    <p className="text-xs text-white/40">mm</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-white/40" />
+                  <div>
+                    <p className="text-xs font-medium text-white">{weatherData.current.visMiles || 10}</p>
+                    <p className="text-xs text-white/40">mi</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        // No address configured
+        <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-amber-400" />
+            <span className="text-sm text-amber-400">Add project address for weather</span>
           </div>
-        ) : (
-          // Missing address banner
-          <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          {projectId && (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-auto py-1 px-2 text-xs"
+            >
+              <Link href="/admin/settings">Configure</Link>
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Project Quick Stats */}
+      <div className="space-y-3 pt-2 border-t border-white/10">
+        {/* Task Progress */}
+        <Link
+          href="/admin/tasks"
+          className="block space-y-2 p-3 rounded-lg hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-amber-400" />
-              <span className="text-sm text-amber-400">Add project address for weather</span>
+              <CheckCircle className="h-4 w-4 text-white/60" />
+              <span className="text-sm font-medium text-white">Task Progress</span>
             </div>
-            {projectId && (
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className="h-auto py-1 px-2 text-xs text-amber-400 hover:text-amber-300 motion-reduce:transition-none"
-              >
-                <Link href="/admin/settings">
-                  Configure →
-                </Link>
-              </Button>
-            )}
+            <span className="text-sm text-white/60">
+              {taskCompletion.completed}/{taskCompletion.total}
+            </span>
           </div>
-        )}
+          <Progress
+            value={taskCompletion.percentage}
+            className="h-2"
+          />
+          <p className="text-xs text-white/60">
+            {taskCompletion.percentage}% Complete
+          </p>
+        </Link>
 
-        {/* Quick metrics - now interactive */}
-        <div className="grid grid-cols-3 gap-3">
-          <Link
-            href="/admin/tasks?filter=dueToday"
-            className="group text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg p-2 -m-2"
-          >
-            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-yellow-400/10 group-hover:bg-yellow-400/20 motion-reduce:transition-none transition-colors">
-              <Clock className="h-5 w-5 text-yellow-400" />
+        {/* Today's Schedule */}
+        <div className="p-3 rounded-lg bg-white/5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-white/60" />
+              <span className="text-sm font-medium text-white">Today's Schedule</span>
             </div>
-            <p className="text-2xl font-bold text-white">{metrics.dueToday}</p>
-            <p className="text-xs text-white/60 group-hover:text-white/80">Due Today</p>
-          </Link>
+            <Link
+              href="/admin/schedule?range=today"
+              className="text-xs text-[#8EE3C8] hover:text-[#8EE3C8]/80"
+            >
+              View all
+              <ArrowRight className="inline h-3 w-3 ml-1" />
+            </Link>
+          </div>
 
-          <Link
-            href="/admin/tasks?filter=overdue"
-            className="group text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg p-2 -m-2"
-          >
-            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-red-400/10 group-hover:bg-red-400/20 motion-reduce:transition-none transition-colors">
-              <AlertCircle className="h-5 w-5 text-red-400" />
+          {nextEvent ? (
+            <div className="space-y-1">
+              <p className="text-sm text-white font-medium truncate">
+                {nextEvent.title}
+              </p>
+              <div className="flex items-center gap-2 text-xs text-white/60">
+                <Clock className="h-3 w-3" />
+                <span>
+                  {formatEventTime(nextEvent.startTime)}
+                  {nextEvent.endTime && ` - ${formatEventTime(nextEvent.endTime)}`}
+                </span>
+              </div>
             </div>
-            <p className="text-2xl font-bold text-white">{metrics.overdue}</p>
-            <p className="text-xs text-white/60 group-hover:text-white/80">Overdue</p>
-          </Link>
-
-          <Link
-            href="/admin/schedule?range=today"
-            className="group text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background rounded-lg p-2 -m-2"
-          >
-            <div className="flex items-center justify-center w-10 h-10 mx-auto mb-1 rounded-lg bg-[#8EE3C8]/10 group-hover:bg-[#8EE3C8]/20 motion-reduce:transition-none transition-colors">
-              <Calendar className="h-5 w-5 text-[#8EE3C8]" />
-            </div>
-            <p className="text-2xl font-bold text-white">{todayEvents}</p>
-            <p className="text-xs text-white/60 group-hover:text-white/80">Events Today</p>
-          </Link>
+          ) : (
+            <p className="text-sm text-white/60">No events scheduled</p>
+          )}
         </div>
 
-        {/* Heads-up line */}
-        <div className="text-xs text-white/60 text-center">
-          {metrics.overdue > 0 ? (
-            <span className="text-amber-400">Heads up: {metrics.overdue} overdue task{metrics.overdue !== 1 ? 's' : ''}</span>
-          ) : todayEvents > 0 ? (
-            <span>You have {todayEvents} event{todayEvents !== 1 ? 's' : ''} today</span>
-          ) : (
-            <span>You&apos;re clear for today</span>
-          )}
+        {/* Quick Actions */}
+        <div className="flex gap-2">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="flex-1 h-9"
+          >
+            <Link href="/admin/tasks/new">
+              New Task
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="flex-1 h-9"
+          >
+            <Link href="/admin/schedule">
+              Schedule
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="flex-1 h-9"
+          >
+            <Link href="/admin/budget">
+              Budget
+            </Link>
+          </Button>
         </div>
       </div>
     </Widget>
