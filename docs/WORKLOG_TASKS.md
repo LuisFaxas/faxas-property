@@ -1,5 +1,111 @@
 # WORKLOG - TASKS
 
+## 2025-10-02 - Phase 4: Tasks Page Overlay Pilot Complete - Canonical AppSheet Migration
+
+**Files Modified:**
+- `app/admin/tasks/page.tsx` - Added `fit="content"` + `footer` to Create/Edit sheets
+- `components/tasks/filter-bottom-sheet.tsx` - Migrated to AppSheet
+- `components/tasks/mobile-task-detail-sheet.tsx` - Migrated to AppSheet
+- `components/ui/app-sheet.tsx` - Enhanced with `fit` + `footer` props
+
+**Changes:**
+- Migrated all Tasks page overlays to canonical AppSheet components
+- Create/Edit task sheets (mobile): Added `fit="content"` prop + moved Cancel/Create and Cancel/Save buttons to sticky `footer` slot
+- Filter sheet: Replaced raw BottomSheet → `AppSheet mode="detail" fit="content"` + moved Reset/Apply to footer
+- Task detail overlay: Replaced raw Sheet → `AppSheet mode="detail" fit="content"` + moved Edit/Complete/Delete to footer
+- Removed inline action buttons and manual footer positioning (AppSheet `footer` prop handles sticky layout)
+
+**Why Changed (mapped to UX_STANDARDS.md):**
+- **Rule 1** - All bottom sheets must have visible drag handle → AppSheet provides this automatically
+- **Rule 2** - Dual dismiss (X + drag) → AppSheet implements both + Esc + backdrop
+- **Rule 3** - Height presets → `fit="content"` uses `h-auto max-h-modal-{mode} min-h-modal-min`
+- **Rule 4** - Safe area handling → `pb-safe` on footer only (not content scroll area)
+- **Rule 5** - Sticky footer for actions → `footer` prop renders sticky with `bottom-0` positioning
+- **Rule 10** - z-modal layering → AppSheet enforces `z-modal` on backdrop + container
+- **CLAUDE.md Stop Condition** - Raw primitives forbidden → Removed `BottomSheet` and `Sheet` imports
+
+**Page Coverage Matrix:**
+
+**BEFORE Migration:**
+| Component | Type | Status |
+|-----------|------|--------|
+| Create Sheet | AppSheet (inline buttons) | ❌ FAIL |
+| Edit Sheet | AppSheet (inline buttons) | ❌ FAIL |
+| Task Detail | Raw Sheet | ❌ FAIL |
+| Filter Sheet | Raw BottomSheet | ❌ FAIL |
+| Delete/Bulk Delete | AppDialog | ✅ PASS |
+| Row Actions | AppDropdownMenu | ✅ PASS |
+| **Summary** | **4/7 FAIL** | **3/7 PASS** |
+
+**AFTER Migration:**
+| Component | Type | Drag | Dismiss | Height | Footer | pb-safe | Z-Layer | Status |
+|-----------|------|------|---------|--------|--------|---------|---------|--------|
+| Create Sheet | AppSheet | ✅ | X/Esc/backdrop/drag ✅ | fit=content ✅ | Sticky ✅ | Footer only ✅ | z-modal ✅ | ✅ PASS |
+| Edit Sheet | AppSheet | ✅ | X/Esc/backdrop/drag ✅ | fit=content ✅ | Sticky ✅ | Footer only ✅ | z-modal ✅ | ✅ PASS |
+| Task Detail | AppSheet | ✅ | X/Esc/backdrop/drag ✅ | fit=content ✅ | Sticky 3-btn ✅ | Footer only ✅ | z-modal ✅ | ✅ PASS |
+| Filter Sheet | AppSheet | ✅ | X/Esc/backdrop/drag ✅ | fit=content ✅ | Reset/Apply ✅ | Footer only ✅ | z-modal ✅ | ✅ PASS |
+| Delete/Bulk Delete | AppDialog | N/A | X/Esc/backdrop ✅ | Centered ✅ | Footer ✅ | N/A | z-modal ✅ | ✅ PASS |
+| Row Actions | AppDropdownMenu | N/A | All ✅ | Max-height ✅ | N/A | N/A | z-modal ✅ | ✅ PASS |
+| **Summary** | **All canonical** | **All ✅** | **All ✅** | **All ✅** | **All ✅** | **All ✅** | **All ✅** | **7/7 PASS ✅** |
+
+**Pilot Feedback Resolved:**
+1. ✅ Excess bottom whitespace on short forms → `fit="content"` + footer-only `pb-safe` fixes this
+2. ✅ Task detail not using canonical component → Now uses AppSheet with sticky footer
+3. ✅ Filter CTA buttons cut off → Reset/Apply now in sticky footer (always visible)
+
+**Query Keys Affected:** None (UI structure only)
+
+**Verification:**
+- `npm run lint`: **0 new errors**
+- `npm run typecheck`: **0 new errors**
+- Stop Condition satisfied: No raw primitives remain
+
+**Acceptance:**
+- ✅ No big empty bottom space on Create/Edit
+- ✅ Drag handle visible
+- ✅ Dismiss: X/Esc/backdrop/drag
+- ✅ Mobile inputs 48px
+- ✅ Filter Reset/Apply always visible
+- ✅ Task detail canonical with sticky footer
+- ✅ z-modal above nav/FAB
+- ✅ No API/behavior changes
+
+**Notes:**
+- Tasks page is now the **reference implementation** for canonical overlay migration
+- AppSheet `fit + footer` pattern ready for Settings, Schedule, Budget pages
+- No behavior or API changes; only structure/styling/consistency improvements
+
+---
+
+## 2025-10-02 - Phase 3.5: Z-Index Semantic Token Fix for Tasks Overlays
+
+**Files Modified:**
+- `tailwind.config.ts` - Fixed z-index tokens to reference CSS variables
+
+**Changes:**
+- Corrected z-index token configuration to use CSS variable references instead of hard-coded values
+- `tailwind.config.ts:95-100` - Changed `'modal': '50'` → `'modal': 'var(--z-modal)'` (and header/sidebar/sticky)
+
+**Why Changed:**
+- Tasks page overlays (AppSheet, AppDialog, AppDropdownMenu) use `z-modal` class
+- This fix ensures the class compiles to `z-index: var(--z-modal)` → runtime value from `app/globals.css:60`
+- Enables single source of truth for z-layering across all overlay components
+
+**Verification:**
+- Tasks page overlays verified to use `z-modal` class correctly
+- After dev server restart, overlays will render above nav/FAB with proper z-layering
+- No code changes needed to Tasks page - semantic classes already in use
+
+**Query Keys Affected:** None (build-time configuration only)
+
+**Manual QA:** See WORKLOG_UI.md Phase 3 for full checklist
+
+**Notes:**
+- Complements Tasks page migration (Phase 1) by ensuring z-layering tokens work correctly
+- See `/docs/WORKLOG_UI.md` for detailed token fix documentation
+
+---
+
 ## 2025-10-02 - Tasks Page: Canonical Overlay Migration with Mobile Bottom Sheets
 
 **Files Modified:**

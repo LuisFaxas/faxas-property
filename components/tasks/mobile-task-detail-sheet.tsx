@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AppSheet } from '@/components/ui/app-sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -81,18 +81,34 @@ export function MobileTaskDetailSheet({
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent 
-        side="bottom" 
-        className="h-[85vh] bg-graphite-900 border-t border-white/10 rounded-t-2xl overflow-hidden"
-      >
-        {/* Hidden title for accessibility */}
-        <SheetHeader className="sr-only">
-          <SheetTitle>{task.title}</SheetTitle>
-        </SheetHeader>
-        
-        {/* Header with status icon */}
-        <div className="sticky top-0 bg-graphite-900 z-10 pb-4 -mx-6 px-6 -mt-6 pt-6">
+    <AppSheet
+      open={isOpen}
+      onOpenChange={onClose}
+      mode="detail"
+      fit="content"
+      title={task.title}
+      description={statusStyle.label}
+      footer={
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button onClick={handleEdit} variant="outline" className="flex-1 h-12 bg-blue-600/20 border-blue-600/30 text-blue-400 hover:bg-blue-600/30">
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Task
+            </Button>
+            <Button onClick={handleComplete} variant="outline" className={cn('flex-1 h-12', isCompleted ? 'bg-yellow-600/20 border-yellow-600/30 text-yellow-400 hover:bg-yellow-600/30' : 'bg-green-600/20 border-green-600/30 text-green-400 hover:bg-green-600/30')}>
+              {isCompleted ? <><ChevronLeft className="h-4 w-4 mr-2" />Mark Incomplete</> : <><Check className="h-4 w-4 mr-2" />Complete Task</>}
+            </Button>
+          </div>
+          <Button onClick={handleDelete} variant="outline" className="w-full h-12 bg-red-600/20 border-red-600/30 text-red-400 hover:bg-red-600/30">
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Task
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {/* Header with status icon - now in content area */}
+        <div className="pb-4 border-b border-white/10">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className={cn('p-2 rounded-lg', statusStyle.bg)}>
@@ -120,19 +136,9 @@ export function MobileTaskDetailSheet({
                 </div>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0 text-white/60"
-            >
-              <X className="h-5 w-5" />
-            </Button>
           </div>
         </div>
 
-        {/* Scrollable content */}
-        <div className="overflow-y-auto pb-24 -mx-6 px-6">
           {/* Description */}
           {task.description && (
             <div className="mb-6">
@@ -287,52 +293,7 @@ export function MobileTaskDetailSheet({
               <p>Updated: {format(new Date(task.updatedAt), 'MMM d, yyyy h:mm a')}</p>
             )}
           </div>
-        </div>
-
-        {/* Fixed action buttons */}
-        <div className="absolute bottom-0 left-0 right-0 bg-graphite-900 border-t border-white/10 p-4 space-y-2">
-          <div className="flex gap-2">
-            <Button
-              onClick={handleEdit}
-              variant="outline"
-              className="flex-1 h-12 bg-blue-600/20 border-blue-600/30 text-blue-400 hover:bg-blue-600/30"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Task
-            </Button>
-            <Button
-              onClick={handleComplete}
-              variant="outline"
-              className={cn(
-                'flex-1 h-12',
-                isCompleted
-                  ? 'bg-yellow-600/20 border-yellow-600/30 text-yellow-400 hover:bg-yellow-600/30'
-                  : 'bg-green-600/20 border-green-600/30 text-green-400 hover:bg-green-600/30'
-              )}
-            >
-              {isCompleted ? (
-                <>
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Mark Incomplete
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Complete Task
-                </>
-              )}
-            </Button>
-          </div>
-          <Button
-            onClick={handleDelete}
-            variant="outline"
-            className="w-full h-12 bg-red-600/20 border-red-600/30 text-red-400 hover:bg-red-600/30"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete Task
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </AppSheet>
   );
 }

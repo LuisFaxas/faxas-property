@@ -968,7 +968,29 @@ export default function AdminTasksPage() {
 
         {/* Create Dialog */}
         {isMobile ? (
-          <AppSheet open={isCreateOpen} onOpenChange={setIsCreateOpen} mode="form" title="Create New Task">
+          <AppSheet
+            open={isCreateOpen}
+            onOpenChange={setIsCreateOpen}
+            mode="form"
+            fit="content"
+            title="Create New Task"
+            footer={
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isSubmitting}
+                  className="flex-1 h-12 text-base border-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" form="create-task-form" className="flex-1 h-12 text-base bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+                  {isSubmitting ? <><div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Creating...</> : 'Create Task'}
+                </Button>
+              </div>
+            }
+          >
             <div className="pb-safe">
               <Form {...form}>
                 <form
@@ -1077,31 +1099,6 @@ export default function AdminTasksPage() {
                       </FormItem>
                     )}
                   />
-                  <div className="flex gap-2 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsCreateOpen(false)}
-                      disabled={isSubmitting}
-                      className="flex-1 h-12 text-base border-white/10"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="flex-1 h-12 text-base bg-blue-600 hover:bg-blue-700"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Creating...
-                        </>
-                      ) : (
-                        'Create Task'
-                      )}
-                    </Button>
-                  </div>
                 </form>
               </Form>
             </div>
@@ -1256,7 +1253,29 @@ export default function AdminTasksPage() {
 
         {/* Edit Dialog */}
         {isMobile ? (
-          <AppSheet open={isEditOpen} onOpenChange={setIsEditOpen} mode="form" title="Edit Task">
+          <AppSheet
+            open={isEditOpen}
+            onOpenChange={setIsEditOpen}
+            mode="form"
+            fit="content"
+            title="Edit Task"
+            footer={
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditOpen(false)}
+                  disabled={isSubmitting}
+                  className="flex-1 h-12 text-base border-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" form="edit-task-form" className="flex-1 h-12 text-base bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+                  {isSubmitting ? <><div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Saving...</> : 'Save Changes'}
+                </Button>
+              </div>
+            }
+          >
             <div className="pb-safe">
               <Form {...form}>
                 <form id="edit-task-form" onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
@@ -1361,31 +1380,6 @@ export default function AdminTasksPage() {
                       </FormItem>
                     )}
                   />
-                  <div className="flex gap-2 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsEditOpen(false)}
-                      disabled={isSubmitting}
-                      className="flex-1 h-12 text-base border-white/10"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="flex-1 h-12 text-base bg-blue-600 hover:bg-blue-700"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save Changes'
-                      )}
-                    </Button>
-                  </div>
                 </form>
               </Form>
             </div>

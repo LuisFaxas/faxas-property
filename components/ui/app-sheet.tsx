@@ -11,7 +11,21 @@ interface AppSheetProps {
   children: React.ReactNode
   title?: string
   description?: string
+  /**
+   * Height mode for the sheet
+   * - detail: 85vh (default for detail/view sheets)
+   * - form: 90vh (for form dialogs)
+   * - fullscreen: calc() with safe area (full-screen sheets)
+   */
   mode?: 'detail' | 'form' | 'fullscreen'
+  /**
+   * Height fitting behavior
+   * - max: Fixed height from mode (default, current behavior)
+   * - content: Auto-fit to content with max-height from mode
+   */
+  fit?: 'content' | 'max'
+  /** Sticky footer content (buttons, actions, etc.) */
+  footer?: React.ReactNode
 }
 
 export function AppSheet({
@@ -20,19 +34,35 @@ export function AppSheet({
   children,
   title,
   description,
-  mode = 'detail'
+  mode = 'detail',
+  fit = 'max',
+  footer
 }: AppSheetProps) {
   const [startY, setStartY] = React.useState(0)
   const [currentY, setCurrentY] = React.useState(0)
   const [isDragging, setIsDragging] = React.useState(false)
   const sheetRef = React.useRef<HTMLDivElement>(null)
 
-  // Height mapping based on mode
-  const heightClass = {
+  // Fixed height classes for fit='max'
+  const fixedHeightClass = {
     detail: 'h-modal-detail',
     form: 'h-modal-form',
     fullscreen: 'h-modal-fullscreen'
   }[mode]
+
+  // Max height classes for fit='content'
+  const maxHeightClass = {
+    detail: 'max-h-modal-detail',
+    form: 'max-h-modal-form',
+    fullscreen: 'max-h-modal-fullscreen'
+  }[mode]
+
+  const minHeightClass = 'min-h-modal-min'
+
+  // Compute final height class based on fit mode
+  const heightClass = fit === 'content'
+    ? `h-auto ${maxHeightClass} ${minHeightClass}`
+    : `${fixedHeightClass} ${minHeightClass}`
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartY(e.touches[0].clientY)
@@ -139,7 +169,6 @@ export function AppSheet({
           "data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=open]:duration-500",
           "data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=closed]:duration-300",
           heightClass,
-          "min-h-modal-min",
           "flex flex-col overflow-hidden"
         )}
         data-state={open ? 'open' : 'closed'}
@@ -198,6 +227,13 @@ export function AppSheet({
         <div className="flex-1 overflow-y-auto p-4">
           {children}
         </div>
+
+        {/* Sticky Footer */}
+        {footer && (
+          <div className="sticky bottom-0 bg-graphite-900/95 backdrop-blur-sm border-t border-white/10 p-3 pb-safe">
+            {footer}
+          </div>
+        )}
       </div>
     </>
   )

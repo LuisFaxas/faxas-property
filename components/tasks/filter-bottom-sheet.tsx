@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { AppSheet } from '@/components/ui/app-sheet';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -83,12 +83,24 @@ export function FilterBottomSheet({
   const hasActiveFilters = tempStatusFilter !== 'all' || tempPriorityFilter !== 'all';
 
   return (
-    <BottomSheet
+    <AppSheet
       open={open}
       onOpenChange={onOpenChange}
+      mode="detail"
+      fit="content"
       title="Filter Tasks"
+      footer={
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1 h-12 text-base border-white/20 text-white hover:bg-white/10" onClick={handleReset} disabled={!hasActiveFilters}>
+            Reset
+          </Button>
+          <Button className="flex-1 h-12 text-base bg-blue-600 hover:bg-blue-700 text-white" onClick={handleApply}>
+            Apply Filters
+          </Button>
+        </div>
+      }
     >
-      <div className="space-y-6 pb-4">
+      <div className="space-y-6">
         {/* Status Filter */}
         <div>
           <Label className="text-base font-semibold text-white mb-3 block">
@@ -154,25 +166,7 @@ export function FilterBottomSheet({
             })}
           </RadioGroup>
         </div>
-
-        {/* Actions */}
-        <div className="flex gap-3 pt-4 border-t border-white/10">
-          <Button
-            variant="outline"
-            className="flex-1 h-12 text-base border-white/20 text-white hover:bg-white/10"
-            onClick={handleReset}
-            disabled={!hasActiveFilters}
-          >
-            Reset
-          </Button>
-          <Button
-            className="flex-1 h-12 text-base bg-blue-600 hover:bg-blue-700 text-white"
-            onClick={handleApply}
-          >
-            Apply Filters
-          </Button>
-        </div>
       </div>
-    </BottomSheet>
+    </AppSheet>
   );
 }

@@ -93,10 +93,10 @@ const config: Config = {
         'sticky-header': '0.95',        // 95% - Sticky headers with blur
       },
       zIndex: {
-        'modal': '50',                  // All modals/overlays
-        'header': '40',                 // Page header
-        'sidebar': '30',                // Navigation sidebar
-        'sticky': '10',                 // Sticky content within modals
+        'modal': 'var(--z-modal)',      // All modals/overlays
+        'header': 'var(--z-header)',    // Page header
+        'sidebar': 'var(--z-sidebar)',  // Navigation sidebar
+        'sticky': 'var(--z-sticky)',    // Sticky content within modals
       },
       borderRadius: {
         lg: "var(--radius)",
