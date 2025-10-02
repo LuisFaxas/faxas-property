@@ -184,10 +184,23 @@ export function FullCalendarView({
     }
   };
 
-  // Handle date selection
+  // Handle date selection (for drag selection)
   const handleDateSelect = (selectInfo: DateSelectArg) => {
     if (onSelectSlot) {
       onSelectSlot(selectInfo.start, selectInfo.end);
+    }
+    // Clear the selection after handling
+    selectInfo.view.calendar.unselect();
+  };
+
+  // Handle single date click (for mobile tap)
+  const handleDateClick = (arg: any) => {
+    if (onSelectSlot && isMobile) {
+      // For mobile, treat single tap as all-day event selection
+      const startDate = arg.date;
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 1);
+      onSelectSlot(startDate, endDate);
     }
   };
 
@@ -455,7 +468,7 @@ export function FullCalendarView({
                 <ChevronRight className="h-2.5 w-2.5" />
               </div>
               <div className="bg-blue-600/80 rounded-full px-2 py-0.5 text-[9px] text-white animate-pulse">
-                Hold date to add event
+                Tap date to add event
               </div>
             </div>
           </div>
@@ -469,12 +482,13 @@ export function FullCalendarView({
             events={calendarEvents}
             editable={!isMobile} // Disable drag on mobile
             droppable={true}
-            selectable={true}
+            selectable={!isMobile} // Only allow drag selection on desktop
             selectMirror={true}
             dayMaxEvents={isMobile ? 3 : true}
             eventDisplay="block"
             weekends={true}
             select={handleDateSelect}
+            dateClick={handleDateClick} // Add single tap handler
             eventClick={handleEventClick}
             eventChange={handleEventChange}
             eventTimeFormat={{
@@ -490,7 +504,6 @@ export function FullCalendarView({
             height="auto"
           // Mobile-specific options - balanced for swipe vs select
           eventLongPressDelay={300} // Reasonable delay for mobile
-          selectLongPressDelay={500} // Hold 500ms to select, allows swipe navigation
           // Responsive options
           views={{
             dayGridMonth: {

@@ -1,5 +1,30 @@
 # WORKLOG - SCHEDULE
 
+## 2025-10-03 - Today Indicator Styling Fix
+- **File**: `app/globals.css`
+- **Issue**: October 2nd (today) appeared selected with prominent blue circle
+- **Fix**: Made today indicator more subtle (lines 248-256)
+  - Light blue background (5% opacity) instead of circle
+  - Softer blue text color (#60a5fa)
+  - Bold font weight for distinction
+- **Result**: Clear visual difference between "today" and "selected" states
+
+## 2025-10-03 - Calendar Selection and Tap Fixes
+- **Files**:
+  - `components/schedule/fullcalendar-view.tsx`
+  - `app/globals.css`
+- **Issues Fixed**:
+  1. **Persistent October 2nd selection**: Added `unselect()` after handling date selection (line 193)
+  2. **Mobile tap not working**: Added `dateClick` handler for immediate response (lines 196-205)
+- **Changes**:
+  - Added `handleDateClick` for single tap on mobile (triggers create dialog)
+  - Changed `selectable={!isMobile}` to disable drag selection on mobile (line 485)
+  - Added `dateClick={handleDateClick}` to FullCalendar props (line 491)
+  - Removed `selectLongPressDelay` (was 500ms hold requirement)
+  - Updated hint text from "Hold date" to "Tap date" (line 471)
+  - Added CSS to remove persistent selection styling (globals.css:257-259)
+- **Result**: Mobile users can now tap any date to immediately open the create event dialog
+
 ## 2025-10-03 - Schedule Page Calendar Visibility Fix (Final)
 - **Files**:
   - `components/schedule/fullcalendar-view.tsx`
