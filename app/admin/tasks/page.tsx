@@ -10,7 +10,6 @@ import { MobileTaskCard } from '@/components/tasks/mobile-task-card';
 import { MobileListView } from '@/components/tasks/mobile-list-view';
 import { MobileDateTimePicker } from '@/components/tasks/mobile-date-time-picker';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
-import { MobileDialog } from '@/components/ui/mobile/dialog';
 import { TaskFilterBar } from '@/components/tasks/task-filter-bar';
 import { FilterBottomSheet } from '@/components/tasks/filter-bottom-sheet';
 import { Button } from '@/components/ui/button';
@@ -32,23 +31,22 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  AppDialog,
+  AppDialogContent,
+  AppDialogDescription,
+  AppDialogFooter,
+  AppDialogHeader,
+  AppDialogTitle,
+} from '@/components/ui/app-dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  AppDropdownMenu,
+  AppDropdownMenuContent,
+  AppDropdownMenuItem,
+  AppDropdownMenuLabel,
+  AppDropdownMenuSeparator,
+  AppDropdownMenuTrigger,
+} from '@/components/ui/app-menu';
+import { AppSheet } from '@/components/ui/app-sheet';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -502,48 +500,48 @@ export default function AdminTasksPage() {
       cell: ({ row }) => {
         const task = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <AppDropdownMenu>
+            <AppDropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
                 <span className="sr-only">Open menu</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleEdit(task)}>
+            </AppDropdownMenuTrigger>
+            <AppDropdownMenuContent align="end">
+              <AppDropdownMenuLabel>Actions</AppDropdownMenuLabel>
+              <AppDropdownMenuItem onClick={() => handleEdit(task)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              </AppDropdownMenuItem>
+              <AppDropdownMenuSeparator />
+              <AppDropdownMenuItem
                 onClick={() => handleStatusUpdate(task.id, 'IN_PROGRESS')}
                 disabled={task.status === 'IN_PROGRESS'}
               >
                 Start Task
-              </DropdownMenuItem>
-              <DropdownMenuItem 
+              </AppDropdownMenuItem>
+              <AppDropdownMenuItem
                 onClick={() => handleStatusUpdate(task.id, 'IN_REVIEW')}
                 disabled={task.status === 'IN_REVIEW'}
               >
                 Mark for Review
-              </DropdownMenuItem>
-              <DropdownMenuItem 
+              </AppDropdownMenuItem>
+              <AppDropdownMenuItem
                 onClick={() => handleStatusUpdate(task.id, 'COMPLETED')}
                 disabled={task.status === 'COMPLETED'}
               >
                 Mark as Done
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              </AppDropdownMenuItem>
+              <AppDropdownMenuSeparator />
+              <AppDropdownMenuItem
                 onClick={() => handleDelete(task)}
                 className="text-red-500"
               >
                 <Trash className="mr-2 h-4 w-4" />
                 Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </AppDropdownMenuItem>
+            </AppDropdownMenuContent>
+          </AppDropdownMenu>
         );
       },
     },
@@ -969,327 +967,595 @@ export default function AdminTasksPage() {
         )}
 
         {/* Create Dialog */}
-        <MobileDialog 
-          open={isCreateOpen} 
-          onOpenChange={setIsCreateOpen}
-          title="Create New Task"
-          description={!isMobile ? "Add a new task to the project. Click save when you're done." : undefined}
-          size="md"
-          showCloseButton={false}
-          footer={
-            <div className="flex gap-2">
-              <Button 
-                type="button"
-                variant="outline" 
-                onClick={() => setIsCreateOpen(false)}
-                disabled={isSubmitting}
-                className={cn(
-                  "border-white/10",
-                  isMobile && "flex-1 h-12 text-base"
-                )}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                form="create-task-form"
-                className={cn(
-                  "bg-blue-600 hover:bg-blue-700",
-                  isMobile && "flex-1 h-12 text-base"
-                )}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create Task'
-                )}
-              </Button>
+        {isMobile ? (
+          <AppSheet open={isCreateOpen} onOpenChange={setIsCreateOpen} mode="form" title="Create New Task">
+            <div className="pb-safe">
+              <Form {...form}>
+                <form
+                  id="create-task-form"
+                  onSubmit={form.handleSubmit(handleCreate)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Title</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter task title"
+                            className="bg-white/5 border-white/10 text-white min-h-[48px] text-base"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter task description"
+                            className="bg-white/5 border-white/10 text-white resize-none min-h-[48px] text-base"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Priority</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white/5 border-white/10 text-white min-h-[48px] text-base">
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="LOW">Low</SelectItem>
+                              <SelectItem value="MEDIUM">Medium</SelectItem>
+                              <SelectItem value="HIGH">High</SelectItem>
+                              <SelectItem value="URGENT">Urgent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white/5 border-white/10 text-white min-h-[48px] text-base">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="TODO">To Do</SelectItem>
+                              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                              <SelectItem value="IN_REVIEW">In Review</SelectItem>
+                              <SelectItem value="BLOCKED">Blocked</SelectItem>
+                              <SelectItem value="COMPLETED">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Due Date</FormLabel>
+                        <FormControl>
+                          <MobileDateTimePicker
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Select date and time"
+                            className="w-full"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreateOpen(false)}
+                      disabled={isSubmitting}
+                      className="flex-1 h-12 text-base border-white/10"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1 h-12 text-base bg-blue-600 hover:bg-blue-700"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Task'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
             </div>
-          }
-        >
-          <Form {...form}>
-            <form 
-              id="create-task-form"
-              onSubmit={form.handleSubmit(handleCreate)} 
-              className="space-y-4"
-            >
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Title</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Enter task title" 
-                          className="bg-white/5 border-white/10 text-white"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Enter task description"
-                          className="bg-white/5 border-white/10 text-white resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
+          </AppSheet>
+        ) : (
+          <AppDialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <AppDialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
+              <AppDialogHeader>
+                <AppDialogTitle>Create New Task</AppDialogTitle>
+                <AppDialogDescription>
+                  Add a new task to the project. Click save when you're done.
+                </AppDialogDescription>
+              </AppDialogHeader>
+              <Form {...form}>
+                <form
+                  id="create-task-form"
+                  onSubmit={form.handleSubmit(handleCreate)}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
-                    name="priority"
+                    name="title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-white">Priority</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="LOW">Low</SelectItem>
-                            <SelectItem value="MEDIUM">Medium</SelectItem>
-                            <SelectItem value="HIGH">High</SelectItem>
-                            <SelectItem value="URGENT">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel className="text-white">Title</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter task title"
+                            className="bg-white/5 border-white/10 text-white"
+                            {...field}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
                     control={form.control}
-                    name="status"
+                    name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-white">Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className={cn(
-                              "bg-white/5 border-white/10 text-white",
-                              isMobile && "min-h-[48px] text-base"
-                            )}>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="TODO">To Do</SelectItem>
-                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                            <SelectItem value="IN_REVIEW">In Review</SelectItem>
-                            <SelectItem value="BLOCKED">Blocked</SelectItem>
-                            <SelectItem value="COMPLETED">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel className="text-white">Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter task description"
+                            className="bg-white/5 border-white/10 text-white resize-none"
+                            {...field}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Due Date</FormLabel>
-                      <FormControl>
-                        <MobileDateTimePicker
-                          value={field.value}
-                          onChange={field.onChange}
-                          placeholder="Select date and time"
-                          className="w-full"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Priority</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="LOW">Low</SelectItem>
+                              <SelectItem value="MEDIUM">Medium</SelectItem>
+                              <SelectItem value="HIGH">High</SelectItem>
+                              <SelectItem value="URGENT">Urgent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="TODO">To Do</SelectItem>
+                              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                              <SelectItem value="IN_REVIEW">In Review</SelectItem>
+                              <SelectItem value="BLOCKED">Blocked</SelectItem>
+                              <SelectItem value="COMPLETED">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Due Date</FormLabel>
+                        <FormControl>
+                          <MobileDateTimePicker
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Select date and time"
+                            className="w-full"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </form>
+              </Form>
+              <AppDialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isSubmitting}
+                  className="border-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  form="create-task-form"
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Task'
                   )}
-                />
-            </form>
-          </Form>
-        </MobileDialog>
+                </Button>
+              </AppDialogFooter>
+            </AppDialogContent>
+          </AppDialog>
+        )}
 
         {/* Edit Dialog */}
-        <MobileDialog
-          open={isEditOpen}
-          onOpenChange={setIsEditOpen}
-          title="Edit Task"
-          description={!isMobile ? "Make changes to the task. Click save when you're done." : undefined}
-          size="md"
-          showCloseButton={false}
-          footer={
-            <div className="flex gap-2">
-              <Button 
-                type="button"
-                variant="outline" 
-                onClick={() => setIsEditOpen(false)}
+        {isMobile ? (
+          <AppSheet open={isEditOpen} onOpenChange={setIsEditOpen} mode="form" title="Edit Task">
+            <div className="pb-safe">
+              <Form {...form}>
+                <form id="edit-task-form" onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Title</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter task title"
+                            className="bg-white/5 border-white/10 text-white min-h-[48px] text-base"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter task description"
+                            className="bg-white/5 border-white/10 text-white resize-none min-h-[48px] text-base"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Priority</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white/5 border-white/10 text-white min-h-[48px] text-base">
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="LOW">Low</SelectItem>
+                              <SelectItem value="MEDIUM">Medium</SelectItem>
+                              <SelectItem value="HIGH">High</SelectItem>
+                              <SelectItem value="URGENT">Urgent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white/5 border-white/10 text-white min-h-[48px] text-base">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="TODO">To Do</SelectItem>
+                              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                              <SelectItem value="IN_REVIEW">In Review</SelectItem>
+                              <SelectItem value="BLOCKED">Blocked</SelectItem>
+                              <SelectItem value="COMPLETED">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Due Date</FormLabel>
+                        <FormControl>
+                          <MobileDateTimePicker
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Select date and time"
+                            className="w-full"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsEditOpen(false)}
+                      disabled={isSubmitting}
+                      className="flex-1 h-12 text-base border-white/10"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1 h-12 text-base bg-blue-600 hover:bg-blue-700"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Changes'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </div>
+          </AppSheet>
+        ) : (
+          <AppDialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <AppDialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
+              <AppDialogHeader>
+                <AppDialogTitle>Edit Task</AppDialogTitle>
+                <AppDialogDescription>
+                  Make changes to the task. Click save when you're done.
+                </AppDialogDescription>
+              </AppDialogHeader>
+              <Form {...form}>
+                <form id="edit-task-form" onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Title</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter task title"
+                            className="bg-white/5 border-white/10 text-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter task description"
+                            className="bg-white/5 border-white/10 text-white resize-none"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Priority</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="LOW">Low</SelectItem>
+                              <SelectItem value="MEDIUM">Medium</SelectItem>
+                              <SelectItem value="HIGH">High</SelectItem>
+                              <SelectItem value="URGENT">Urgent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-white">Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="TODO">To Do</SelectItem>
+                              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                              <SelectItem value="IN_REVIEW">In Review</SelectItem>
+                              <SelectItem value="BLOCKED">Blocked</SelectItem>
+                              <SelectItem value="COMPLETED">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white">Due Date</FormLabel>
+                        <FormControl>
+                          <MobileDateTimePicker
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Select date and time"
+                            className="w-full"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </form>
+              </Form>
+              <AppDialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditOpen(false)}
+                  disabled={isSubmitting}
+                  className="border-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  form="edit-task-form"
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </Button>
+              </AppDialogFooter>
+            </AppDialogContent>
+          </AppDialog>
+        )}
+
+        {/* Delete Confirmation */}
+        <AppDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+          <AppDialogContent size="sm">
+            <AppDialogHeader>
+              <AppDialogTitle>Are you sure?</AppDialogTitle>
+              <AppDialogDescription>
+                This action cannot be undone. This will permanently delete the task
+                {selectedTask?.title && ` "${selectedTask.title}"`}.
+              </AppDialogDescription>
+            </AppDialogHeader>
+            <AppDialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteOpen(false)}
                 disabled={isSubmitting}
-                className={cn(
-                  "border-white/10",
-                  isMobile && "flex-1 h-12 text-base"
-                )}
+                className="border-white/10"
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                form="edit-task-form"
-                className={cn(
-                  "bg-blue-600 hover:bg-blue-700",
-                  isMobile && "flex-1 h-12 text-base"
-                )}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </Button>
-            </div>
-          }
-        >
-          <Form {...form}>
-            <form id="edit-task-form" onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Title</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Enter task title" 
-                          className="bg-white/5 border-white/10 text-white"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Description</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Enter task description"
-                          className="bg-white/5 border-white/10 text-white resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-white">Priority</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="LOW">Low</SelectItem>
-                            <SelectItem value="MEDIUM">Medium</SelectItem>
-                            <SelectItem value="HIGH">High</SelectItem>
-                            <SelectItem value="URGENT">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-white">Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="TODO">To Do</SelectItem>
-                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                            <SelectItem value="IN_REVIEW">In Review</SelectItem>
-                            <SelectItem value="BLOCKED">Blocked</SelectItem>
-                            <SelectItem value="COMPLETED">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white">Due Date</FormLabel>
-                      <FormControl>
-                        <MobileDateTimePicker
-                          value={field.value}
-                          onChange={field.onChange}
-                          placeholder="Select date and time"
-                          className="w-full"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-            </form>
-          </Form>
-        </MobileDialog>
-
-        {/* Delete Confirmation */}
-        <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-          <AlertDialogContent className="bg-graphite-800 border-white/10">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-white">Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription className="text-white/60">
-                This action cannot be undone. This will permanently delete the task
-                {selectedTask?.title && ` "${selectedTask.title}"`}.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="border-white/10" disabled={isSubmitting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
+              <Button
+                variant="destructive"
                 onClick={handleConfirmDelete}
-                className="bg-red-500 hover:bg-red-600"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
@@ -1300,28 +1566,33 @@ export default function AdminTasksPage() {
                 ) : (
                   'Delete'
                 )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+              </Button>
+            </AppDialogFooter>
+          </AppDialogContent>
+        </AppDialog>
 
         {/* Bulk Delete Confirmation Dialog */}
-        <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
-          <AlertDialogContent className="bg-graphite-800 border-white/10 text-white">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Multiple Tasks</AlertDialogTitle>
-              <AlertDialogDescription className="text-white/60">
-                Are you sure you want to delete {selectedRows.length} selected task{selectedRows.length !== 1 ? 's' : ''}? 
+        <AppDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+          <AppDialogContent size="sm">
+            <AppDialogHeader>
+              <AppDialogTitle>Delete Multiple Tasks</AppDialogTitle>
+              <AppDialogDescription>
+                Are you sure you want to delete {selectedRows.length} selected task{selectedRows.length !== 1 ? 's' : ''}?
                 This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="border-white/10" disabled={isSubmitting}>
+              </AppDialogDescription>
+            </AppDialogHeader>
+            <AppDialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkDeleteOpen(false)}
+                disabled={isSubmitting}
+                className="border-white/10"
+              >
                 Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction 
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={handleConfirmBulkDelete}
-                className="bg-red-500 hover:bg-red-600"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
@@ -1332,10 +1603,10 @@ export default function AdminTasksPage() {
                 ) : (
                   `Delete ${selectedRows.length} Task${selectedRows.length !== 1 ? 's' : ''}`
                 )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+              </Button>
+            </AppDialogFooter>
+          </AppDialogContent>
+        </AppDialog>
       </div>
     </PageShell>
   );
