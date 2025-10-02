@@ -2,6 +2,54 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Always Load These Files First
+
+Before working on any task, **always read these files** to understand constraints and protocols:
+
+- `@PROJECT_GUARDRAILS.md`
+- `@WORK_PROTOCOL.md`
+- `@SOURCE_OF_TRUTH_GENERATOR_PROMPT.md`
+
+**Note:** Do not auto-load `SOURCE_OF_TRUTH.md`; reference it on demand to save tokens. Use the generator prompt to understand the expected structure and anchors.
+
+**Critical:** If you are about to modify code, you MUST read WORK_PROTOCOL.md and follow the 6-step process exactly.
+
+---
+
+## Evidence Rule
+
+**Every claim must be backed by file path + symbol. Line numbers are optional but helpful.**
+
+**Format:** `file/path.ts:symbolName` or `file/path.ts:symbolName:123` (with line number)
+
+**Examples:**
+- When documenting behavior: `lib/api/auth-check.ts:requireAuth()`
+- When referencing a pattern: `components/ui/dialog.tsx:DialogContent:43-51` (with code snippet)
+- When proposing changes: Show diffs with exact line context
+- If uncertain: Write `TODO(path/to/file.ts:symbolName?)` with suggested grep search
+
+**Never guess.** If a file/symbol doesn't exist or behavior is unclear, state this explicitly and propose how to verify.
+
+---
+
+## Anchors from SOT
+
+When SOURCE_OF_TRUTH.md exists, use these anchors to quickly navigate (reference on demand, don't auto-load):
+
+- `#inventory` - Directory & file listing
+- `#data` - Prisma schema & ERD
+- `#api` - API endpoints with methods, auth, schemas
+- `#auth` - Auth flows, token refresh, role matrix
+- `#frontend` - Routes, components, hooks
+- `#state` - Query Keys Registry & Mutation→Invalidation Matrix
+- `#storage` - Firebase Storage & webhooks
+- `#observability` - Logging, correlation IDs, errors
+- `#security` - RBAC, validation, mitigations
+- `#ops` - Commands, deployment, runbooks
+- `#design` - Tailwind theme, design tokens, mobile patterns
+
+---
+
 ## Critical Commands
 
 ### Development
@@ -183,6 +231,29 @@ queryClient.invalidateQueries({ queryKey: ['tasks', { projectId }] });
 
 ## Important Notes
 
+### Stop Conditions (READ THIS)
+
+**STOP immediately and ask for guidance if:**
+
+1. **UI Components:** You see raw `Dialog`, `Sheet`, `Popover`, or `DropdownMenu` imports in NEW page/feature code
+   - **Action:** Propose migration to `AppSheet`, `AppDialog`, or `AppMenu` components
+   - **Reference:** `/docs/UX_STANDARDS.md` for contracts and acceptance checklist
+
+2. **Missing References:** A file path or symbol cited in docs doesn't exist
+   - **Action:** State the discrepancy, propose grep searches to locate the actual implementation
+
+3. **Guardrail Violations:** Proposed change violates PROJECT_GUARDRAILS.md
+   - **Examples:** Raw SQL, bypassing auth, violating Task XOR, exposing secrets, skipping Zod validation
+   - **Action:** Explain why the approach violates guardrails, propose compliant alternative
+
+4. **Protocol Violations:** You're asked to skip WORK_PROTOCOL.md steps
+   - **Examples:** "Just make the change" without showing diffs, applying without approval, skipping verification
+   - **Action:** Politely remind user of protocol, explain why each step matters
+
+5. **UX Standards Violations:** Proposed component doesn't meet acceptance checklist
+   - **Action:** Reference specific UX_STANDARDS.md rule being violated, propose fix
+
+---
 - Always run `npx prisma generate` after modifying `schema.prisma`
 - The system expects `projectId` in most API calls - get from `useProjects()` hook
 - Contact assignment system: Tasks can be assigned to `assignedToId` (User) OR `assignedContactId` (Contact)

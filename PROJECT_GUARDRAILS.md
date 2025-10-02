@@ -25,6 +25,12 @@
 ## Query Keys & Invalidations
 - **Rule:** Use the keys and invalidation matrix **as listed in SOT** `05-state-management.md`. Do not embed the whole list here; reference SOT directly to avoid drift.
 
+## UI Component Standards
+- **Rule:** Use **ONLY** `AppSheet`, `AppDialog`, and `AppMenu` (or `AppDropdownMenu`) for all overlay components in app code.
+- **Forbidden:** Direct imports of raw primitives (`Dialog`, `Sheet`, `Popover`, `DropdownMenu`) in page/feature code.
+- **Exceptions:** Base UI component implementations in `components/ui/*.tsx` and existing components during migration.
+- **Reference:** See `/docs/UX_STANDARDS.md` for complete contracts and acceptance checklist.
+
 ## Editing Workflow (summarized; see WORK_PROTOCOL.md)
 1) READ: list exact files you will open.
 2) PLAN: propose a tiny batch (≤ 3 files).

@@ -63,6 +63,41 @@ const config: Config = {
           100: '#6b7490',
         },
       },
+      height: {
+        'modal-detail': 'var(--modal-detail)',
+        'modal-form': 'var(--modal-form)',
+        'modal-fullscreen': 'var(--modal-fullscreen)',
+        'modal-compact': 'var(--modal-compact)',
+        'dropdown': 'var(--dropdown)',
+        'modal-min': 'var(--modal-min)',
+      },
+      maxHeight: {
+        'modal-detail': 'var(--modal-detail)',
+        'modal-form': 'var(--modal-form)',
+        'modal-fullscreen': 'var(--modal-fullscreen)',
+        'modal-compact': 'var(--modal-compact)',
+        'dropdown': 'var(--dropdown)',
+      },
+      minHeight: {
+        'modal-min': 'var(--modal-min)',
+      },
+      opacity: {
+        'backdrop-light': '0.5',        // 50% - BottomSheet backdrop
+        'backdrop-heavy': '0.8',        // 80% - Dialog/Sheet backdrop
+        'border-default': '0.1',        // 10% - Borders/dividers
+        'text-muted': '0.6',            // 60% - Secondary text
+        'text-disabled': '0.4',         // 40% - Disabled text
+        'handle': '0.3',                // 30% - Drag handles
+        'glass-bg': '0.55',             // 55% - Glass morphism backgrounds
+        'card-bg': '0.5',               // 50% - Card backgrounds
+        'sticky-header': '0.95',        // 95% - Sticky headers with blur
+      },
+      zIndex: {
+        'modal': '50',                  // All modals/overlays
+        'header': '40',                 // Page header
+        'sidebar': '30',                // Navigation sidebar
+        'sticky': '10',                 // Sticky content within modals
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

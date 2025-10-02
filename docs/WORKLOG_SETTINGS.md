@@ -1,5 +1,28 @@
 # WORKLOG - SETTINGS
 
+## 2025-10-01 - Phase 1-2: UX Standards & Design Tokens
+
+**Files Modified:**
+- `tailwind.config.ts` - Added design tokens (height, opacity, z-index) unified with CSS variables
+- `app/globals.css` - Added CSS variables for modal heights, z-layers, and .pb-safe utility
+- `PROJECT_GUARDRAILS.md` - Added UI Component Standards enforcement rules
+
+**Changes:**
+- Design tokens now use single source of truth: CSS vars in globals.css, referenced by Tailwind config
+- Tokens include: modal-detail (85vh), modal-form (90vh), modal-fullscreen (calc with safe area), opacity presets, z-index layers
+- .glass class refactored to use Tailwind utilities instead of hard-coded rgba values
+- pb-safe utility added for iOS safe area handling
+
+**Query Keys:** N/A (settings system unchanged, tokens only)
+
+**Tests:** Passed lint/typecheck (pre-existing errors only, no new issues)
+
+**Notes:**
+- Part of broader UI standardization effort (see WORKLOG_UI.md for component details)
+- Settings page will be pilot for Phase 4 migration to canonical components
+
+---
+
 ## 2025-09-23 - Mobile Navigation Rearrangement Flow Enhancement
 
 ### Summary

@@ -1,0 +1,68 @@
+File,Component Type,Imported From,Props Used,Handlers Present,Height/Z-Index Classes,Custom Styles,Notes
+components/ui/dialog.tsx,DialogContent,@radix-ui/react-dialog,"className, children, ...props",onOpenAutoFocus,"z-50, max-w-lg",Custom focus management,Center-positioned desktop dialog
+components/ui/sheet.tsx,SheetContent,@radix-ui/react-dialog,"side, className, children","N/A (default Radix)",z-50,4 side variants,Radix Dialog disguised as Sheet
+components/ui/bottom-sheet.tsx,BottomSheet,Custom,"open, onOpenChange, children, title","onTouchStart, onTouchMove, onTouchEnd, onMouseDown, onMouseMove, onMouseUp","z-50, max-h-[85vh], min-h-[200px]","glass, backdrop-blur-sm, bg-black/50",✅ HAS DRAG SUPPORT - Reference implementation
+components/ui/mobile/dialog.tsx,MobileDialog,Custom (Sheet/Dialog adapter),"open, onOpenChange, title, description, children, footer, size, showCloseButton, preventScroll",onPointerDownOutside,"z-50, h-[90vh] (mobile)","rounded-t-2xl, pb-safe",Form protection on backdrop click
+components/ui/mobile/detail-sheet.tsx,MobileDetailSheet,Sheet,"isOpen, onClose, title, subtitle, statusBadge, sections, actions","N/A (wraps Sheet)","z-50, h-[85vh]","sticky header (z-10), overflow-y-auto, absolute bottom actions",Reusable detail view pattern
+components/ui/popover.tsx,PopoverContent,@radix-ui/react-popover,"className, align, sideOffset","N/A (default Radix)","z-50, max-h-[--radix-popover-content-available-height]",Uses Radix variable heights,Dropdown-style positioning
+components/ui/dropdown-menu.tsx,DropdownMenuContent,@radix-ui/react-dropdown-menu,"className, sideOffset","N/A (default Radix)","z-50, max-h-[var(--radix-dropdown-menu-content-available-height)]","overflow-y-auto, overflow-x-hidden",Context menu pattern
+components/ui/alert-dialog.tsx,AlertDialogContent,@radix-ui/react-alert-dialog,"className, ...props","N/A (default Radix)","z-50, max-w-lg",Center-positioned,Destructive confirmation dialogs
+components/ui/command.tsx,CommandGroup,cmdk,"className, ...props","N/A (cmdk library)",max-h-[300px],"overflow-y-auto, overflow-x-hidden",Command palette / search
+components/ui/select.tsx,SelectContent,@radix-ui/react-select,"className, children, position","N/A (default Radix)","z-50, max-h-[--radix-select-content-available-height]","overflow-y-auto, overflow-x-hidden",Dropdown select menu
+components/tasks/filter-bottom-sheet.tsx,FilterBottomSheet,BottomSheet,"open, onOpenChange",Inherited from BottomSheet,Inherited from BottomSheet,Uses BottomSheet internally,✅ HAS DRAG via BottomSheet
+components/tasks/mobile-task-detail-sheet.tsx,MobileTaskDetailSheet,Sheet,"isOpen, onClose, task, onEdit, onDelete, onStatusChange","N/A (wraps Sheet)","z-50, h-[85vh]","rounded-t-2xl, sr-only SheetTitle, sticky header, absolute bottom actions",338 lines - custom implementation
+components/tasks/mobile-task-dialog.tsx,MobileTaskDialog,Sheet,"open, onOpenChange, title, children, footer","N/A (wraps Sheet)","z-50, h-full, max-h-[calc(100vh-env(safe-area-inset-top))]","rounded-t-2xl, pb-[calc(1rem+env(safe-area-inset-bottom))]",Full-screen with safe area handling
+components/tasks/mobile-date-time-picker.tsx,MobileDateTimePicker,Popover + Calendar,"value, onChange, label, placeholder","N/A (wraps Popover)",max-h-[300px],Custom mobile date/time selection,Uses popover for picker overlay
+components/tasks/mobile-task-card.tsx,MobileTaskCard,N/A (div),"task, onClick, onStatusChange",onClick,"N/A (card, not overlay)",backdrop-blur-sm bg-graphite-800/50,Clickable card that opens detail sheet
+components/tasks/mobile-list-view.tsx,MobileListView,N/A (list container),"tasks, onTaskClick",onTaskClick,"N/A (list, not overlay)",Uses MobileTaskCard internally,Container for mobile task cards
+components/tasks/view-switcher.tsx,ViewSwitcher,N/A (button group),"view, onViewChange",onViewChange,"N/A (toolbar, not overlay)",backdrop-blur-sm bg-graphite-800/50,View toggle buttons (list/kanban/calendar)
+components/tasks/task-filter-bar.tsx,TaskFilterBar,N/A (toolbar),"filters, onChange",onChange,"N/A (toolbar, not overlay)",backdrop-blur-sm bg-graphite-900/95,Desktop filter bar with dropdowns
+components/tasks/task-card.tsx,TaskCard (desktop),N/A (card),"task, onClick",onClick,"N/A (card, not overlay)",backdrop-blur-sm bg-graphite-800/50,Desktop task card
+components/tasks/sortable-task-card.tsx,SortableTaskCard,dnd-kit,"task, ...props","N/A (dnd-kit)",N/A,Uses task-card internally,Drag-and-drop wrapper for Kanban
+components/tasks/kanban-board.tsx,KanbanBoard,dnd-kit,"tasks, onMove, onEdit, onDelete","onDragEnd, onDragStart","N/A (board container)",DnD context provider,Kanban board with drag-drop columns
+components/tasks/kanban-column.tsx,KanbanColumn,dnd-kit,"column, tasks, onDrop",onDrop,N/A,Droppable area + sortable context,Kanban column with sortable cards
+components/contacts/mobile-contact-detail-sheet.tsx,MobileContactDetailSheet,Sheet,"isOpen, onClose, contact, onEdit, onDelete, onInvite","N/A (wraps Sheet)","z-50, h-[85vh]","rounded-t-2xl, absolute bottom actions, grid for quick actions",415 lines - custom implementation
+components/contacts/mobile-filter-sheet.tsx,MobileFilterSheet,Sheet,"open, onClose, filters, onChange","N/A (wraps Sheet)","z-50, h-[85vh]","rounded-t-2xl, absolute bottom actions",350 lines - complex filter UI
+components/contacts/mobile-contact-dialog.tsx,MobileContactDialog,Sheet/Dialog (responsive),"open, onClose, title, children","N/A (wraps Sheet/Dialog)","z-50, h-[90vh] (mobile)",rounded-t-2xl,Responsive adapter pattern
+components/contacts/contact-card.tsx,ContactCard (desktop),N/A (card),"contact, onClick",onClick,N/A,backdrop-blur-sm,Desktop contact card
+components/contacts/assign-task-dialog.tsx,AssignTaskDialog,Dialog,"open, onClose, onAssign",onAssign,"z-50, max-h-[90vh]",overflow-y-auto,Desktop dialog for task assignment
+components/contacts/invite-to-rfp-dialog.tsx,InviteToRfpDialog,Dialog,"open, onClose, onInvite",onInvite,"z-50, max-w-2xl",N/A,Desktop dialog for RFP vendor invites
+components/schedule/mobile/event-detail-sheet.tsx,EventDetailSheet,MobileDetailSheet,"isOpen, onClose, event, onEdit, onDelete, onComplete, onCancel","N/A (wraps MobileDetailSheet)",Inherited from MobileDetailSheet,Uses MobileDetailSheet pattern,⚠️ BUG: Delete button conditionally hidden
+components/schedule/mobile/event-form.tsx,EventForm,N/A (form component),"formData, onChange","N/A (form fields)",N/A,Form fields for event creation/editing,Used inside EventDialog
+components/schedule/event-dialog/index.tsx,EventDialog,Dialog/Sheet (responsive),"open, onClose, event, onSave","N/A (wraps Dialog/Sheet)",z-50,Multi-tab dialog (details/attendees/recurrence/notifications),Complex event creation dialog
+components/schedule/event-dialog/details-tab.tsx,DetailsTab,N/A (form section),"formData, onChange",onChange,N/A,Event details form fields,Tab content component
+components/schedule/event-dialog/attendees-tab.tsx,AttendeesTab,N/A (form section),"attendees, onChange",onChange,N/A,Attendees selection interface,Tab content component
+components/schedule/event-dialog/recurrence-tab.tsx,RecurrenceTab,N/A (form section),"recurrence, onChange",onChange,N/A,Recurrence pattern configuration,Tab content component
+components/schedule/event-dialog/notifications-tab.tsx,NotificationsTab,N/A (form section),"notifications, onChange",onChange,N/A,Notification settings,Tab content component
+components/schedule/fullcalendar-view.tsx,FullCalendarView,FullCalendar library,"events, onEventClick, onDateSelect","eventClick, dateSelect","min-h-[400px] sm:min-h-[500px]",Calendar grid with event rendering,FullCalendar.js wrapper
+components/schedule/filter-panel.tsx,FilterPanel,N/A (side panel),"filters, onChange",onChange,N/A,Desktop sidebar filter panel,Not a modal
+components/schedule/kpi-carousel.tsx,KPICarousel,N/A (carousel),"metrics, ...props",N/A,N/A,Metrics carousel with schedule KPIs,Not a modal
+components/dashboard/QuickActionsSheet.tsx,QuickActionsSheet,Sheet,"open, onOpenChange","N/A (wraps Sheet)",z-50,side varies (bottom mobile / right desktop),FAB menu with action list
+components/dashboard/widgets/WelcomeWidget.tsx,WelcomeWidget,N/A (card),"user, projectStats",N/A,N/A,Dashboard welcome card,Not a modal
+components/dashboard/widgets/ProjectOverviewWidget.tsx,ProjectOverviewWidget,N/A (card),projectData,N/A,N/A,Dashboard project stats card,Not a modal
+components/dashboard/widgets/BudgetHealthWidget.tsx,BudgetHealthWidget,N/A (card),"budgetData, ...props",N/A,N/A,Dashboard budget chart card,Not a modal
+components/bidding/manual-bid-dialog.tsx,ManualBidDialog,Dialog,"open, onClose, rfpId, onSubmit",onSubmit,"z-50, max-w-2xl",overflow-y-auto,Desktop dialog for manual bid entry
+components/bidding/bid-tabulation.tsx,BidTabulation,N/A (table),"bids, rfp, onAward",onAward,N/A,Bid comparison table with award action,Not a modal
+components/blocks/page-shell.tsx,PageShell,N/A (layout),"children, pageTitle, userRole, fabIcon, onFabClick",onFabClick,"z-30 (sidebar), z-40 (header)",backdrop-blur on sticky headers,Main layout wrapper with sidebar + header
+components/blocks/mobile-bottom-nav.tsx,MobileBottomNav,N/A (nav),"activeRoute, ...props",N/A,"fixed bottom-0, min-h-[env(safe-area-inset-bottom)]",backdrop-blur-sm,Mobile bottom navigation bar
+components/blocks/project-switcher.tsx,ProjectSwitcher,Popover,"projects, activeProject, onChange",onChange,z-50 (via Popover),Uses Popover for dropdown,Project selection dropdown
+components/blocks/rearrangeable-navigation.tsx,RearrangeableNavigation,Sheet (settings modal),"items, onChange",onDrag (dnd-kit),"z-50 (modal)",Uses GripVertical icon for drag handle,Navigation customization UI with drag-drop
+components/blocks/adaptive-toolbar.tsx,AdaptiveToolbar,N/A (toolbar),"actions, ...props",N/A,N/A,Responsive toolbar that adapts to screen size,Not a modal
+components/ui/data-table.tsx,DataTable,N/A (table),"columns, data, ...props",N/A,N/A,TanStack Table wrapper,Not a modal
+components/ui/date-picker.tsx,DatePicker,Popover + Calendar,"value, onChange, ...props",onChange,z-50 (via Popover),Uses popover for calendar overlay,Calendar date picker
+components/ui/scroll-area.tsx,ScrollArea,@radix-ui/react-scroll-area,"className, children",N/A,overflow-hidden,Custom scrollbar styling,Styled scroll container
+components/ui/avatar.tsx,Avatar,@radix-ui/react-avatar,"src, alt, fallback",N/A,overflow-hidden,Circular image with fallback,Image component
+components/ui/badge.tsx,Badge,N/A (span),"variant, className",N/A,N/A,"Variants: default, secondary, destructive, outline",Status badge component
+components/ui/button.tsx,Button,N/A (button),"variant, size, className",onClick,N/A,"Variants: default, destructive, outline, secondary, ghost, link",Primary button component
+components/ui/card.tsx,Card,N/A (div),"className, ...props",N/A,N/A,CardHeader + CardContent + CardFooter,Container component
+components/ui/checkbox.tsx,Checkbox,@radix-ui/react-checkbox,"checked, onCheckedChange",onCheckedChange,N/A,Accessible checkbox,Form input
+components/ui/form.tsx,Form,react-hook-form,"form, ...props",N/A,N/A,FormField + FormLabel + FormControl + FormMessage,Form wrapper components
+components/ui/input.tsx,Input,N/A (input),"type, className, ...props",onChange,N/A,Styled text input,Form input
+components/ui/label.tsx,Label,@radix-ui/react-label,"className, ...props",N/A,N/A,Form label,Form label
+components/ui/skeleton.tsx,Skeleton,N/A (div),"className, ...props",N/A,N/A,Loading placeholder with pulse animation,Loading state
+components/ui/table.tsx,Table,N/A (table),"className, ...props",N/A,N/A,TableHeader + TableBody + TableRow + TableCell,Table components
+components/ui/tabs.tsx,Tabs,@radix-ui/react-tabs,"value, onValueChange",onValueChange,N/A,TabsList + TabsTrigger + TabsContent,Tab navigation
+components/ui/textarea.tsx,Textarea,N/A (textarea),"className, ...props",onChange,"min-h-[80px], min-h-[100px]",Multi-line text input,Form input
+components/ui/toast.tsx,Toast,@radix-ui/react-toast,"variant, ...props",N/A,"z-50 (toaster)",ToastProvider + ToastViewport + Toast components,Notification system
+components/ui/toaster.tsx,Toaster,Toast system,"...props",N/A,z-50,Toast container with w-8 h-1 drag handle visual,Toast manager
+components/ui/tooltip.tsx,Tooltip,@radix-ui/react-tooltip,"content, ...props",N/A,z-50,TooltipProvider + Tooltip + TooltipTrigger + TooltipContent,Hover tooltip
