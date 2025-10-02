@@ -1,9 +1,11 @@
 'use client';
 
-import { MobileDetailSheet, type DetailSection, type DetailAction } from '@/components/ui/mobile';
+import { AppSheet } from '@/components/ui/app-sheet';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, Users, User, FileText, Edit, Trash, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, User, FileText, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface EventDetailSheetProps {
   event: any | null;
@@ -11,8 +13,6 @@ interface EventDetailSheetProps {
   onClose: () => void;
   onEdit?: (event: any) => void;
   onDelete?: (event: any) => void;
-  onComplete?: (event: any) => void;
-  onCancel?: (event: any) => void;
 }
 
 export function EventDetailSheet({
@@ -21,158 +21,11 @@ export function EventDetailSheet({
   onClose,
   onEdit,
   onDelete,
-  onComplete,
-  onCancel,
 }: EventDetailSheetProps) {
   if (!event) return null;
 
   const startDate = event.start || event.startTime ? new Date(event.start || event.startTime) : null;
   const endDate = event.end || event.endTime ? new Date(event.end || event.endTime) : null;
-
-  const sections: DetailSection[] = [
-    {
-      id: 'description',
-      icon: FileText,
-      label: 'Description',
-      value: event.description || 'No description provided',
-    },
-    {
-      id: 'schedule',
-      icon: Calendar,
-      label: 'Schedule',
-      value: (
-        <div className="space-y-2">
-          {startDate && (
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-white/60" />
-              <span>{format(startDate, 'EEEE, MMMM d, yyyy')}</span>
-            </div>
-          )}
-          {startDate && (
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-white/60" />
-              <span>
-                {format(startDate, 'h:mm a')}
-                {endDate && ` - ${format(endDate, 'h:mm a')}`}
-              </span>
-            </div>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  if (event.location) {
-    sections.push({
-      id: 'location',
-      icon: MapPin,
-      label: 'Location',
-      value: event.location,
-    });
-  }
-
-  if (event.attendees && event.attendees.length > 0) {
-    sections.push({
-      id: 'attendees',
-      icon: Users,
-      label: 'Attendees',
-      value: (
-        <div className="space-y-1">
-          {event.attendees.map((attendee: string, index: number) => (
-            <div key={index} className="flex items-center gap-2">
-              <User className="h-3 w-3 text-white/40" />
-              <span className="text-sm">{attendee}</span>
-            </div>
-          ))}
-        </div>
-      ),
-    });
-  }
-
-  if (event.requestedBy) {
-    sections.push({
-      id: 'requestedBy',
-      icon: User,
-      label: 'Requested By',
-      value: event.requestedBy,
-    });
-  }
-
-  if (event.approvedBy) {
-    sections.push({
-      id: 'approvedBy',
-      icon: User,
-      label: 'Approved By',
-      value: event.approvedBy,
-    });
-  }
-
-  if (event.notes) {
-    sections.push({
-      id: 'notes',
-      icon: FileText,
-      label: 'Notes',
-      value: event.notes,
-    });
-  }
-
-  const actions: DetailAction[] = [];
-
-  if (event.status !== 'DONE' && event.status !== 'CANCELED') {
-    if (onComplete) {
-      actions.push({
-        id: 'complete',
-        label: 'Mark Complete',
-        icon: CheckCircle,
-        variant: 'default',
-        className: 'bg-green-600 hover:bg-green-700',
-        onClick: () => {
-          onComplete(event);
-          onClose();
-        },
-      });
-    }
-
-    if (onEdit) {
-      actions.push({
-        id: 'edit',
-        label: 'Edit Event',
-        icon: Edit,
-        variant: 'outline',
-        onClick: () => {
-          onEdit(event);
-          onClose();
-        },
-      });
-    }
-
-    if (onCancel) {
-      actions.push({
-        id: 'cancel',
-        label: 'Cancel Event',
-        icon: XCircle,
-        variant: 'outline',
-        className: 'text-orange-400 border-orange-400/50 hover:bg-orange-400/10',
-        onClick: () => {
-          onCancel(event);
-          onClose();
-        },
-      });
-    }
-  }
-
-  if (onDelete) {
-    actions.push({
-      id: 'delete',
-      label: 'Delete Event',
-      icon: Trash,
-      variant: 'destructive',
-      onClick: () => {
-        onDelete(event);
-        onClose();
-      },
-    });
-  }
 
   const statusColors: Record<string, string> = {
     PENDING: 'bg-yellow-500/20 text-yellow-400',
@@ -192,21 +45,126 @@ export function EventDetailSheet({
   };
 
   return (
-    <MobileDetailSheet
-      isOpen={isOpen}
-      onClose={onClose}
+    <AppSheet
+      open={isOpen}
+      onOpenChange={onClose}
+      mode="detail"
+      fit="content"
       title={event.title}
-      subtitle={event.type?.replace('_', ' ')}
-      statusBadge={{
-        label: event.status?.replace('_', ' '),
-        className: statusColors[event.status],
-      }}
-      headerIcon={{
-        icon: Calendar,
-        className: eventTypeColors[event.type],
-      }}
-      sections={sections}
-      actions={actions}
-    />
+      description={event.type?.replace('_', ' ')}
+      footer={
+        <div className="flex gap-2">
+          {onEdit && (
+            <Button
+              onClick={() => {
+                onEdit(event);
+                onClose();
+              }}
+              variant="outline"
+              className="flex-1 h-12 bg-blue-600/20 border-blue-600/30 text-blue-400 hover:bg-blue-600/30"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Event
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              onClick={() => {
+                onDelete(event);
+                onClose();
+              }}
+              variant="outline"
+              className="flex-1 h-12 bg-red-600/20 border-red-600/30 text-red-400 hover:bg-red-600/30"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          )}
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {/* Status Badge */}
+        <div className="flex items-center gap-3">
+          <div className={cn('p-2 rounded-lg', eventTypeColors[event.type])}>
+            <Calendar className="h-5 w-5 text-white" />
+          </div>
+          <Badge className={cn('text-sm', statusColors[event.status])}>
+            {event.status?.replace('_', ' ')}
+          </Badge>
+        </div>
+
+        {/* Description */}
+        {event.description && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-white/60">
+              <FileText className="h-4 w-4" />
+              <span className="text-sm font-medium">Description</span>
+            </div>
+            <p className="text-white/80">{event.description}</p>
+          </div>
+        )}
+
+        {/* Schedule */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-white/60">
+            <Calendar className="h-4 w-4" />
+            <span className="text-sm font-medium">Schedule</span>
+          </div>
+          {startDate && (
+            <div className="space-y-1">
+              <p className="text-white/80">{format(startDate, 'EEEE, MMMM d, yyyy')}</p>
+              <div className="flex items-center gap-2 text-white/60">
+                <Clock className="h-4 w-4" />
+                <span>
+                  {format(startDate, 'h:mm a')}
+                  {endDate && ` - ${format(endDate, 'h:mm a')}`}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Location */}
+        {event.location && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-white/60">
+              <MapPin className="h-4 w-4" />
+              <span className="text-sm font-medium">Location</span>
+            </div>
+            <p className="text-white/80">{event.location}</p>
+          </div>
+        )}
+
+        {/* Attendees */}
+        {event.attendees && event.attendees.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-white/60">
+              <Users className="h-4 w-4" />
+              <span className="text-sm font-medium">Attendees ({event.attendees.length})</span>
+            </div>
+            <div className="space-y-1">
+              {event.attendees.map((attendee: string, index: number) => (
+                <div key={index} className="flex items-center gap-2 text-white/60">
+                  <User className="h-3 w-3" />
+                  <span className="text-sm">{attendee}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
+        {event.notes && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-white/60">
+              <FileText className="h-4 w-4" />
+              <span className="text-sm font-medium">Notes</span>
+            </div>
+            <p className="text-white/80 text-sm">{event.notes}</p>
+          </div>
+        )}
+      </div>
+    </AppSheet>
   );
 }

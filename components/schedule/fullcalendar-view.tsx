@@ -20,16 +20,14 @@ import {
   MoreHorizontal,
   ChevronDown
 } from 'lucide-react';
-// Removed unused Select imports - using dropdown menu instead
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  AppDropdownMenu,
+  AppDropdownMenuContent,
+  AppDropdownMenuItem,
+  AppDropdownMenuTrigger,
+} from '@/components/ui/app-menu';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useCalendarSwipe } from '@/hooks/use-swipe-gestures';
-// Removed unused AdaptiveToolbar import
 
 interface ScheduleEvent {
   id: string;
@@ -271,7 +269,7 @@ export function FullCalendarView({
   }, [mounted]); // Only run when mounted changes
 
   return (
-    <div className="flex flex-col h-full min-h-[400px] sm:min-h-[500px]">
+    <div className="flex flex-col h-full">
       {/* Custom Toolbar */}
       <div className="mb-3 bg-white/5 rounded-lg border border-white/10 p-2 sm:p-3 flex-shrink-0">
         {/* Mobile Toolbar - Compact single-row layout */}
@@ -312,15 +310,15 @@ export function FullCalendarView({
               >
                 Today
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <AppDropdownMenu>
+                <AppDropdownMenuTrigger asChild>
                   <Button size="icon" variant="ghost" className="h-8 w-8">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                </AppDropdownMenuTrigger>
+                <AppDropdownMenuContent align="end" className="glass border-white/10">
                   {viewOptions.map((option) => (
-                    <DropdownMenuItem
+                    <AppDropdownMenuItem
                       key={option.value}
                       onClick={() => handleViewChange(option.value)}
                       className={cn(
@@ -330,10 +328,10 @@ export function FullCalendarView({
                     >
                       <option.icon className="h-4 w-4" />
                       {option.label}
-                    </DropdownMenuItem>
+                    </AppDropdownMenuItem>
                   ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </AppDropdownMenuContent>
+              </AppDropdownMenu>
             </div>
           </div>
         ) : (
@@ -375,11 +373,11 @@ export function FullCalendarView({
             
             {/* Smart responsive view selector - Correct logic: dropdown for smaller screens */}
             {(isTablet || isInCriticalZone || needsDropdownMenu || toolbarLayout === 'dropdown' || toolbarLayout === 'compact') ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+              <AppDropdownMenu>
+                <AppDropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="gap-2 min-w-[120px] justify-between"
                   >
                     {viewOptions.find(o => o.value === currentView)?.icon && (
@@ -390,10 +388,10 @@ export function FullCalendarView({
                     {viewOptions.find(o => o.value === currentView)?.label}
                     <ChevronDown className="h-4 w-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                </AppDropdownMenuTrigger>
+                <AppDropdownMenuContent align="end" className="glass border-white/10">
                   {viewOptions.map((option) => (
-                    <DropdownMenuItem
+                    <AppDropdownMenuItem
                       key={option.value}
                       onClick={() => handleViewChange(option.value)}
                       className={cn(
@@ -403,10 +401,10 @@ export function FullCalendarView({
                     >
                       <option.icon className="h-4 w-4" />
                       {option.label}
-                    </DropdownMenuItem>
+                    </AppDropdownMenuItem>
                   ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </AppDropdownMenuContent>
+              </AppDropdownMenu>
             ) : (
               /* Full button layout - Only for large desktop screens (>1100px) */
               <div className="flex items-center gap-1 sm:gap-2">
@@ -434,10 +432,11 @@ export function FullCalendarView({
       </div>
 
       {/* FullCalendar Component with Swipe Support */}
-      <div 
+      <div
         {...swipeHandlers}
         className={cn(
-          "flex-1 min-h-0 bg-gray-950 rounded-lg p-2 sm:p-3",
+          "flex-1 min-h-[400px] overflow-hidden",
+          "bg-gray-950 rounded-lg p-2 sm:p-3",
           "relative transition-opacity duration-300",
           isTransitioning && "opacity-70"
         )}
