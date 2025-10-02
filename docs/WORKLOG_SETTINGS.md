@@ -1,5 +1,52 @@
 # WORKLOG - SETTINGS
 
+## 2025-10-01 - Settings Page: Canonical Overlay Migration
+
+**Files Modified:**
+- `app/admin/settings/page.tsx` - Migrated all dialogs and menus to canonical App* components
+
+**Changes:**
+- Replaced `Dialog` → `AppDialog` for Create/Edit Project dialogs (lines 519-718, 800-994)
+- Replaced `DropdownMenu` → `AppDropdownMenu` for project actions menu (lines 400-454)
+- Replaced `AlertDialog` → `AppDialog` with destructive Button pattern for delete confirmation (lines 997-1016)
+- Removed raw primitive imports; added canonical component imports from `@/components/ui/app-dialog` and `@/components/ui/app-menu`
+
+**Why Changed:**
+- Canonical overlay migration per UX_STANDARDS.md and PROJECT_GUARDRAILS.md
+- Enforces consistent z-layering (z-modal), focus management, body scroll lock
+- AppDialog provides size variants ('sm'|'md'|'lg') for consistent max-widths
+- AppDropdownMenu enforces z-modal and consistent item padding
+- Delete dialog now uses standard destructive Button variant instead of custom AlertDialog styling
+
+**Acceptance Checklist:**
+- ✅ No drag handle needed (desktop dialogs, not bottom sheets)
+- ✅ Dismiss: X button + Esc + backdrop click (via Radix Dialog primitives)
+- ✅ Heights: Dialogs use size="lg" (max-w-2xl) for forms, size="sm" (max-w-md) for confirmation
+- ✅ Focus trap: Automatic via Radix Dialog with custom onOpenAutoFocus to prevent aria-hidden warnings
+- ✅ Focus return: Automatic via Radix Dialog when closed
+- ✅ Body scroll lock: Automatic via Radix Dialog
+- ✅ Z-layer policy: z-modal applied by canonical components (overlays above content/nav, under toasts)
+- ✅ No raw Dialog/Sheet/DropdownMenu imports remain in app/admin/settings/page.tsx
+- ✅ No console/a11y warnings (AppDialog custom focus management prevents aria-hidden issues)
+
+**Nav/FAB Non-Regression:**
+- Read-only verification: Canonical components use z-modal (50) which renders above bottom nav and FAB
+- Backdrop overlay and Radix Portal ensure underlying elements are inert while overlays are open
+- No changes made to nav or FAB code
+
+**Query Keys Affected:** None (UI-only migration, no data/state changes)
+
+**Verification Results:**
+- `npm run lint`: 825 pre-existing problems, **0 new issues** from migration
+- `npm run typecheck`: Pre-existing errors only, canonical components type-safe
+
+**Notes:**
+- First Settings page migration to canonical App* components complete
+- All overlay behavior preserved (open/close, form state, API calls unchanged)
+- Ready for additional page migrations using same pattern
+
+---
+
 ## 2025-10-01 - Phase 1-2: UX Standards & Design Tokens
 
 **Files Modified:**

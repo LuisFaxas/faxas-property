@@ -32,22 +32,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DataTable } from '@/components/ui/data-table';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  AppDialog,
+  AppDialogContent,
+  AppDialogDescription,
+  AppDialogFooter,
+  AppDialogHeader,
+  AppDialogTitle,
+  AppDialogTrigger,
+} from '@/components/ui/app-dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  AppDropdownMenu,
+  AppDropdownMenuContent,
+  AppDropdownMenuItem,
+  AppDropdownMenuLabel,
+  AppDropdownMenuSeparator,
+  AppDropdownMenuTrigger,
+} from '@/components/ui/app-menu';
 import {
   Select,
   SelectContent,
@@ -55,16 +55,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
@@ -407,16 +397,16 @@ export default function AdminSettingsPage() {
         const project = row.original;
         
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <AppDropdownMenu>
+            <AppDropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
                 <span className="sr-only">Open menu</span>
                 <MoreVertical className="h-4 w-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
+            </AppDropdownMenuTrigger>
+            <AppDropdownMenuContent align="end">
+              <AppDropdownMenuLabel>Actions</AppDropdownMenuLabel>
+              <AppDropdownMenuItem
                 onClick={() => {
                   setSelectedProject(project);
                   setProjectForm({
@@ -440,28 +430,28 @@ export default function AdminSettingsPage() {
               >
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => console.log('Clone project:', project.id)}>
+              </AppDropdownMenuItem>
+              <AppDropdownMenuItem onClick={() => console.log('Clone project:', project.id)}>
                 <Copy className="mr-2 h-4 w-4" />
                 Clone
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              </AppDropdownMenuItem>
+              <AppDropdownMenuSeparator />
+              <AppDropdownMenuItem
                 onClick={() => handleArchiveProject(project.id)}
                 disabled={project.status === 'ARCHIVED'}
               >
                 <Archive className="mr-2 h-4 w-4" />
                 Archive
-              </DropdownMenuItem>
-              <DropdownMenuItem 
+              </AppDropdownMenuItem>
+              <AppDropdownMenuItem
                 onClick={() => setDeleteProjectId(project.id)}
                 className="text-red-600"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </AppDropdownMenuItem>
+            </AppDropdownMenuContent>
+          </AppDropdownMenu>
         );
       },
     },
@@ -526,20 +516,20 @@ export default function AdminSettingsPage() {
                       Initialize Miami Duplex
                     </Button>
                   )}
-                  <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                    <DialogTrigger asChild>
+                  <AppDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                    <AppDialogTrigger asChild>
                     <Button className="bg-accent-500 hover:bg-accent-600">
                       <Plus className="mr-2 h-4 w-4" />
                       New Project
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Create New Project</DialogTitle>
-                      <DialogDescription>
+                  </AppDialogTrigger>
+                  <AppDialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
+                    <AppDialogHeader>
+                      <AppDialogTitle>Create New Project</AppDialogTitle>
+                      <AppDialogDescription>
                         Enter the details for your new construction project
-                      </DialogDescription>
-                    </DialogHeader>
+                      </AppDialogDescription>
+                    </AppDialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -712,20 +702,20 @@ export default function AdminSettingsPage() {
                         </div>
                       </div>
                     </div>
-                    <DialogFooter>
+                    <AppDialogFooter>
                       <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                         Cancel
                       </Button>
-                      <Button 
+                      <Button
                         onClick={handleCreateProject}
                         disabled={!projectForm.name}
                         className="bg-accent-500 hover:bg-accent-600"
                       >
                         Create Project
                       </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    </AppDialogFooter>
+                  </AppDialogContent>
+                </AppDialog>
                 </div>
               </div>
             </CardHeader>
@@ -807,14 +797,14 @@ export default function AdminSettingsPage() {
       </Tabs>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
-            <DialogDescription>
+      <AppDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <AppDialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
+          <AppDialogHeader>
+            <AppDialogTitle>Edit Project</AppDialogTitle>
+            <AppDialogDescription>
               Update the project details
-            </DialogDescription>
-          </DialogHeader>
+            </AppDialogDescription>
+          </AppDialogHeader>
           <div className="grid gap-4 py-4">
             {/* Same form fields as create dialog */}
             <div className="grid grid-cols-2 gap-4">
@@ -988,42 +978,42 @@ export default function AdminSettingsPage() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <AppDialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleEditProject}
               disabled={!projectForm.name}
               className="bg-accent-500 hover:bg-accent-600"
             >
               Save Changes
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </AppDialogFooter>
+        </AppDialogContent>
+      </AppDialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteProjectId} onOpenChange={() => setDeleteProjectId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+      <AppDialog open={!!deleteProjectId} onOpenChange={() => setDeleteProjectId(null)}>
+        <AppDialogContent size="sm">
+          <AppDialogHeader>
+            <AppDialogTitle>Are you absolutely sure?</AppDialogTitle>
+            <AppDialogDescription>
               This action cannot be undone. This will permanently delete the project
               and all associated data including tasks, budget items, and documents.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+            </AppDialogDescription>
+          </AppDialogHeader>
+          <AppDialogFooter>
+            <Button variant="outline" onClick={() => setDeleteProjectId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
               onClick={() => deleteProjectId && handleDeleteProject(deleteProjectId)}
-              className="bg-red-600 hover:bg-red-700"
             >
               Delete Project
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </AppDialogFooter>
+        </AppDialogContent>
+      </AppDialog>
       </div>
     </PageShell>
   );
